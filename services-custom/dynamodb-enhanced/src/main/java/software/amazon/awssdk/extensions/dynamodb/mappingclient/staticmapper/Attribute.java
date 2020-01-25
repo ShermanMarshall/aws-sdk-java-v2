@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class Attribute<T> {
         this.attributeValueType = attributeValueType;
     }
 
-    public static <T, R> AttributeSupplier<T> of(
+    public static <T, R> AttributeSupplier<T> create(
         String attributeName,
         Function<T, R> getAttributeMethod,
         BiConsumer<T, R> updateItemMethod,
@@ -78,7 +78,7 @@ public class Attribute<T> {
         return new AttributeSupplier<>(attributeName,
                                        getAttributeValueWithTransform,
                                        updateItemWithTransform,
-                                       attributeType.getAttributeValueType());
+                                       attributeType.attributeValueType());
     }
 
     /**
@@ -112,19 +112,19 @@ public class Attribute<T> {
             attributeValueType);
     }
 
-    String getAttributeName() {
+    String attributeName() {
         return attributeName;
     }
 
-    Function<T, AttributeValue> getGetAttributeMethod() {
+    Function<T, AttributeValue> attributeGetterMethod() {
         return getAttributeMethod;
     }
 
-    BiConsumer<T, AttributeValue> getUpdateItemMethod() {
+    BiConsumer<T, AttributeValue> updateItemMethod() {
         return updateItemMethod;
     }
 
-    StaticTableMetadata getTableMetadata() {
+    StaticTableMetadata tableMetadata() {
         return tableMetadata;
     }
 

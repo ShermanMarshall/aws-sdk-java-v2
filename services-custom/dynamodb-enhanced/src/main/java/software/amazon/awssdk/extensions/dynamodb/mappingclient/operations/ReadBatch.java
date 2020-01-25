@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -26,48 +26,48 @@ import java.util.stream.Stream;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.BatchableReadOperation;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTableResource;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableMetadata;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.KeysAndAttributes;
 
 @SdkPublicApi
 public class ReadBatch<T> {
-    private final MappedTable<T> mappedTable;
+    private final MappedTableResource<T> mappedTableResource;
     private final Collection<BatchableReadOperation> readOperations;
 
-    private ReadBatch(MappedTable<T> mappedTable, Collection<BatchableReadOperation> readOperations) {
-        this.mappedTable = mappedTable;
+    private ReadBatch(MappedTableResource<T> mappedTableResource, Collection<BatchableReadOperation> readOperations) {
+        this.mappedTableResource = mappedTableResource;
         this.readOperations = readOperations;
     }
 
-    public static <T> ReadBatch<T> of(MappedTable<T> mappedTable,
+    public static <T> ReadBatch<T> create(MappedTableResource<T> mappedTableResource,
                                       Collection<BatchableReadOperation> readOperations) {
-        return new ReadBatch<>(mappedTable, readOperations);
+        return new ReadBatch<>(mappedTableResource, readOperations);
     }
 
-    public static <T> ReadBatch<T> of(MappedTable<T> mappedTable,
+    public static <T> ReadBatch<T> create(MappedTableResource<T> mappedTableResource,
                                       BatchableReadOperation... readOperations) {
-        return new ReadBatch<>(mappedTable, Arrays.asList(readOperations));
+        return new ReadBatch<>(mappedTableResource, Arrays.asList(readOperations));
     }
 
     void addReadRequestsToMap(Map<String, KeysAndAttributes> readRequestMap) {
         KeysAndAttributes newKeysAndAttributes = generateKeysAndAttributes();
-        KeysAndAttributes existingKeysAndAttributes = readRequestMap.get(getTableName());
+        KeysAndAttributes existingKeysAndAttributes = readRequestMap.get(tableName());
 
         if (existingKeysAndAttributes == null) {
-            readRequestMap.put(getTableName(), newKeysAndAttributes);
+            readRequestMap.put(tableName(), newKeysAndAttributes);
             return;
         }
 
         KeysAndAttributes mergedKeysAndAttributes = mergeKeysAndAttributes(existingKeysAndAttributes,
                                                                            newKeysAndAttributes);
 
-        readRequestMap.put(getTableName(), mergedKeysAndAttributes);
+        readRequestMap.put(tableName(), mergedKeysAndAttributes);
     }
 
-    String getTableName() {
-        return mappedTable.getTableName();
+    String tableName() {
+        return mappedTableResource.tableName();
     }
 
     private KeysAndAttributes generateKeysAndAttributes() {
@@ -81,18 +81,18 @@ public class ReadBatch<T> {
             readOperations.stream()
                           .peek(operation -> {
                               if (firstRecord.getAndSet(false)) {
-                                  consistentRead.set(operation.getConsistentRead());
+                                  consistentRead.set(operation.consistentRead());
                               } else {
-                                  if (!compareNullableBooleans(consistentRead.get(), operation.getConsistentRead())) {
+                                  if (!compareNullableBooleans(consistentRead.get(), operation.consistentRead())) {
                                       throw new IllegalArgumentException("All batchable read requests for the same "
                                                                          + "table must have the same 'consistentRead' "
                                                                          + "setting.");
                                   }
                               }
                           })
-                          .map(BatchableReadOperation::getKey)
-                          .map(key -> key.getKeyMap(mappedTable.getTableSchema(),
-                                                    TableMetadata.getPrimaryIndexName()))
+                          .map(BatchableReadOperation::key)
+                          .map(key -> key.keyMap(mappedTableResource.tableSchema(),
+                                                 TableMetadata.primaryIndexName()))
                           .collect(Collectors.toList());
 
         return KeysAndAttributes.builder()
@@ -101,11 +101,11 @@ public class ReadBatch<T> {
                                 .build();
     }
 
-    public MappedTable<T> getMappedTable() {
-        return mappedTable;
+    public MappedTableResource<T> mappedTableResource() {
+        return mappedTableResource;
     }
 
-    public Collection<BatchableReadOperation> getReadOperations() {
+    public Collection<BatchableReadOperation> readOperations() {
         return readOperations;
     }
 
@@ -120,7 +120,9 @@ public class ReadBatch<T> {
 
         ReadBatch<?> readBatch = (ReadBatch<?>) o;
 
-        if (mappedTable != null ? ! mappedTable.equals(readBatch.mappedTable) : readBatch.mappedTable != null) {
+        if (mappedTableResource != null ? !mappedTableResource.equals(readBatch.mappedTableResource) :
+            readBatch.mappedTableResource != null) {
+
             return false;
         }
         return readOperations != null ? readOperations.equals(readBatch.readOperations) : readBatch.readOperations == null;
@@ -128,7 +130,7 @@ public class ReadBatch<T> {
 
     @Override
     public int hashCode() {
-        int result = mappedTable != null ? mappedTable.hashCode() : 0;
+        int result = mappedTableResource != null ? mappedTableResource.hashCode() : 0;
         result = 31 * result + (readOperations != null ? readOperations.hashCode() : 0);
         return result;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * An object that represents a key that can be used to either identify a specific record or form part of a query
  * conditional. Keys are literal and hence not typed, and can be re-used in commands for different modelled types if
  * the literal values are to be the same.
- *
+ * <p>
  * A key will always have a single partition key value associated with it, and optionally will have a sort key value.
  * The names of the keys themselves are not part of this object.
  */
@@ -46,7 +46,7 @@ public class Key {
      * @param partitionKeyValue A DynamoDb {@link AttributeValue} that is the literal value of the partition key.
      * @return A key.
      */
-    public static Key of(AttributeValue partitionKeyValue) {
+    public static Key create(AttributeValue partitionKeyValue) {
         return new Key(partitionKeyValue, null);
     }
 
@@ -56,7 +56,7 @@ public class Key {
      * @param sortKeyValue A DynamoDb {@link AttributeValue} that is the literal value of the sort key.
      * @return A key.
      */
-    public static Key of(AttributeValue partitionKeyValue, AttributeValue sortKeyValue) {
+    public static Key create(AttributeValue partitionKeyValue, AttributeValue sortKeyValue) {
         return new Key(partitionKeyValue, sortKeyValue);
     }
 
@@ -66,12 +66,12 @@ public class Key {
      * @param index The name of the index to use when determining the key attribute names.
      * @return A map of attribute names to {@link AttributeValue}.
      */
-    public Map<String, AttributeValue> getKeyMap(TableSchema<?> tableSchema, String index) {
+    public Map<String, AttributeValue> keyMap(TableSchema<?> tableSchema, String index) {
         Map<String, AttributeValue> keyMap = new HashMap<>();
-        keyMap.put(tableSchema.getTableMetadata().getIndexPartitionKey(index), partitionKeyValue);
+        keyMap.put(tableSchema.tableMetadata().indexPartitionKey(index), partitionKeyValue);
 
         if (sortKeyValue != null) {
-            keyMap.put(tableSchema.getTableMetadata().getIndexSortKey(index).orElseThrow(
+            keyMap.put(tableSchema.tableMetadata().indexSortKey(index).orElseThrow(
                 () -> new IllegalArgumentException("A sort key value was supplied for an index that does not support "
                                                    + "one. Index: " + index)), sortKeyValue);
         }
@@ -83,7 +83,7 @@ public class Key {
      * Get the literal value of the partition key stored in this object.
      * @return An {@link AttributeValue} representing the literal value of the partition key.
      */
-    public AttributeValue getPartitionKeyValue() {
+    public AttributeValue partitionKeyValue() {
         return partitionKeyValue;
     }
 
@@ -92,7 +92,7 @@ public class Key {
      * @return An optional {@link AttributeValue} representing the literal value of the sort key, or empty if there
      * is no sort key value in this Key.
      */
-    public Optional<AttributeValue> getSortKeyValue() {
+    public Optional<AttributeValue> sortKeyValue() {
         return Optional.ofNullable(sortKeyValue);
     }
 
@@ -101,8 +101,8 @@ public class Key {
      * @param tableSchema A tableschema to determine the key attribute names from.
      * @return A map of attribute names to {@link AttributeValue}.
      */
-    public Map<String, AttributeValue> getPrimaryKeyMap(TableSchema<?> tableSchema) {
-        return getKeyMap(tableSchema, TableMetadata.getPrimaryIndexName());
+    public Map<String, AttributeValue> primaryKeyMap(TableSchema<?> tableSchema) {
+        return keyMap(tableSchema, TableMetadata.primaryIndexName());
     }
 
     @Override

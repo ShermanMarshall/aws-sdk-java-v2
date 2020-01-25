@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ public enum AttributeValueType {
         this.scalarAttributeType = scalarAttributeType;
     }
 
-    public ScalarAttributeType getScalarAttributeType() {
+    public ScalarAttributeType scalarAttributeType() {
         return scalarAttributeType;
     }
 }

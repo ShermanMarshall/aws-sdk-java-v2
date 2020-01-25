@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -41,8 +41,8 @@ public class AttributeTagTest {
 
     private static class KeyAttributeTag extends AttributeTag {
         @Override
-        protected Map<String, Object> getCustomMetadataForAttribute(String attributeName,
-                                                                    AttributeValueType attributeValueType) {
+        protected Map<String, Object> customMetadataForAttribute(String attributeName,
+                                                                 AttributeValueType attributeValueType) {
             return CUSTOM_METADATA;
         }
 
@@ -55,8 +55,8 @@ public class AttributeTagTest {
     private static class NonKeyAttributeTag extends AttributeTag {
 
         @Override
-        protected Map<String, Object> getCustomMetadataForAttribute(String attributeName,
-                                                                    AttributeValueType attributeValueType) {
+        protected Map<String, Object> customMetadataForAttribute(String attributeName,
+                                                                 AttributeValueType attributeValueType) {
             return CUSTOM_METADATA;
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ import java.util.Iterator;
 import java.util.function.Function;
 
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 
+// TODO: Consider moving to SDK core
 @SdkInternalApi
-public class TransformIterable<T, R> implements Iterable<R> {
+public class TransformIterable<T, R> implements SdkIterable<R> {
     private final Iterable<T> wrappedIterable;
     private final Function<T, R> transformFunction;
 
@@ -30,12 +32,12 @@ public class TransformIterable<T, R> implements Iterable<R> {
         this.transformFunction = transformFunction;
     }
 
-    public static <T, R> TransformIterable<T, R> of(Iterable<T> iterable, Function<T, R> transformFunction) {
+    public static <T, R> TransformIterable<T, R> of(SdkIterable<T> iterable, Function<T, R> transformFunction) {
         return new TransformIterable<>(iterable, transformFunction);
     }
 
     @Override
     public Iterator<R> iterator() {
-        return TransformIterator.of(wrappedIterable.iterator(), transformFunction);
+        return TransformIterator.create(wrappedIterable.iterator(), transformFunction);
     }
 }

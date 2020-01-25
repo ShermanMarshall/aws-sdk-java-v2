@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ public class ChainMapperExtension implements MapperExtension {
      * @param mapperExtensions A list of {@link MapperExtension} to chain together.
      * @return A constructed {@link ChainMapperExtension} object.
      */
-    public static ChainMapperExtension of(MapperExtension... mapperExtensions) {
+    public static ChainMapperExtension create(MapperExtension... mapperExtensions) {
         return new ChainMapperExtension(Arrays.asList(mapperExtensions));
     }
 
@@ -91,17 +91,17 @@ public class ChainMapperExtension implements MapperExtension {
                                                                         operationContext,
                                                                         tableMetadata);
 
-            if (writeModification.getTransformedItem() != null) {
-                transformedItem.set(writeModification.getTransformedItem());
+            if (writeModification.transformedItem() != null) {
+                transformedItem.set(writeModification.transformedItem());
             }
 
-            if (writeModification.getAdditionalConditionalExpression() != null) {
+            if (writeModification.additionalConditionalExpression() != null) {
                 if (conditionalExpression.get() == null) {
-                    conditionalExpression.set(writeModification.getAdditionalConditionalExpression());
+                    conditionalExpression.set(writeModification.additionalConditionalExpression());
                 } else {
                     conditionalExpression.set(
                         Expression.coalesce(conditionalExpression.get(),
-                                            writeModification.getAdditionalConditionalExpression(),
+                                            writeModification.additionalConditionalExpression(),
                                             " AND "));
                 }
             }
@@ -131,8 +131,8 @@ public class ChainMapperExtension implements MapperExtension {
             Map<String, AttributeValue> itemToTransform = transformedItem.get() == null ? item : transformedItem.get();
             ReadModification readModification = extension.afterRead(itemToTransform, operationContext, tableMetadata);
 
-            if (readModification.getTransformedItem() != null) {
-                transformedItem.set(readModification.getTransformedItem());
+            if (readModification.transformedItem() != null) {
+                transformedItem.set(readModification.transformedItem());
             }
         });
 

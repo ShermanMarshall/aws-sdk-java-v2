@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,18 +23,18 @@ import org.junit.Test;
 public class OperationContextTest {
     @Test
     public void createWithTableNameAndIndexName() {
-        OperationContext context = OperationContext.of("table_name", "index_name");
+        OperationContext context = OperationContext.create("table_name", "index_name");
 
-        assertThat(context.getTableName(), is("table_name"));
-        assertThat(context.getIndexName(), is("index_name"));
+        assertThat(context.tableName(), is("table_name"));
+        assertThat(context.indexName(), is("index_name"));
     }
 
     @Test
     public void createWithTableName() {
-        OperationContext context = OperationContext.of("table_name");
+        OperationContext context = OperationContext.create("table_name");
 
-        assertThat(context.getTableName(), is("table_name"));
-        assertThat(context.getIndexName(), is(TableMetadata.getPrimaryIndexName()));
+        assertThat(context.tableName(), is("table_name"));
+        assertThat(context.indexName(), is(TableMetadata.primaryIndexName()));
     }
 
 }

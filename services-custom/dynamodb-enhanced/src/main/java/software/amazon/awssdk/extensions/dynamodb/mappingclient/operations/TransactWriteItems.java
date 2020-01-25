@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@ package software.amazon.awssdk.extensions.dynamodb.mappingclient.operations;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.DatabaseOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MapperExtension;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
@@ -38,11 +40,11 @@ public class TransactWriteItems
         this.writeTransactions = writeTransactions;
     }
 
-    public static TransactWriteItems of(List<WriteTransaction> writeTransactions) {
+    public static TransactWriteItems create(List<WriteTransaction> writeTransactions) {
         return new TransactWriteItems(writeTransactions);
     }
 
-    public static TransactWriteItems of(WriteTransaction... writeTransactions) {
+    public static TransactWriteItems create(WriteTransaction... writeTransactions) {
         return new TransactWriteItems(Arrays.asList(writeTransactions));
     }
 
@@ -71,13 +73,20 @@ public class TransactWriteItems
     }
 
     @Override
-    public Function<TransactWriteItemsRequest, TransactWriteItemsResponse> getServiceCall(
+    public Function<TransactWriteItemsRequest, TransactWriteItemsResponse> serviceCall(
         DynamoDbClient dynamoDbClient) {
 
         return dynamoDbClient::transactWriteItems;
     }
 
-    public List<WriteTransaction> getWriteTransactions() {
+    @Override
+    public Function<TransactWriteItemsRequest, CompletableFuture<TransactWriteItemsResponse>> asyncServiceCall(
+        DynamoDbAsyncClient dynamoDbAsyncClient) {
+
+        return dynamoDbAsyncClient::transactWriteItems;
+    }
+
+    public List<WriteTransaction> writeTransactions() {
         return writeTransactions;
     }
 

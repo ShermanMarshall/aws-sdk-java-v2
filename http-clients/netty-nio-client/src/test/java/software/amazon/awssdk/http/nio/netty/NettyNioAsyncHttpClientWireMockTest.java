@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -111,6 +111,32 @@ public class NettyNioAsyncHttpClientWireMockTest {
     @AfterClass
     public static void tearDown() throws Exception {
         client.close();
+    }
+
+    @Test
+    public void defaultConnectionIdleTimeout() {
+        try (NettyNioAsyncHttpClient client = (NettyNioAsyncHttpClient) NettyNioAsyncHttpClient.builder().build()) {
+            assertThat(client.configuration().idleTimeoutMillis()).isEqualTo(5000);
+        }
+    }
+
+    @Test
+    public void overrideConnectionIdleTimeout_shouldHonor() {
+        try (NettyNioAsyncHttpClient client = (NettyNioAsyncHttpClient) NettyNioAsyncHttpClient.builder()
+                                                                                               .connectionMaxIdleTime(Duration.ofMillis(1000))
+                                                                                               .build()) {
+            assertThat(client.configuration().idleTimeoutMillis()).isEqualTo(1000);
+        }
+    }
+
+    @Test
+    public void invalidMaxPendingConnectionAcquireConfig_shouldPropagateException() {
+        try (SdkAsyncHttpClient customClient = NettyNioAsyncHttpClient.builder()
+                                                                 .maxConcurrency(1)
+                                                                 .maxPendingConnectionAcquires(0)
+                                                                 .build()) {
+            assertThatThrownBy(() -> makeSimpleRequest(customClient)).hasMessageContaining("java.lang.IllegalArgumentException: maxPendingAcquires: 0 (expected: >= 1)");
+        }
     }
 
     @Test

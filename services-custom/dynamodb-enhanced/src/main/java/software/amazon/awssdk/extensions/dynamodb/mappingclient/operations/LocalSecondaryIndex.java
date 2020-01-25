@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -28,17 +28,17 @@ public class LocalSecondaryIndex {
         this.projection = projection;
     }
 
-    public static LocalSecondaryIndex of(String indexName,
-                                         Projection projection) {
+    public static LocalSecondaryIndex create(String indexName,
+                                             Projection projection) {
 
         return new LocalSecondaryIndex(indexName, projection);
     }
 
-    public String getIndexName() {
+    public String indexName() {
         return indexName;
     }
 
-    public Projection getProjection() {
+    public Projection projection() {
         return projection;
     }
 

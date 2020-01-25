@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import static software.amazon.awssdk.extensions.dynamodb.mappingclient.Attribute
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.AttributeValues.stringValue;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.primaryPartitionKey;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.primarySortKey;
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.integerNumber;
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.string;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.integerNumberAttribute;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.stringAttribute;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,13 +44,15 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Page;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.core.DynamoDbMappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.CreateTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.PutItem;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.Scan;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.StaticTableSchema;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest;
 
-public class BasicScanTest extends LocalDynamoDbTestBase {
+public class BasicScanTest extends LocalDynamoDbSyncTestBase {
     private static class Record {
         private String id;
         private Integer sort;
@@ -89,31 +91,31 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
     }
 
     private static final TableSchema<Record> TABLE_SCHEMA =
-        TableSchema.builder()
-                   .newItemSupplier(Record::new)
-                   .attributes(
-                       string("id", Record::getId, Record::setId).as(primaryPartitionKey()),
-                       integerNumber("sort", Record::getSort, Record::setSort).as(primarySortKey()))
-        .build();
+        StaticTableSchema.builder()
+                         .newItemSupplier(Record::new)
+                         .attributes(
+                             stringAttribute("id", Record::getId, Record::setId).as(primaryPartitionKey()),
+                             integerNumberAttribute("sort", Record::getSort, Record::setSort).as(primarySortKey()))
+                         .build();
 
     private static final List<Record> RECORDS =
         IntStream.range(0, 10)
                  .mapToObj(i -> new Record().setId("id-value").setSort(i))
                  .collect(Collectors.toList());
 
-    private MappedDatabase mappedDatabase = MappedDatabase.builder()
-                                                          .dynamoDbClient(getDynamoDbClient())
-                                                          .build();
+    private MappedDatabase mappedDatabase = DynamoDbMappedDatabase.builder()
+                                                                  .dynamoDbClient(getDynamoDbClient())
+                                                                  .build();
 
     private MappedTable<Record> mappedTable = mappedDatabase.table(getConcreteTableName("table-name"), TABLE_SCHEMA);
 
     private void insertRecords() {
-        RECORDS.forEach(record -> mappedTable.execute(PutItem.of(record)));
+        RECORDS.forEach(record -> mappedTable.execute(PutItem.create(record)));
     }
 
     @Before
     public void createTable() {
-        mappedTable.execute(CreateTable.of(getDefaultProvisionedThroughput()));
+        mappedTable.execute(CreateTable.create(getDefaultProvisionedThroughput()));
     }
 
     @After
@@ -133,8 +135,8 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page.getItems(), is(RECORDS));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(RECORDS));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -155,9 +157,9 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page.getItems(),
+        assertThat(page.items(),
                    is(RECORDS.stream().filter(r -> r.sort >= 3 && r.sort <= 5).collect(Collectors.toList())));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -172,12 +174,12 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
         Page<Record> page3 = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page1.getItems(), is(RECORDS.subList(0, 5)));
-        assertThat(page1.getLastEvaluatedKey(), is(getKeyMap(4)));
-        assertThat(page2.getItems(), is(RECORDS.subList(5, 10)));
-        assertThat(page2.getLastEvaluatedKey(), is(getKeyMap(9)));
-        assertThat(page3.getItems(), is(empty()));
-        assertThat(page3.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page1.items(), is(RECORDS.subList(0, 5)));
+        assertThat(page1.lastEvaluatedKey(), is(getKeyMap(4)));
+        assertThat(page2.items(), is(RECORDS.subList(5, 10)));
+        assertThat(page2.lastEvaluatedKey(), is(getKeyMap(9)));
+        assertThat(page3.items(), is(empty()));
+        assertThat(page3.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -186,8 +188,8 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
-        assertThat(page.getItems(), is(empty()));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(empty()));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -199,8 +201,8 @@ public class BasicScanTest extends LocalDynamoDbTestBase {
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
-        assertThat(page.getItems(), is(RECORDS.subList(8, 10)));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(RECORDS.subList(8, 10)));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     private Map<String, AttributeValue> getKeyMap(int sort) {

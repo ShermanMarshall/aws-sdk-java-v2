@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class ConditionCheck<T> implements TransactableWriteOperation<T> {
         this.conditionExpression = conditionExpression;
     }
 
-    public static <T> ConditionCheck<T> of(Key key, Expression conditionExpression) {
+    public static <T> ConditionCheck<T> create(Key key, Expression conditionExpression) {
         return new ConditionCheck<>(key, conditionExpression);
     }
 
@@ -53,11 +53,11 @@ public class ConditionCheck<T> implements TransactableWriteOperation<T> {
         software.amazon.awssdk.services.dynamodb.model.ConditionCheck conditionCheck =
             software.amazon.awssdk.services.dynamodb.model.ConditionCheck
                 .builder()
-                .tableName(operationContext.getTableName())
-                .key(key.getKeyMap(tableSchema, operationContext.getIndexName()))
-                .conditionExpression(conditionExpression.getExpression())
-                .expressionAttributeNames(conditionExpression.getExpressionNames())
-                .expressionAttributeValues(conditionExpression.getExpressionValues())
+                .tableName(operationContext.tableName())
+                .key(key.keyMap(tableSchema, operationContext.indexName()))
+                .conditionExpression(conditionExpression.expression())
+                .expressionAttributeNames(conditionExpression.expressionNames())
+                .expressionAttributeValues(conditionExpression.expressionValues())
                 .build();
 
         return TransactWriteItem.builder()
@@ -65,11 +65,11 @@ public class ConditionCheck<T> implements TransactableWriteOperation<T> {
                                 .build();
     }
 
-    public Key getKey() {
+    public Key key() {
         return key;
     }
 
-    public Expression getConditionExpression() {
+    public Expression conditionExpression() {
         return conditionExpression;
     }
 

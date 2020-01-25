@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,19 +27,19 @@ public class OperationContext {
         this.indexName = indexName;
     }
 
-    public static OperationContext of(String tableName, String indexName) {
+    public static OperationContext create(String tableName, String indexName) {
         return new OperationContext(tableName, indexName);
     }
 
-    public static OperationContext of(String tableName) {
-        return new OperationContext(tableName, TableMetadata.getPrimaryIndexName());
+    public static OperationContext create(String tableName) {
+        return new OperationContext(tableName, TableMetadata.primaryIndexName());
     }
 
-    public String getTableName() {
+    public String tableName() {
         return tableName;
     }
 
-    public String getIndexName() {
+    public String indexName() {
         return indexName;
     }
 

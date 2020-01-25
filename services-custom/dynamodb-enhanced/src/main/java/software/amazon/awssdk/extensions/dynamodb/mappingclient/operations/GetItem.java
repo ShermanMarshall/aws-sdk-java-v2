@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package software.amazon.awssdk.extensions.dynamodb.mappingclient.operations;
 
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.core.Utils.readAndTransformSingleItem;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
@@ -28,6 +29,7 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableMetadata;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TransactableReadOperation;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.Get;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
@@ -47,7 +49,7 @@ public class GetItem<T> implements TableOperation<T, GetItemRequest, GetItemResp
         this.consistentRead = consistentRead;
     }
 
-    public static <T> GetItem<T> of(Key key) {
+    public static <T> GetItem<T> create(Key key) {
         return new GetItem<>(key, null);
     }
 
@@ -60,12 +62,12 @@ public class GetItem<T> implements TableOperation<T, GetItemRequest, GetItemResp
     }
 
     @Override
-    public Boolean getConsistentRead() {
+    public Boolean consistentRead() {
         return this.consistentRead;
     }
 
     @Override
-    public Key getKey() {
+    public Key key() {
         return this.key;
     }
 
@@ -73,13 +75,13 @@ public class GetItem<T> implements TableOperation<T, GetItemRequest, GetItemResp
     public GetItemRequest generateRequest(TableSchema<T> tableSchema,
                                           OperationContext context,
                                           MapperExtension mapperExtension) {
-        if (!TableMetadata.getPrimaryIndexName().equals(context.getIndexName())) {
+        if (!TableMetadata.primaryIndexName().equals(context.indexName())) {
             throw new IllegalArgumentException("GetItem cannot be executed against a secondary index.");
         }
 
         return GetItemRequest.builder()
-                             .tableName(context.getTableName())
-                             .key(key.getKeyMap(tableSchema, context.getIndexName()))
+                             .tableName(context.tableName())
+                             .key(key.keyMap(tableSchema, context.indexName()))
                              .consistentRead(consistentRead)
                              .build();
     }
@@ -93,8 +95,15 @@ public class GetItem<T> implements TableOperation<T, GetItemRequest, GetItemResp
     }
 
     @Override
-    public Function<GetItemRequest, GetItemResponse> getServiceCall(DynamoDbClient dynamoDbClient) {
+    public Function<GetItemRequest, GetItemResponse> serviceCall(DynamoDbClient dynamoDbClient) {
         return dynamoDbClient::getItem;
+    }
+
+    @Override
+    public Function<GetItemRequest, CompletableFuture<GetItemResponse>> asyncServiceCall(
+        DynamoDbAsyncClient dynamoDbAsyncClient) {
+
+        return dynamoDbAsyncClient::getItem;
     }
 
     @Override
@@ -103,8 +112,8 @@ public class GetItem<T> implements TableOperation<T, GetItemRequest, GetItemResp
                                                    MapperExtension mapperExtension) {
         return TransactGetItem.builder()
                               .get(Get.builder()
-                                      .tableName(operationContext.getTableName())
-                                      .key(key.getKeyMap(tableSchema, operationContext.getIndexName()))
+                                      .tableName(operationContext.tableName())
+                                      .key(key.keyMap(tableSchema, operationContext.indexName()))
                                       .build())
                               .build();
     }

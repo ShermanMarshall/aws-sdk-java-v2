@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.DatabaseOperatio
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MapperExtension;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.OperationContext;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemResponse;
@@ -50,11 +52,11 @@ public class BatchWriteItem
         this.writeBatches = writeBatches;
     }
 
-    public static BatchWriteItem of(Collection<WriteBatch> writeBatches) {
+    public static BatchWriteItem create(Collection<WriteBatch> writeBatches) {
         return new BatchWriteItem(writeBatches);
     }
 
-    public static BatchWriteItem of(WriteBatch... writeBatches) {
+    public static BatchWriteItem create(WriteBatch... writeBatches) {
         return new BatchWriteItem(Arrays.asList(writeBatches));
     }
 
@@ -81,11 +83,18 @@ public class BatchWriteItem
     }
 
     @Override
-    public Function<BatchWriteItemRequest, BatchWriteItemResponse> getServiceCall(DynamoDbClient dynamoDbClient) {
+    public Function<BatchWriteItemRequest, BatchWriteItemResponse> serviceCall(DynamoDbClient dynamoDbClient) {
         return dynamoDbClient::batchWriteItem;
     }
 
-    public Collection<WriteBatch> getWriteBatches() {
+    @Override
+    public Function<BatchWriteItemRequest, CompletableFuture<BatchWriteItemResponse>> asyncServiceCall(
+        DynamoDbAsyncClient dynamoDbAsyncClient) {
+
+        return dynamoDbAsyncClient::batchWriteItem;
+    }
+
+    public Collection<WriteBatch> writeBatches() {
         return writeBatches;
     }
 
@@ -133,7 +142,7 @@ public class BatchWriteItem
 
         public <T> List<T> unprocessedPutItemsForTable(MappedTable<T> mappedTable) {
             List<WriteRequest> writeRequests =
-                unprocessedRequests.getOrDefault(mappedTable.getTableName(),
+                unprocessedRequests.getOrDefault(mappedTable.tableName(),
                                                  Collections.emptyList());
 
             return writeRequests.stream()
@@ -141,22 +150,22 @@ public class BatchWriteItem
                                 .map(WriteRequest::putRequest)
                                 .map(PutRequest::item)
                                 .map(item -> readAndTransformSingleItem(item,
-                                                                        mappedTable.getTableSchema(),
-                                                                        OperationContext.of(mappedTable.getTableName()),
-                                                                        mappedTable.getMapperExtension()))
+                                                                        mappedTable.tableSchema(),
+                                                                        OperationContext.create(mappedTable.tableName()),
+                                                                        mappedTable.mapperExtension()))
                                 .collect(Collectors.toList());
         }
 
         public <T> List<T> unprocessedDeleteItemsForTable(MappedTable<T> mappedTable) {
             List<WriteRequest> writeRequests =
-                unprocessedRequests.getOrDefault(mappedTable.getTableName(),
+                unprocessedRequests.getOrDefault(mappedTable.tableName(),
                                                  Collections.emptyList());
 
             return writeRequests.stream()
                                 .filter(writeRequest -> writeRequest.deleteRequest() != null)
                                 .map(WriteRequest::deleteRequest)
                                 .map(DeleteRequest::key)
-                                .map(itemMap -> mappedTable.getTableSchema().mapToItem(itemMap))
+                                .map(itemMap -> mappedTable.tableSchema().mapToItem(itemMap))
                                 .collect(Collectors.toList());
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ public class CommonOperationTest {
     @Before
     public void stubSpy() {
         when(spyCommonOperation.generateRequest(any(), any(), any())).thenReturn(FAKE_REQUEST);
-        when(spyCommonOperation.getServiceCall(any())).thenReturn(s -> {
+        when(spyCommonOperation.serviceCall(any())).thenReturn(s -> {
             if (!FAKE_REQUEST.equals(s)) {
                 throw new RuntimeException("Did not receive expected request");
             }
@@ -64,7 +64,7 @@ public class CommonOperationTest {
 
     @Test
     public void execute_defaultImplementation_behavesCorrectlyAndReturnsCorrectResult() {
-        OperationContext operationContext = OperationContext.of(FAKE_TABLE_NAME, FAKE_INDEX_NAME);
+        OperationContext operationContext = OperationContext.create(FAKE_TABLE_NAME, FAKE_INDEX_NAME);
         String result = spyCommonOperation.execute(FakeItem.getTableSchema(),
                                                    operationContext,
                                                    mockMapperExtension,
@@ -72,7 +72,7 @@ public class CommonOperationTest {
 
         assertThat(result, is(FAKE_RESULT));
         verify(spyCommonOperation).generateRequest(FakeItem.getTableSchema(), operationContext, mockMapperExtension);
-        verify(spyCommonOperation).getServiceCall(mockDynamoDbClient);
+        verify(spyCommonOperation).serviceCall(mockDynamoDbClient);
         verify(spyCommonOperation).transformResponse(FAKE_RESPONSE, FakeItem.getTableSchema(), operationContext,
                                                      mockMapperExtension);
     }

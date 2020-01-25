@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.Assert.assertThat;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import org.junit.Test;
@@ -27,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.functionaltests.models.FakeItem;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -54,7 +56,7 @@ public class TableOperationTest {
         assertThat(fakeTableOperation.lastMapperExtension, sameInstance(mockMapperExtension));
         assertThat(fakeTableOperation.lastTableSchema, sameInstance(FakeItem.getTableSchema()));
         assertThat(fakeTableOperation.lastOperationContext, is(
-            OperationContext.of(FAKE_TABLE_NAME, TableMetadata.getPrimaryIndexName())));
+            OperationContext.create(FAKE_TABLE_NAME, TableMetadata.primaryIndexName())));
     }
 
     private static class FakeTableOperation implements TableOperation<FakeItem, String, String, String> {
@@ -70,7 +72,12 @@ public class TableOperationTest {
         }
 
         @Override
-        public Function<String, String> getServiceCall(DynamoDbClient dynamoDbClient) {
+        public Function<String, String> serviceCall(DynamoDbClient dynamoDbClient) {
+            return null;
+        }
+
+        @Override
+        public Function<String, CompletableFuture<String>> asyncServiceCall(DynamoDbAsyncClient dynamoDbAsyncClient) {
             return null;
         }
 

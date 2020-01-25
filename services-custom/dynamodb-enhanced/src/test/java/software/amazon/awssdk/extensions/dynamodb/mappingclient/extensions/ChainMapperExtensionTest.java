@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.functionaltests.
 public class ChainMapperExtensionTest {
     private static final String TABLE_NAME = "concrete-table-name";
     private static final OperationContext PRIMARY_CONTEXT =
-        OperationContext.of(TABLE_NAME, TableMetadata.getPrimaryIndexName());
+        OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
 
     private static final Map<String, AttributeValue> ATTRIBUTE_VALUES_1 =
         Collections.unmodifiableMap(Collections.singletonMap("key1", AttributeValue.builder().s("1").build()));
@@ -75,7 +75,7 @@ public class ChainMapperExtensionTest {
         Expression expression1 = Expression.builder().expression("one").expressionValues(ATTRIBUTE_VALUES_1).build();
         Expression expression2 = Expression.builder().expression("two").expressionValues(ATTRIBUTE_VALUES_2).build();
         Expression expression3 = Expression.builder().expression("three").expressionValues(ATTRIBUTE_VALUES_3).build();
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         WriteModification writeModification1 = WriteModification.builder()
                                                                 .additionalConditionalExpression(expression1)
                                                                 .transformedItem(fakeItems.get(1))
@@ -100,9 +100,9 @@ public class ChainMapperExtensionTest {
         combinedMap.putAll(ATTRIBUTE_VALUES_2);
         combinedMap.putAll(ATTRIBUTE_VALUES_3);
         Expression expectedExpression =
-            Expression.builder().expression("one AND two AND three").expressionValues(combinedMap).build();
-        assertThat(result.getTransformedItem(), is(fakeItems.get(3)));
-        assertThat(result.getAdditionalConditionalExpression(), is(expectedExpression));
+            Expression.builder().expression("((one) AND (two)) AND (three)").expressionValues(combinedMap).build();
+        assertThat(result.transformedItem(), is(fakeItems.get(3)));
+        assertThat(result.additionalConditionalExpression(), is(expectedExpression));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension1).beforeWrite(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -113,7 +113,7 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void beforeWrite_multipleExtensions_doingNothing() {
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         when(mockExtension1.beforeWrite(anyMap(), any(), any())).thenReturn(WriteModification.builder().build());
         when(mockExtension2.beforeWrite(anyMap(), any(), any())).thenReturn(WriteModification.builder().build());
         when(mockExtension3.beforeWrite(anyMap(), any(), any())).thenReturn(WriteModification.builder().build());
@@ -122,8 +122,8 @@ public class ChainMapperExtensionTest {
                                                          PRIMARY_CONTEXT,
                                                          FakeItem.getTableMetadata());
 
-        assertThat(result.getAdditionalConditionalExpression(), is(nullValue()));
-        assertThat(result.getTransformedItem(), is(nullValue()));
+        assertThat(result.additionalConditionalExpression(), is(nullValue()));
+        assertThat(result.transformedItem(), is(nullValue()));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension1).beforeWrite(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -135,7 +135,7 @@ public class ChainMapperExtensionTest {
     @Test
     public void beforeWrite_multipleExtensions_singleCondition_noTransformations() {
         Expression expression = Expression.builder().expression("one").expressionValues(ATTRIBUTE_VALUES_1).build();
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         WriteModification writeModification1 = WriteModification.builder().build();
         WriteModification writeModification2 = WriteModification.builder()
                                                                 .additionalConditionalExpression(expression)
@@ -153,8 +153,8 @@ public class ChainMapperExtensionTest {
                                                   .expression("one")
                                                   .expressionValues(ATTRIBUTE_VALUES_1)
                                                   .build();
-        assertThat(result.getTransformedItem(), is(nullValue()));
-        assertThat(result.getAdditionalConditionalExpression(), is(expectedExpression));
+        assertThat(result.transformedItem(), is(nullValue()));
+        assertThat(result.additionalConditionalExpression(), is(expectedExpression));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension1).beforeWrite(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -165,7 +165,7 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void beforeWrite_multipleExtensions_noConditions_singleTransformation() {
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         WriteModification writeModification1 = WriteModification.builder().build();
         WriteModification writeModification2 = WriteModification.builder()
                                                                 .transformedItem(fakeItems.get(1))
@@ -179,8 +179,8 @@ public class ChainMapperExtensionTest {
                                                          PRIMARY_CONTEXT,
                                                          FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(fakeItems.get(1)));
-        assertThat(result.getAdditionalConditionalExpression(), is(nullValue()));
+        assertThat(result.transformedItem(), is(fakeItems.get(1)));
+        assertThat(result.additionalConditionalExpression(), is(nullValue()));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension1).beforeWrite(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -191,19 +191,19 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void beforeWrite_noExtensions() {
-        ChainMapperExtension extension = ChainMapperExtension.of();
+        ChainMapperExtension extension = ChainMapperExtension.create();
 
         WriteModification result = extension.beforeWrite(fakeItems.get(0),
                                                          PRIMARY_CONTEXT,
                                                          FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(nullValue()));
-        assertThat(result.getAdditionalConditionalExpression(), is(nullValue()));
+        assertThat(result.transformedItem(), is(nullValue()));
+        assertThat(result.additionalConditionalExpression(), is(nullValue()));
     }
 
     @Test
     public void afterRead_multipleExtensions_multipleTransformations() {
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         ReadModification readModification1 = ReadModification.builder().transformedItem(fakeItems.get(1)).build();
         ReadModification readModification2 = ReadModification.builder().transformedItem(fakeItems.get(2)).build();
         ReadModification readModification3 = ReadModification.builder().transformedItem(fakeItems.get(3)).build();
@@ -213,7 +213,7 @@ public class ChainMapperExtensionTest {
 
         ReadModification result = extension.afterRead(fakeItems.get(0), PRIMARY_CONTEXT,  FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(fakeItems.get(1)));
+        assertThat(result.transformedItem(), is(fakeItems.get(1)));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension3).afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -224,7 +224,7 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void afterRead_multipleExtensions_singleTransformation() {
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         ReadModification readModification1 = ReadModification.builder().build();
         ReadModification readModification2 = ReadModification.builder().transformedItem(fakeItems.get(1)).build();
         ReadModification readModification3 = ReadModification.builder().build();
@@ -234,7 +234,7 @@ public class ChainMapperExtensionTest {
 
         ReadModification result = extension.afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(fakeItems.get(1)));
+        assertThat(result.transformedItem(), is(fakeItems.get(1)));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension3).afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -245,7 +245,7 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void afterRead_multipleExtensions_noTransformations() {
-        ChainMapperExtension extension = ChainMapperExtension.of(mockExtension1, mockExtension2, mockExtension3);
+        ChainMapperExtension extension = ChainMapperExtension.create(mockExtension1, mockExtension2, mockExtension3);
         ReadModification readModification1 = ReadModification.builder().build();
         ReadModification readModification2 = ReadModification.builder().build();
         ReadModification readModification3 = ReadModification.builder().build();
@@ -255,7 +255,7 @@ public class ChainMapperExtensionTest {
 
         ReadModification result = extension.afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(nullValue()));
+        assertThat(result.transformedItem(), is(nullValue()));
 
         InOrder inOrder = Mockito.inOrder(mockExtension1, mockExtension2, mockExtension3);
         inOrder.verify(mockExtension3).afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
@@ -266,10 +266,10 @@ public class ChainMapperExtensionTest {
 
     @Test
     public void afterRead_noExtensions() {
-        ChainMapperExtension extension = ChainMapperExtension.of();
+        ChainMapperExtension extension = ChainMapperExtension.create();
 
         ReadModification result = extension.afterRead(fakeItems.get(0), PRIMARY_CONTEXT, FakeItem.getTableMetadata());
 
-        assertThat(result.getTransformedItem(), is(nullValue()));
+        assertThat(result.transformedItem(), is(nullValue()));
     }
 }

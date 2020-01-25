@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ public class TransactWriteItemsTest {
 
     @Test
     public void generateRequest_multipleTransactions() {
-        TransactWriteItems operation = TransactWriteItems.of(Arrays.asList(mockWriteTransaction1,
+        TransactWriteItems operation = TransactWriteItems.create(Arrays.asList(mockWriteTransaction1,
                                                                            mockWriteTransaction2));
 
         TransactWriteItemsRequest actualRequest = operation.generateRequest(mockMapperExtension);
@@ -95,7 +95,7 @@ public class TransactWriteItemsTest {
 
     @Test
     public void generateRequest_singleTransaction() {
-        TransactWriteItems operation = TransactWriteItems.of(mockWriteTransaction1);
+        TransactWriteItems operation = TransactWriteItems.create(mockWriteTransaction1);
 
         TransactWriteItemsRequest actualRequest = operation.generateRequest(mockMapperExtension);
 
@@ -109,7 +109,7 @@ public class TransactWriteItemsTest {
 
     @Test
     public void generateRequest_noTransactions() {
-        TransactWriteItems operation = TransactWriteItems.of();
+        TransactWriteItems operation = TransactWriteItems.create();
 
         TransactWriteItemsRequest actualRequest = operation.generateRequest(mockMapperExtension);
 
@@ -122,7 +122,7 @@ public class TransactWriteItemsTest {
 
     @Test
     public void getServiceCall_callsServiceAndReturnsResult() {
-        TransactWriteItems operation = TransactWriteItems.of();
+        TransactWriteItems operation = TransactWriteItems.create();
         TransactWriteItemsRequest request =
             TransactWriteItemsRequest.builder()
                                      .transactItems(Collections.singletonList(fakeTransactWriteItem1))
@@ -131,7 +131,7 @@ public class TransactWriteItemsTest {
                                                                                 .build();
         when(mockDynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class))).thenReturn(expectedResponse);
 
-        TransactWriteItemsResponse actualResponse = operation.getServiceCall(mockDynamoDbClient).apply(request);
+        TransactWriteItemsResponse actualResponse = operation.serviceCall(mockDynamoDbClient).apply(request);
 
         assertThat(actualResponse, is(sameInstance(expectedResponse)));
         verify(mockDynamoDbClient).transactWriteItems(request);
@@ -140,7 +140,7 @@ public class TransactWriteItemsTest {
 
     @Test
     public void transformResponse_doesNothing() {
-        TransactWriteItems operation = TransactWriteItems.of();
+        TransactWriteItems operation = TransactWriteItems.create();
         TransactWriteItemsResponse response = TransactWriteItemsResponse.builder().build();
 
         operation.transformResponse(response, mockMapperExtension);

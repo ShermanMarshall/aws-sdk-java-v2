@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import java.util.Collection;
 import java.util.Map;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.StaticTableSchema;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -34,7 +33,7 @@ public interface TableSchema<T> {
     /**
      * Takes a raw DynamoDb SDK representation of a record in a table and maps it to a Java object. A new object is
      * created to fulfil this operation.
-     *
+     * <p>
      * If attributes are missing from the map, that will not cause an error, however if attributes are found in the
      * map which the mapper does not know how to map, an exception will be thrown.
      *
@@ -76,22 +75,12 @@ public interface TableSchema<T> {
      * @return A single {@link AttributeValue} representing the requested modelled attribute in the model object or
      * null if the attribute has not been set with a value in the modelled object.
      */
-    AttributeValue getAttributeValue(T item, String key);
+    AttributeValue attributeValue(T item, String key);
 
     /**
      * Returns the object that describes the structure of the table being modelled by the mapper. This includes
      * information such as the table name, index keys and attribute tags.
      * @return A {@link TableMetadata} object that contains structural information about the table being modelled.
      */
-    TableMetadata getTableMetadata();
-
-    /**
-     * Returns a builder for the default implementation of this interface which is an immutable, declarative, type-safe
-     * mapper.
-     * See {@link StaticTableSchema} for more information.
-     * @return A default builder for a {@link StaticTableSchema}.
-     */
-    static StaticTableSchema.GenericBuilder builder() {
-        return StaticTableSchema.builder();
-    }
+    TableMetadata tableMetadata();
 }

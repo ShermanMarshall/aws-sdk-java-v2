@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,29 +23,35 @@ import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmap
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.primarySortKey;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.secondaryPartitionKey;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.secondarySortKey;
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.string;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.stringAttribute;
 
 import java.util.Objects;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.Expression;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Key;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.core.DynamoDbMappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.CreateTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.DeleteItem;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.GetItem;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.GlobalSecondaryIndex;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.PutItem;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.UpdateItem;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.StaticTableSchema;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest;
 import software.amazon.awssdk.services.dynamodb.model.Projection;
 import software.amazon.awssdk.services.dynamodb.model.ProjectionType;
 
-public class BasicCrudTest extends LocalDynamoDbTestBase {
+public class BasicCrudTest extends LocalDynamoDbSyncTestBase {
     private static class Record {
         private String id;
         private String sort;
@@ -165,45 +171,47 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
     }
 
     private static final TableSchema<Record> TABLE_SCHEMA =
-        TableSchema.builder()
-                   .newItemSupplier(Record::new)
-                   .attributes(
-                       string("id", Record::getId, Record::setId).as(primaryPartitionKey()),
-                       string("sort", Record::getSort, Record::setSort).as(primarySortKey()),
-                       // This is a DynamoDb reserved word, forces testing of AttributeNames
-                       string("attribute", Record::getAttribute, Record::setAttribute),
-                       // Using tricky characters to force scrubbing of attributeName tokens
-                       string("*attribute2*", Record::getAttribute2, Record::setAttribute2)
-                           .as(secondaryPartitionKey("gsi_1")),
-                       string("attribute3", Record::getAttribute3, Record::setAttribute3)
-                           .as(secondarySortKey("gsi_1")))
-                   .build();
+        StaticTableSchema.builder()
+                         .newItemSupplier(Record::new)
+                         .attributes(
+                             stringAttribute("id", Record::getId, Record::setId).as(primaryPartitionKey()),
+                             stringAttribute("sort", Record::getSort, Record::setSort).as(primarySortKey()),
+                             // This is a DynamoDb reserved word, forces testing of AttributeNames
+                             stringAttribute("attribute", Record::getAttribute, Record::setAttribute),
+                             // Using tricky characters to force scrubbing of attributeName tokens
+                             stringAttribute("*attribute2*", Record::getAttribute2, Record::setAttribute2)
+                                 .as(secondaryPartitionKey("gsi_1")),
+                             stringAttribute("attribute3", Record::getAttribute3, Record::setAttribute3)
+                                 .as(secondarySortKey("gsi_1")))
+                         .build();
 
     private static final TableSchema<ShortRecord> SHORT_TABLE_SCHEMA =
-        TableSchema.builder()
-                   .newItemSupplier(ShortRecord::new)
-                   .attributes(
-                       string("id", ShortRecord::getId, ShortRecord::setId).as(primaryPartitionKey()),
-                       string("sort", ShortRecord::getSort, ShortRecord::setSort).as(primarySortKey()),
-                       string("attribute", ShortRecord::getAttribute, ShortRecord::setAttribute))
-                   .build();
+            StaticTableSchema.builder()
+                             .newItemSupplier(ShortRecord::new)
+                             .attributes(
+                                 stringAttribute("id", ShortRecord::getId, ShortRecord::setId).as(primaryPartitionKey()),
+                                 stringAttribute("sort", ShortRecord::getSort, ShortRecord::setSort).as(primarySortKey()),
+                                 stringAttribute("attribute", ShortRecord::getAttribute, ShortRecord::setAttribute))
+                             .build();
 
 
-    private MappedDatabase mappedDatabase = MappedDatabase.builder()
-                                                          .dynamoDbClient(getDynamoDbClient())
-                                                          .build();
+    private MappedDatabase mappedDatabase = DynamoDbMappedDatabase.builder()
+                                                                  .dynamoDbClient(getDynamoDbClient())
+                                                                  .build();
 
     private MappedTable<Record> mappedTable = mappedDatabase.table(getConcreteTableName("table-name"), TABLE_SCHEMA);
     private MappedTable<ShortRecord> mappedShortTable = mappedDatabase.table(getConcreteTableName("table-name"),
                                                                              SHORT_TABLE_SCHEMA);
 
+    @Rule
+    public ExpectedException exception = ExpectedException.none();
 
     @Before
     public void createTable() {
         mappedTable.execute(CreateTable.builder()
                                            .provisionedThroughput(getDefaultProvisionedThroughput())
                                            .globalSecondaryIndices(
-                                               GlobalSecondaryIndex.of("gsi_1",
+                                               GlobalSecondaryIndex.create("gsi_1",
                                                                        Projection.builder()
                                                                                  .projectionType(ProjectionType.ALL)
                                                                                  .build(),
@@ -227,8 +235,8 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
-        Record result = mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+        mappedTable.execute(PutItem.create(record));
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
 
         assertThat(result, is(record));
     }
@@ -242,16 +250,16 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record result =
-            mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+            mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
 
         assertThat(result, is(record));
     }
 
     @Test
     public void getNonExistentItem() {
-        Record result = mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
         assertThat(result, is(nullValue()));
     }
 
@@ -264,7 +272,7 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record record2 = new Record()
                                .setId("id-value")
                                .setSort("sort-value")
@@ -272,8 +280,8 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                                .setAttribute2("five")
                                .setAttribute3("six");
 
-        mappedTable.execute(PutItem.of(record2));
-        Record result = mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+        mappedTable.execute(PutItem.create(record2));
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
 
         assertThat(result, is(record2));
     }
@@ -287,20 +295,121 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record beforeDeleteResult =
-            mappedTable.execute(DeleteItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+            mappedTable.execute(DeleteItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
         Record afterDeleteResult =
-            mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+            mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
 
         assertThat(beforeDeleteResult, is(record));
         assertThat(afterDeleteResult, is(nullValue()));
     }
 
     @Test
+    public void putWithConditionThatSucceeds() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+        record.setAttribute("four");
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("three"))
+                                                   .build();
+
+        mappedTable.execute(PutItem.builder().item(record).conditionExpression(conditionExpression).build());
+
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
+        assertThat(result, is(record));
+    }
+
+    @Test
+    public void putWithConditionThatFails() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+        record.setAttribute("four");
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("wrong"))
+                                                   .build();
+
+        exception.expect(ConditionalCheckFailedException.class);
+        mappedTable.execute(PutItem.builder().item(record).conditionExpression(conditionExpression).build());
+    }
+
+    @Test
     public void deleteNonExistentItem() {
-        Record result = mappedTable.execute(DeleteItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+        Record result = mappedTable.execute(DeleteItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
         assertThat(result, is(nullValue()));
+    }
+
+    @Test
+    public void deleteWithConditionThatSucceeds() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("three"))
+                                                   .build();
+
+        Key key = mappedTable.keyFrom(record);
+        mappedTable.execute(DeleteItem.builder().key(key).conditionExpression(conditionExpression).build());
+
+        Record result = mappedTable.execute(GetItem.create(key));
+        assertThat(result, is(nullValue()));
+    }
+
+    @Test
+    public void deleteWithConditionThatFails() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("wrong"))
+                                                   .build();
+
+        exception.expect(ConditionalCheckFailedException.class);
+        mappedTable.execute(DeleteItem.builder().key(mappedTable.keyFrom(record))
+                                      .conditionExpression(conditionExpression)
+                                      .build());
     }
 
     @Test
@@ -312,14 +421,14 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record record2 = new Record()
                                .setId("id-value")
                                .setSort("sort-value")
                                .setAttribute("four")
                                .setAttribute2("five")
                                .setAttribute3("six");
-        Record result = mappedTable.execute(UpdateItem.of(record2));
+        Record result = mappedTable.execute(UpdateItem.create(record2));
 
         assertThat(result, is(record2));
     }
@@ -331,7 +440,7 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setSort("sort-value")
                               .setAttribute("one");
 
-        Record result = mappedTable.execute(UpdateItem.of(record));
+        Record result = mappedTable.execute(UpdateItem.create(record));
 
         assertThat(result, is(record));
     }
@@ -342,7 +451,7 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setId("id-value")
                               .setSort("sort-value");
 
-        Record result = mappedTable.execute(UpdateItem.of(record));
+        Record result = mappedTable.execute(UpdateItem.create(record));
         assertThat(result, is(record));
     }
 
@@ -355,12 +464,12 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record record2 = new Record()
                                .setId("id-value")
                                .setSort("sort-value")
                                .setAttribute("four");
-        Record result = mappedTable.execute(UpdateItem.of(record2));
+        Record result = mappedTable.execute(UpdateItem.create(record2));
 
         assertThat(result, is(record2));
     }
@@ -374,7 +483,7 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record record2 = new Record()
                                .setId("id-value")
                                .setSort("sort-value")
@@ -399,13 +508,13 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         ShortRecord record2 = new ShortRecord()
                                          .setId("id-value")
                                          .setSort("sort-value")
                                          .setAttribute("four");
-        ShortRecord shortResult = mappedShortTable.execute(UpdateItem.of(record2));
-        Record result = mappedTable.execute(GetItem.of(Key.of(stringValue(record.getId()),
+        ShortRecord shortResult = mappedShortTable.execute(UpdateItem.create(record2));
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue(record.getId()),
                                                               stringValue(record.getSort()))));
 
         Record expectedResult = new Record()
@@ -427,7 +536,7 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
                               .setAttribute2("two")
                               .setAttribute3("three");
 
-        mappedTable.execute(PutItem.of(record));
+        mappedTable.execute(PutItem.create(record));
         Record updateRecord = new Record().setId("id-value").setSort("sort-value");
 
         Record result = mappedTable.execute(UpdateItem.builder().item(updateRecord).ignoreNulls(true).build());
@@ -436,18 +545,68 @@ public class BasicCrudTest extends LocalDynamoDbTestBase {
     }
 
     @Test
+    public void updateWithConditionThatSucceeds() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+        record.setAttribute("four");
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("three"))
+                                                   .build();
+
+        mappedTable.execute(UpdateItem.builder().item(record).conditionExpression(conditionExpression).build());
+
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
+        assertThat(result, is(record));
+    }
+
+    @Test
+    public void updateWithConditionThatFails() {
+        Record record = new Record()
+            .setId("id-value")
+            .setSort("sort-value")
+            .setAttribute("one")
+            .setAttribute2("two")
+            .setAttribute3("three");
+
+        mappedTable.execute(PutItem.create(record));
+        record.setAttribute("four");
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#key = :value OR #key1 = :value1")
+                                                   .putExpressionName("#key", "attribute")
+                                                   .putExpressionName("#key1", "attribute3")
+                                                   .putExpressionValue(":value", stringValue("wrong"))
+                                                   .putExpressionValue(":value1", stringValue("wrong"))
+                                                   .build();
+
+        exception.expect(ConditionalCheckFailedException.class);
+        mappedTable.execute(UpdateItem.builder().item(record).conditionExpression(conditionExpression).build());
+    }
+
+    @Test
     public void getAShortRecordWithNewModelledFields() {
         ShortRecord shortRecord = new ShortRecord()
                                          .setId("id-value")
                                          .setSort("sort-value")
                                          .setAttribute("one");
-        mappedShortTable.execute(PutItem.of(shortRecord));
+        mappedShortTable.execute(PutItem.create(shortRecord));
         Record expectedRecord = new Record()
                                       .setId("id-value")
                                       .setSort("sort-value")
                                       .setAttribute("one");
 
-        Record result = mappedTable.execute(GetItem.of(Key.of(stringValue("id-value"), stringValue("sort-value"))));
+        Record result = mappedTable.execute(GetItem.create(Key.create(stringValue("id-value"), stringValue("sort-value"))));
         assertThat(result, is(expectedRecord));
     }
 }

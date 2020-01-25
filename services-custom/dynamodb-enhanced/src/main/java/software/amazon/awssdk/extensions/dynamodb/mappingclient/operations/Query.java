@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,24 +21,25 @@ import java.util.Map;
 import java.util.function.Function;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.core.async.SdkPublisher;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Expression;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.IndexOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MapperExtension;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.OperationContext;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Page;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.PaginatedIndexOperation;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.PaginatedTableOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableMetadata;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.core.TransformIterable;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
-import software.amazon.awssdk.services.dynamodb.paginators.QueryIterable;
 
 @SdkPublicApi
-public class Query<T> implements TableOperation<T, QueryRequest, QueryIterable, Iterable<Page<T>>>,
-                                 IndexOperation<T, QueryRequest, QueryIterable, Iterable<Page<T>>> {
+public class Query<T> implements PaginatedTableOperation<T, QueryRequest, QueryResponse, Page<T>>,
+                                 PaginatedIndexOperation<T, QueryRequest, QueryResponse, Page<T>> {
 
     private final QueryConditional queryConditional;
     private final Map<String, AttributeValue> exclusiveStartKey;
@@ -62,7 +63,7 @@ public class Query<T> implements TableOperation<T, QueryRequest, QueryIterable, 
         this.filterExpression = filterExpression;
     }
 
-    public static <T> Query<T> of(QueryConditional queryConditional) {
+    public static <T> Query<T> create(QueryConditional queryConditional) {
         return new Query<>(queryConditional, null, null, null, null, null);
     }
 
@@ -83,18 +84,18 @@ public class Query<T> implements TableOperation<T, QueryRequest, QueryIterable, 
     public QueryRequest generateRequest(TableSchema<T> tableSchema,
                                         OperationContext operationContext,
                                         MapperExtension mapperExtension) {
-        Expression queryExpression = queryConditional.getExpression(tableSchema, operationContext.getIndexName());
-        Map<String, AttributeValue> expressionValues = queryExpression.getExpressionValues();
-        Map<String, String> expressionNames = queryExpression.getExpressionNames();
+        Expression queryExpression = queryConditional.expression(tableSchema, operationContext.indexName());
+        Map<String, AttributeValue> expressionValues = queryExpression.expressionValues();
+        Map<String, String> expressionNames = queryExpression.expressionNames();
 
         if (filterExpression != null) {
-            expressionValues = Expression.coalesceValues(expressionValues, filterExpression.getExpressionValues());
-            expressionNames = Expression.coalesceNames(expressionNames, filterExpression.getExpressionNames());
+            expressionValues = Expression.coalesceValues(expressionValues, filterExpression.expressionValues());
+            expressionNames = Expression.coalesceNames(expressionNames, filterExpression.expressionNames());
         }
 
         QueryRequest.Builder queryRequest = QueryRequest.builder()
-                                                        .tableName(operationContext.getTableName())
-                                                        .keyConditionExpression(queryExpression.getExpression())
+                                                        .tableName(operationContext.tableName())
+                                                        .keyConditionExpression(queryExpression.expression())
                                                         .expressionAttributeValues(expressionValues)
                                                         .expressionAttributeNames(expressionNames)
                                                         .scanIndexForward(scanIndexForward)
@@ -102,58 +103,62 @@ public class Query<T> implements TableOperation<T, QueryRequest, QueryIterable, 
                                                         .exclusiveStartKey(exclusiveStartKey)
                                                         .consistentRead(consistentRead);
 
-        if (!TableMetadata.getPrimaryIndexName().equals(operationContext.getIndexName())) {
-            queryRequest = queryRequest.indexName(operationContext.getIndexName());
+        if (!TableMetadata.primaryIndexName().equals(operationContext.indexName())) {
+            queryRequest = queryRequest.indexName(operationContext.indexName());
         }
 
         if (filterExpression != null) {
-            queryRequest = queryRequest.filterExpression(filterExpression.getExpression());
+            queryRequest = queryRequest.filterExpression(filterExpression.expression());
         }
 
         return queryRequest.build();
     }
 
     @Override
-    public Iterable<Page<T>> transformResponse(QueryIterable response,
-                                               TableSchema<T> tableSchema,
-                                               OperationContext operationContext,
-                                               MapperExtension mapperExtension) {
-        return TransformIterable.of(response, getQueryResponseMapper(tableSchema, operationContext, mapperExtension));
-    }
-
-    @Override
-    public Function<QueryRequest, QueryIterable> getServiceCall(DynamoDbClient dynamoDbClient) {
+    public Function<QueryRequest, SdkIterable<QueryResponse>> serviceCall(DynamoDbClient dynamoDbClient) {
         return dynamoDbClient::queryPaginator;
     }
 
-    private Function<QueryResponse, Page<T>> getQueryResponseMapper(TableSchema<T> tableSchema,
-                                                                    OperationContext operationContext,
-                                                                    MapperExtension mapperExtension) {
-        return readAndTransformPaginatedItems(tableSchema, operationContext, mapperExtension, QueryResponse::items,
+    @Override
+    public Function<QueryRequest, SdkPublisher<QueryResponse>> asyncServiceCall(DynamoDbAsyncClient dynamoDbAsyncClient) {
+        return dynamoDbAsyncClient::queryPaginator;
+    }
+
+    @Override
+    public Page<T> transformResponse(QueryResponse response,
+                                     TableSchema<T> tableSchema,
+                                     OperationContext context,
+                                     MapperExtension mapperExtension) {
+
+        return readAndTransformPaginatedItems(response,
+                                              tableSchema,
+                                              context,
+                                              mapperExtension,
+                                              QueryResponse::items,
                                               QueryResponse::lastEvaluatedKey);
     }
 
-    public QueryConditional getQueryConditional() {
+    public QueryConditional queryConditional() {
         return queryConditional;
     }
 
-    public Map<String, AttributeValue> getExclusiveStartKey() {
+    public Map<String, AttributeValue> exclusiveStartKey() {
         return exclusiveStartKey;
     }
 
-    public Boolean getScanIndexForward() {
+    public Boolean scanIndexForward() {
         return scanIndexForward;
     }
 
-    public Integer getLimit() {
+    public Integer limit() {
         return limit;
     }
 
-    public Boolean getConsistentRead() {
+    public Boolean consistentRead() {
         return consistentRead;
     }
 
-    public Expression getFilterExpression() {
+    public Expression filterExpression() {
         return filterExpression;
     }
 

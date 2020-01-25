@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -68,54 +68,53 @@ public final class Utils {
         if (mapperExtension != null) {
             ReadModification readModification = mapperExtension.afterRead(itemMap,
                                                                           operationContext,
-                                                                          tableSchema.getTableMetadata());
+                                                                          tableSchema.tableMetadata());
 
-            if (readModification != null && readModification.getTransformedItem() != null) {
-                return tableSchema.mapToItem(readModification.getTransformedItem());
+            if (readModification != null && readModification.transformedItem() != null) {
+                return tableSchema.mapToItem(readModification.transformedItem());
             }
         }
 
         return tableSchema.mapToItem(itemMap);
     }
 
-    public static <ResponseT, ItemT> Function<ResponseT, Page<ItemT>> readAndTransformPaginatedItems(
+    public static <ResponseT, ItemT> Page<ItemT> readAndTransformPaginatedItems(
+        ResponseT response,
         TableSchema<ItemT> tableSchema,
         OperationContext operationContext,
         MapperExtension mapperExtension,
         Function<ResponseT, List<Map<String, AttributeValue>>> getItems,
         Function<ResponseT, Map<String, AttributeValue>> getLastEvaluatedKey) {
 
-        return response -> {
-            if (getLastEvaluatedKey.apply(response) == null || getLastEvaluatedKey.apply(response).isEmpty()) {
-                // Last page
-                return Page.of(getItems.apply(response)
-                                       .stream()
-                                       .map(itemMap -> readAndTransformSingleItem(itemMap,
-                                                                                  tableSchema,
-                                                                                  operationContext,
-                                                                                  mapperExtension))
-                                       .collect(Collectors.toList()));
-            } else {
-                // More pages to come; add the lastEvaluatedKey
-                return Page.of(getItems.apply(response)
-                                       .stream()
-                                       .map(itemMap -> readAndTransformSingleItem(itemMap,
-                                                                                  tableSchema,
-                                                                                  operationContext,
-                                                                                  mapperExtension))
-                                       .collect(Collectors.toList()),
-                               getLastEvaluatedKey.apply(response));
-            }
-        };
+        if (getLastEvaluatedKey.apply(response) == null || getLastEvaluatedKey.apply(response).isEmpty()) {
+            // Last page
+            return Page.create(getItems.apply(response)
+                                   .stream()
+                                   .map(itemMap -> readAndTransformSingleItem(itemMap,
+                                                                              tableSchema,
+                                                                              operationContext,
+                                                                              mapperExtension))
+                                   .collect(Collectors.toList()));
+        } else {
+            // More pages to come; add the lastEvaluatedKey
+            return Page.create(getItems.apply(response)
+                                   .stream()
+                                   .map(itemMap -> readAndTransformSingleItem(itemMap,
+                                                                              tableSchema,
+                                                                              operationContext,
+                                                                              mapperExtension))
+                                   .collect(Collectors.toList()),
+                           getLastEvaluatedKey.apply(response));
+        }
     }
 
     public static <T> Key createKeyFromItem(T item, TableSchema<T> tableSchema, String indexName) {
-        String partitionKeyName = tableSchema.getTableMetadata().getIndexPartitionKey(indexName);
-        Optional<String> sortKeyName = tableSchema.getTableMetadata().getIndexSortKey(indexName);
-        AttributeValue partitionKeyValue = tableSchema.getAttributeValue(item, partitionKeyName);
-        Optional<AttributeValue> sortKeyValue = sortKeyName.map(key -> tableSchema.getAttributeValue(item, key));
+        String partitionKeyName = tableSchema.tableMetadata().indexPartitionKey(indexName);
+        Optional<String> sortKeyName = tableSchema.tableMetadata().indexSortKey(indexName);
+        AttributeValue partitionKeyValue = tableSchema.attributeValue(item, partitionKeyName);
+        Optional<AttributeValue> sortKeyValue = sortKeyName.map(key -> tableSchema.attributeValue(item, key));
 
-        return sortKeyValue.map(attributeValue -> Key.of(partitionKeyValue, attributeValue))
-                           .orElseGet(() -> Key.of(partitionKeyValue));
+        return sortKeyValue.map(attributeValue -> Key.create(partitionKeyValue, attributeValue))
+                           .orElseGet(() -> Key.create(partitionKeyValue));
     }
 }

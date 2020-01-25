@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 package software.amazon.awssdk.extensions.dynamodb.mappingclient.functionaltests.models;
 
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.string;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.stringAttribute;
 
 import java.util.Objects;
 
@@ -25,7 +25,7 @@ public class FakeItemComposedSubclass extends FakeItemComposedAbstractSubclass {
     private static final StaticTableSchema<FakeItemComposedSubclass> ITEM_MAPPER =
         StaticTableSchema.builder()
                          .newItemSupplier(FakeItemComposedSubclass::new)
-                         .attributes(string("composed_subclass",
+                         .attributes(stringAttribute("composed_subclass",
                                             FakeItemComposedSubclass::getComposedAttribute,
                                             FakeItemComposedSubclass::setComposedAttribute))
                          .extend(FakeItemComposedAbstractSubclass.getSubclassTableSchema())

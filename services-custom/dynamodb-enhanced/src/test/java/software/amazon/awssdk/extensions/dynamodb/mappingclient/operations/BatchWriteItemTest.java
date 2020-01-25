@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MapperExtension;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableMetadata;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.core.DynamoDbMappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.extensions.ReadModification;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.extensions.WriteModification;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.BatchWriteItem.BatchWriteItemResults;
@@ -75,16 +76,16 @@ public class BatchWriteItemTest {
     private static final List<FakeItem> FAKE_ITEMS =
         IntStream.range(0, 6).mapToObj($ -> createUniqueFakeItem()).collect(toList());
     private static final List<Map<String, AttributeValue>> FAKE_ITEM_MAPS = FAKE_ITEMS.stream().map(item ->
-        FakeItem.getTableSchema().itemToMap(item, FakeItem.getTableMetadata().getPrimaryKeys())).collect(toList());
+        FakeItem.getTableSchema().itemToMap(item, FakeItem.getTableMetadata().primaryKeys())).collect(toList());
     private static final List<FakeItemWithSort> FAKESORT_ITEMS =
         IntStream.range(0, 6).mapToObj($ -> createUniqueFakeItemWithSort()).collect(toList());
     private static final List<Map<String, AttributeValue>> FAKESORT_ITEM_MAPS = FAKESORT_ITEMS.stream().map(item ->
-        FakeItemWithSort.getTableSchema().itemToMap(item, FakeItemWithSort.getTableMetadata().getPrimaryKeys()))
+        FakeItemWithSort.getTableSchema().itemToMap(item, FakeItemWithSort.getTableMetadata().primaryKeys()))
                                                                                               .collect(toList());
     private static final List<Key> FAKE_ITEM_KEYS =
-        FAKE_ITEMS.stream().map(fakeItem -> Key.of(stringValue(fakeItem.getId()))).collect(toList());
+        FAKE_ITEMS.stream().map(fakeItem -> Key.create(stringValue(fakeItem.getId()))).collect(toList());
     private static final List<Key> FAKESORT_ITEM_KEYS =
-        FAKESORT_ITEMS.stream().map(fakeItemWithSort -> Key.of(stringValue(fakeItemWithSort.getId()),
+        FAKESORT_ITEMS.stream().map(fakeItemWithSort -> Key.create(stringValue(fakeItemWithSort.getId()),
                                                                stringValue(fakeItemWithSort.getSort()))).collect(toList());
 
     @Mock
@@ -101,11 +102,11 @@ public class BatchWriteItemTest {
 
     @Before
     public void setupMappedTables() {
-        mappedDatabase = MappedDatabase.builder().dynamoDbClient(mockDynamoDbClient).build();
+        mappedDatabase = DynamoDbMappedDatabase.builder().dynamoDbClient(mockDynamoDbClient).build();
         fakeItemMappedTable = mappedDatabase.table(TABLE_NAME, FakeItem.getTableSchema());
         fakeItemWithSortMappedTable = mappedDatabase.table(TABLE_NAME_2, FakeItemWithSort.getTableSchema());
         MappedDatabase mappedDatabaseWithExtension =
-            MappedDatabase.builder().dynamoDbClient(mockDynamoDbClient).extendWith(mockExtension).build();
+            DynamoDbMappedDatabase.builder().dynamoDbClient(mockDynamoDbClient).extendWith(mockExtension).build();
         fakeItemMappedTableWithExtension = mappedDatabaseWithExtension.table(TABLE_NAME, FakeItem.getTableSchema());
         fakeItemWithSortMappedTableWithExtension = mappedDatabaseWithExtension.table(TABLE_NAME_2,
                                                                                      FakeItemWithSort.getTableSchema());
@@ -114,7 +115,7 @@ public class BatchWriteItemTest {
     @Test
     public void getServiceCall_makesTheRightCallAndReturnsResponse() {
         BatchWriteItem operation =
-            BatchWriteItem.of(WriteBatch.of(fakeItemMappedTable, PutItem.of(FAKE_ITEMS.get(0))));
+            BatchWriteItem.create(WriteBatch.create(fakeItemMappedTable, PutItem.create(FAKE_ITEMS.get(0))));
 
         WriteRequest writeRequest =
             WriteRequest.builder()
@@ -129,7 +130,7 @@ public class BatchWriteItemTest {
         BatchWriteItemResponse expectedResponse = BatchWriteItemResponse.builder().build();
         when(mockDynamoDbClient.batchWriteItem(any(BatchWriteItemRequest.class))).thenReturn(expectedResponse);
 
-        BatchWriteItemResponse response = operation.getServiceCall(mockDynamoDbClient).apply(request);
+        BatchWriteItemResponse response = operation.serviceCall(mockDynamoDbClient).apply(request);
 
         assertThat(response, sameInstance(expectedResponse));
         verify(mockDynamoDbClient).batchWriteItem(request);
@@ -138,14 +139,14 @@ public class BatchWriteItemTest {
     @Test
     public void generateRequest_multipleTables_mixedCommands() {
         BatchWriteItem operation =
-            BatchWriteItem.of(WriteBatch.of(fakeItemMappedTable,
-                                            PutItem.of(FAKE_ITEMS.get(0)),
-                                            DeleteItem.of(FAKE_ITEM_KEYS.get(1)),
-                                            PutItem.of(FAKE_ITEMS.get(2))),
-                              WriteBatch.of(fakeItemWithSortMappedTable,
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(0)),
-                                            PutItem.of(FAKESORT_ITEMS.get(1)),
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(2))));
+            BatchWriteItem.create(WriteBatch.create(fakeItemMappedTable,
+                                            PutItem.create(FAKE_ITEMS.get(0)),
+                                            DeleteItem.create(FAKE_ITEM_KEYS.get(1)),
+                                            PutItem.create(FAKE_ITEMS.get(2))),
+                              WriteBatch.create(fakeItemWithSortMappedTable,
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(0)),
+                                            PutItem.create(FAKESORT_ITEMS.get(1)),
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(2))));
 
         BatchWriteItemRequest request = operation.generateRequest(mockExtension);
 
@@ -162,26 +163,26 @@ public class BatchWriteItemTest {
     @Test
     public void generateRequest_multipleTables_extensionOnlyTransformsPutsAndNotDeletes() {
         BatchWriteItem operation =
-            BatchWriteItem.of(WriteBatch.of(fakeItemMappedTableWithExtension,
-                                            PutItem.of(FAKE_ITEMS.get(0)),
-                                            DeleteItem.of(FAKE_ITEM_KEYS.get(1)),
-                                            PutItem.of(FAKE_ITEMS.get(2))),
-                              WriteBatch.of(fakeItemWithSortMappedTableWithExtension,
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(0)),
-                                            PutItem.of(FAKESORT_ITEMS.get(1)),
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(2))));
+            BatchWriteItem.create(WriteBatch.create(fakeItemMappedTableWithExtension,
+                                            PutItem.create(FAKE_ITEMS.get(0)),
+                                            DeleteItem.create(FAKE_ITEM_KEYS.get(1)),
+                                            PutItem.create(FAKE_ITEMS.get(2))),
+                              WriteBatch.create(fakeItemWithSortMappedTableWithExtension,
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(0)),
+                                            PutItem.create(FAKESORT_ITEMS.get(1)),
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(2))));
 
         // Use the mock extension to transform every item based on table name
         IntStream.range(0, 3).forEach(i -> {
             lenient().doReturn(WriteModification.builder().transformedItem(FAKE_ITEM_MAPS.get(i + 3)).build())
                 .when(mockExtension)
                 .beforeWrite(eq(FAKE_ITEM_MAPS.get(i)),
-                             argThat(operationContext -> operationContext.getTableName().equals(TABLE_NAME)),
+                             argThat(operationContext -> operationContext.tableName().equals(TABLE_NAME)),
                              any());
             lenient().doReturn(WriteModification.builder().transformedItem(FAKESORT_ITEM_MAPS.get(i + 3)).build())
                 .when(mockExtension)
                 .beforeWrite(eq(FAKESORT_ITEM_MAPS.get(i)),
-                             argThat(operationContext -> operationContext.getTableName().equals(TABLE_NAME_2)),
+                             argThat(operationContext -> operationContext.tableName().equals(TABLE_NAME_2)),
                              any());
         });
 
@@ -202,14 +203,14 @@ public class BatchWriteItemTest {
     @Test(expected = IllegalArgumentException.class)
     public void generateRequest_extensionTriesToAddConditionalToPutItem() {
         BatchWriteItem operation =
-            BatchWriteItem.of(WriteBatch.of(fakeItemMappedTableWithExtension,
-                                            PutItem.of(FAKE_ITEMS.get(0)),
-                                            DeleteItem.of(FAKE_ITEM_KEYS.get(1)),
-                                            PutItem.of(FAKE_ITEMS.get(2))),
-                              WriteBatch.of(fakeItemWithSortMappedTableWithExtension,
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(0)),
-                                            PutItem.of(FAKESORT_ITEMS.get(1)),
-                                            DeleteItem.of(FAKESORT_ITEM_KEYS.get(2))));
+            BatchWriteItem.create(WriteBatch.create(fakeItemMappedTableWithExtension,
+                                            PutItem.create(FAKE_ITEMS.get(0)),
+                                            DeleteItem.create(FAKE_ITEM_KEYS.get(1)),
+                                            PutItem.create(FAKE_ITEMS.get(2))),
+                              WriteBatch.create(fakeItemWithSortMappedTableWithExtension,
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(0)),
+                                            PutItem.create(FAKESORT_ITEMS.get(1)),
+                                            DeleteItem.create(FAKESORT_ITEM_KEYS.get(2))));
 
         Expression expression = Expression.builder().expression("test-expression").build();
 
@@ -222,7 +223,7 @@ public class BatchWriteItemTest {
 
     @Test
     public void transformResults_multipleUnprocessedOperations() {
-        BatchWriteItem operation = BatchWriteItem.of();
+        BatchWriteItem operation = BatchWriteItem.create();
 
         List<WriteRequest> writeRequests1 = Arrays.asList(putRequest(FAKE_ITEM_MAPS.get(0)),
                                                           deleteRequest(FAKE_ITEM_MAPS.get(1)),
@@ -252,7 +253,7 @@ public class BatchWriteItemTest {
 
     @Test
     public void transformResults_multipleUnprocessedOperations_extensionTransformsPutsNotDeletes() {
-        BatchWriteItem operation = BatchWriteItem.of();
+        BatchWriteItem operation = BatchWriteItem.create();
 
         List<WriteRequest> writeRequests1 = Arrays.asList(putRequest(FAKE_ITEM_MAPS.get(0)),
                                                           deleteRequest(FAKE_ITEM_MAPS.get(1)),
@@ -273,12 +274,12 @@ public class BatchWriteItemTest {
             lenient().doReturn(ReadModification.builder().transformedItem(FAKE_ITEM_MAPS.get(i + 3)).build())
                      .when(mockExtension)
                      .afterRead(eq(FAKE_ITEM_MAPS.get(i)),
-                                argThat(operationContext -> operationContext.getTableName().equals(TABLE_NAME)),
+                                argThat(operationContext -> operationContext.tableName().equals(TABLE_NAME)),
                                 any());
             lenient().doReturn(ReadModification.builder().transformedItem(FAKESORT_ITEM_MAPS.get(i + 3)).build())
                      .when(mockExtension)
                      .afterRead(eq(FAKESORT_ITEM_MAPS.get(i)),
-                                argThat(operationContext -> operationContext.getTableName().equals(TABLE_NAME_2)),
+                                argThat(operationContext -> operationContext.tableName().equals(TABLE_NAME_2)),
                                 any());
         });
 
@@ -296,7 +297,7 @@ public class BatchWriteItemTest {
 
     @Test
     public void transformResults_noUnprocessedOperations() {
-        BatchWriteItem operation = BatchWriteItem.of();
+        BatchWriteItem operation = BatchWriteItem.create();
 
         BatchWriteItemResponse response =
             BatchWriteItemResponse.builder()

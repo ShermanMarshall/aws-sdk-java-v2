@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class AttributeType<T> {
         this.attributeValueType = attributeValueType;
     }
 
-    public static <T> AttributeType<T> of(
+    public static <T> AttributeType<T> create(
         Function<T, AttributeValue> objectTransformer,
         Function<AttributeValue, T> attributeValueTransformer,
         AttributeValueType attributeValueType) {
@@ -50,7 +50,7 @@ public class AttributeType<T> {
         return this.attributeValueTransformer.apply(attributeValue);
     }
 
-    AttributeValueType getAttributeValueType() {
+    AttributeValueType attributeValueType() {
         return attributeValueType;
     }
 }

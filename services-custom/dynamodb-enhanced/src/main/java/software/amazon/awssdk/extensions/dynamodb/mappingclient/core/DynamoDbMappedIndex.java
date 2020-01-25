@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ import static software.amazon.awssdk.extensions.dynamodb.mappingclient.core.Util
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.IndexOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Key;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedIndex;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MapperExtension;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.PaginatedIndexOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
@@ -57,24 +59,33 @@ public class DynamoDbMappedIndex<T> implements MappedIndex<T> {
     }
 
     @Override
-    public MapperExtension getMapperExtension() {
+    public <R> SdkIterable<R> execute(PaginatedIndexOperation<T, ?, ?, R> operationToPerform) {
+        return operationToPerform.executeOnSecondaryIndex(tableSchema,
+                                                          tableName,
+                                                          indexName,
+                                                          mapperExtension,
+                                                          dynamoDbClient);
+    }
+
+    @Override
+    public MapperExtension mapperExtension() {
         return this.mapperExtension;
     }
 
     @Override
-    public TableSchema<T> getTableSchema() {
+    public TableSchema<T> tableSchema() {
         return tableSchema;
     }
 
-    public DynamoDbClient getDynamoDbClient() {
+    public DynamoDbClient dynamoDbClient() {
         return dynamoDbClient;
     }
 
-    public String getTableName() {
+    public String tableName() {
         return tableName;
     }
 
-    public String getIndexName() {
+    public String indexName() {
         return indexName;
     }
 

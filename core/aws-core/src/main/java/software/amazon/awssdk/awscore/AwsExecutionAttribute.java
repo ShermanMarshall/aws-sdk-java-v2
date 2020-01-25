@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package software.amazon.awssdk.awscore;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.auth.signer.AwsSignerExecutionAttribute;
+import software.amazon.awssdk.awscore.client.config.AwsClientOption;
 import software.amazon.awssdk.core.interceptor.ExecutionAttribute;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
@@ -32,6 +33,11 @@ public final class AwsExecutionAttribute extends SdkExecutionAttribute {
      * {@link AwsSignerExecutionAttribute#SIGNING_REGION} for global services like IAM.
      */
     public static final ExecutionAttribute<Region> AWS_REGION = new ExecutionAttribute<>("AwsRegion");
+
+    /**
+     * The {@link AwsClientOption#ENDPOINT_PREFIX} for the client.
+     */
+    public static final ExecutionAttribute<String> ENDPOINT_PREFIX = new ExecutionAttribute<>("AwsEndpointPrefix");
 
     private AwsExecutionAttribute() {}
 }

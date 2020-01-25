@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.OperationContext
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableMetadata;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableOperation;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
 import software.amazon.awssdk.services.dynamodb.model.BillingMode;
@@ -54,7 +56,7 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
         this.globalSecondaryIndices = globalSecondaryIndices;
     }
 
-    public static <T> CreateTable<T> of(ProvisionedThroughput provisionedThroughput) {
+    public static <T> CreateTable<T> create(ProvisionedThroughput provisionedThroughput) {
         return new CreateTable<>(provisionedThroughput, null, null);
     }
 
@@ -76,12 +78,12 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
     public CreateTableRequest generateRequest(TableSchema<T> tableSchema,
                                               OperationContext operationContext,
                                               MapperExtension mapperExtension) {
-        if (!TableMetadata.getPrimaryIndexName().equals(operationContext.getIndexName())) {
+        if (!TableMetadata.primaryIndexName().equals(operationContext.indexName())) {
             throw new IllegalArgumentException("PutItem cannot be executed against a secondary index.");
         }
 
-        String primaryPartitionKey = tableSchema.getTableMetadata().getPrimaryPartitionKey();
-        Optional<String> primarySortKey = tableSchema.getTableMetadata().getPrimarySortKey();
+        String primaryPartitionKey = tableSchema.tableMetadata().primaryPartitionKey();
+        Optional<String> primarySortKey = tableSchema.tableMetadata().primarySortKey();
         Set<String> dedupedIndexKeys = new HashSet<>();
         dedupedIndexKeys.add(primaryPartitionKey);
         primarySortKey.ifPresent(dedupedIndexKeys::add);
@@ -91,17 +93,17 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
         if (globalSecondaryIndices != null) {
             sdkGlobalSecondaryIndices =
                 this.globalSecondaryIndices.stream().map(gsi -> {
-                    String indexPartitionKey = tableSchema.getTableMetadata().getIndexPartitionKey(gsi.getIndexName());
-                    Optional<String> indexSortKey = tableSchema.getTableMetadata().getIndexSortKey(gsi.getIndexName());
+                    String indexPartitionKey = tableSchema.tableMetadata().indexPartitionKey(gsi.indexName());
+                    Optional<String> indexSortKey = tableSchema.tableMetadata().indexSortKey(gsi.indexName());
                     dedupedIndexKeys.add(indexPartitionKey);
                     indexSortKey.ifPresent(dedupedIndexKeys::add);
 
                     return software.amazon.awssdk.services.dynamodb.model.GlobalSecondaryIndex
                         .builder()
-                        .indexName(gsi.getIndexName())
+                        .indexName(gsi.indexName())
                         .keySchema(generateKeySchema(indexPartitionKey, indexSortKey.orElse(null)))
-                        .projection(gsi.getProjection())
-                        .provisionedThroughput(gsi.getProvisionedThroughput())
+                        .projection(gsi.projection())
+                        .provisionedThroughput(gsi.provisionedThroughput())
                         .build();
                 }).collect(Collectors.toList());
         }
@@ -109,21 +111,21 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
         if (localSecondaryIndices != null) {
             sdkLocalSecondaryIndices =
                 this.localSecondaryIndices.stream().map(lsi -> {
-                    Optional<String> indexSortKey = tableSchema.getTableMetadata().getIndexSortKey(lsi.getIndexName());
+                    Optional<String> indexSortKey = tableSchema.tableMetadata().indexSortKey(lsi.indexName());
                     indexSortKey.ifPresent(dedupedIndexKeys::add);
 
                     if (!primaryPartitionKey.equals(
-                        tableSchema.getTableMetadata().getIndexPartitionKey(lsi.getIndexName()))) {
+                        tableSchema.tableMetadata().indexPartitionKey(lsi.indexName()))) {
                         throw new IllegalArgumentException("Attempt to create a local secondary index with a partition "
                                                            + "key that is not the primary partition key. Index name: "
-                                                           + lsi.getIndexName());
+                                                           + lsi.indexName());
                     }
 
                     return software.amazon.awssdk.services.dynamodb.model.LocalSecondaryIndex
                         .builder()
-                        .indexName(lsi.getIndexName())
+                        .indexName(lsi.indexName())
                         .keySchema(generateKeySchema(primaryPartitionKey, indexSortKey.orElse(null)))
-                        .projection(lsi.getProjection())
+                        .projection(lsi.projection())
                         .build();
                 }).collect(Collectors.toList());
         }
@@ -133,8 +135,8 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
                             .map(attribute ->
                                      AttributeDefinition.builder()
                                                         .attributeName(attribute)
-                                                        .attributeType(tableSchema.getTableMetadata()
-                                                                                  .getScalarAttributeType(attribute)
+                                                        .attributeType(tableSchema.tableMetadata()
+                                                                                  .scalarAttributeType(attribute)
                                                                                   .orElseThrow(() ->
                                         new IllegalArgumentException("Could not map the key attribute '" + attribute +
                                                                      "' to a valid scalar type.")))
@@ -144,7 +146,7 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
         BillingMode billingMode = provisionedThroughput == null ? BillingMode.PAY_PER_REQUEST : BillingMode.PROVISIONED;
 
         return CreateTableRequest.builder()
-                                 .tableName(operationContext.getTableName())
+                                 .tableName(operationContext.tableName())
                                  .keySchema(generateKeySchema(primaryPartitionKey, primarySortKey.orElse(null)))
                                  .globalSecondaryIndexes(sdkGlobalSecondaryIndices)
                                  .localSecondaryIndexes(sdkLocalSecondaryIndices)
@@ -155,8 +157,15 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
     }
 
     @Override
-    public Function<CreateTableRequest, CreateTableResponse> getServiceCall(DynamoDbClient dynamoDbClient) {
+    public Function<CreateTableRequest, CreateTableResponse> serviceCall(DynamoDbClient dynamoDbClient) {
         return dynamoDbClient::createTable;
+    }
+
+    @Override
+    public Function<CreateTableRequest, CompletableFuture<CreateTableResponse>> asyncServiceCall(
+        DynamoDbAsyncClient dynamoDbAsyncClient) {
+
+        return dynamoDbAsyncClient::createTable;
     }
 
     @Override
@@ -168,15 +177,15 @@ public class CreateTable<T> implements TableOperation<T, CreateTableRequest, Cre
         return null;
     }
 
-    public ProvisionedThroughput getProvisionedThroughput() {
+    public ProvisionedThroughput provisionedThroughput() {
         return provisionedThroughput;
     }
 
-    public Collection<LocalSecondaryIndex> getLocalSecondaryIndices() {
+    public Collection<LocalSecondaryIndex> localSecondaryIndices() {
         return localSecondaryIndices;
     }
 
-    public Collection<GlobalSecondaryIndex> getGlobalSecondaryIndices() {
+    public Collection<GlobalSecondaryIndex> globalSecondaryIndices() {
         return globalSecondaryIndices;
     }
 

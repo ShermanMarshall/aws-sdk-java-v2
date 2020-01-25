@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.annotations.SdkPublicApi;
@@ -77,6 +78,13 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
 
     private static final Logger log = LoggerFactory.getLogger(NettyNioAsyncHttpClient.class);
     private static final long MAX_STREAMS_ALLOWED = 4294967295L; // unsigned 32-bit, 2^32 -1
+    private static final int DEFAULT_INITIAL_WINDOW_SIZE = 1_048_576; // 1MiB
+
+    // Override connection idle timeout for Netty http client to reduce the frequency of "server failed to complete the
+    // response error". see https://github.com/aws/aws-sdk-java-v2/issues/1122
+    private static final AttributeMap NETTY_HTTP_DEFAULTS = AttributeMap.builder()
+                                                                        .put(CONNECTION_MAX_IDLE_TIMEOUT, Duration.ofSeconds(5))
+                                                                        .build();
 
     private final SdkEventLoopGroup sdkEventLoopGroup;
     private final SdkChannelPoolMap<URI, ? extends ChannelPool> pools;
@@ -85,13 +93,20 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
     private NettyNioAsyncHttpClient(DefaultBuilder builder, AttributeMap serviceDefaultsMap) {
         this.configuration = new NettyConfiguration(serviceDefaultsMap);
         Protocol protocol = serviceDefaultsMap.get(SdkHttpConfigurationOption.PROTOCOL);
-        long maxStreams = builder.maxHttp2Streams == null ? MAX_STREAMS_ALLOWED : builder.maxHttp2Streams;
         this.sdkEventLoopGroup = eventLoopGroup(builder);
+
+        Http2Configuration http2Configuration = builder.http2Configuration;
+
+        long maxStreams = resolveMaxHttp2Streams(builder.maxHttp2Streams, http2Configuration);
+        int initialWindowSize = resolveInitialWindowSize(http2Configuration);
+
         this.pools = AwaitCloseChannelPoolMap.builder()
                                              .sdkChannelOptions(builder.sdkChannelOptions)
                                              .configuration(configuration)
                                              .protocol(protocol)
                                              .maxStreams(maxStreams)
+                                             .initialWindowSize(initialWindowSize)
+                                             .healthCheckPingPeriod(resolveHealthCheckPingPeriod(http2Configuration))
                                              .sdkEventLoopGroup(sdkEventLoopGroup)
                                              .sslProvider(resolveSslProvider(builder))
                                              .proxyConfiguration(builder.proxyConfiguration)
@@ -143,6 +158,32 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         return SslContext.defaultClientProvider();
     }
 
+    private long resolveMaxHttp2Streams(Integer topLevelValue, Http2Configuration http2Configuration) {
+        if (topLevelValue != null) {
+            return topLevelValue;
+        }
+
+        if (http2Configuration == null || http2Configuration.maxStreams() == null) {
+            return MAX_STREAMS_ALLOWED;
+        }
+
+        return Math.min(http2Configuration.maxStreams(), MAX_STREAMS_ALLOWED);
+    }
+
+    private int resolveInitialWindowSize(Http2Configuration http2Configuration) {
+        if (http2Configuration == null || http2Configuration.initialWindowSize() == null) {
+            return DEFAULT_INITIAL_WINDOW_SIZE;
+        }
+        return http2Configuration.initialWindowSize();
+    }
+
+    private Duration resolveHealthCheckPingPeriod(Http2Configuration http2Configuration) {
+        if (http2Configuration != null) {
+            return http2Configuration.healthCheckPingPeriod();
+        }
+        return null;
+    }
+
     private SdkEventLoopGroup nonManagedEventLoopGroup(SdkEventLoopGroup eventLoopGroup) {
         return SdkEventLoopGroup.create(new NonManagedEventLoopGroup(eventLoopGroup.eventLoopGroup()),
                                         eventLoopGroup.channelFactory());
@@ -173,6 +214,11 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
     @Override
     public String clientName() {
         return CLIENT_NAME;
+    }
+
+    @SdkTestInternalApi
+    NettyConfiguration configuration() {
+        return configuration;
     }
 
     /**
@@ -332,6 +378,9 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
          *
          * @param maxHttp2Streams Max concurrent HTTP/2 streams per connection.
          * @return This builder for method chaining.
+         *
+         * @deprecated Use {@link #http2Configuration(Http2Configuration)} along with
+         * {@link Http2Configuration.Builder#maxStreams(Integer)} instead.
          */
         Builder maxHttp2Streams(Integer maxHttp2Streams);
 
@@ -369,6 +418,28 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
          * @return The builder for method chaining.
          */
         Builder tlsKeyManagersProvider(TlsKeyManagersProvider keyManagersProvider);
+
+        /**
+         * Set the HTTP/2 specific configuration for this client.
+         * <p>
+         * <b>Note:</b>If {@link #maxHttp2Streams(Integer)} and {@link Http2Configuration#maxStreams()} are both set,
+         * the value set using {@link #maxHttp2Streams(Integer)} takes precedence.
+         *
+         * @param http2Configuration The HTTP/2 configuration object.
+         * @return the builder for method chaining.
+         */
+        Builder http2Configuration(Http2Configuration http2Configuration);
+
+        /**
+         * Set the HTTP/2 specific configuration for this client.
+         * <p>
+         * <b>Note:</b>If {@link #maxHttp2Streams(Integer)} and {@link Http2Configuration#maxStreams()} are both set,
+         * the value set using {@link #maxHttp2Streams(Integer)} takes precedence.
+         *
+         * @param http2ConfigurationBuilderConsumer The consumer of the HTTP/2 configuration builder object.
+         * @return the builder for method chaining.
+         */
+        Builder http2Configuration(Consumer<Http2Configuration.Builder> http2ConfigurationBuilderConsumer);
     }
 
     /**
@@ -383,6 +454,7 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         private SdkEventLoopGroup eventLoopGroup;
         private SdkEventLoopGroup.Builder eventLoopGroupBuilder;
         private Integer maxHttp2Streams;
+        private Http2Configuration http2Configuration;
         private SslProvider sslProvider;
         private ProxyConfiguration proxyConfiguration;
 
@@ -558,9 +630,27 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         }
 
         @Override
+        public Builder http2Configuration(Http2Configuration http2Configuration) {
+            this.http2Configuration = http2Configuration;
+            return this;
+        }
+
+        @Override
+        public Builder http2Configuration(Consumer<Http2Configuration.Builder> http2ConfigurationBuilderConsumer) {
+            Http2Configuration.Builder builder = Http2Configuration.builder();
+            http2ConfigurationBuilderConsumer.accept(builder);
+            return http2Configuration(builder.build());
+        }
+
+        public void setHttp2Configuration(Http2Configuration http2Configuration) {
+            http2Configuration(http2Configuration);
+        }
+
+        @Override
         public SdkAsyncHttpClient buildWithDefaults(AttributeMap serviceDefaults) {
             return new NettyNioAsyncHttpClient(this, standardOptions.build()
                                                                     .merge(serviceDefaults)
+                                                                    .merge(NETTY_HTTP_DEFAULTS)
                                                                     .merge(SdkHttpConfigurationOption.GLOBAL_HTTP_DEFAULTS));
 
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -31,22 +31,22 @@ public class GlobalSecondaryIndex {
         this.provisionedThroughput = provisionedThroughput;
     }
 
-    public static GlobalSecondaryIndex of(String indexName,
-                                          Projection projection,
-                                          ProvisionedThroughput provisionedThroughput) {
+    public static GlobalSecondaryIndex create(String indexName,
+                                              Projection projection,
+                                              ProvisionedThroughput provisionedThroughput) {
 
         return new GlobalSecondaryIndex(indexName, projection, provisionedThroughput);
     }
 
-    public String getIndexName() {
+    public String indexName() {
         return indexName;
     }
 
-    public Projection getProjection() {
+    public Projection projection() {
         return projection;
     }
 
-    public ProvisionedThroughput getProvisionedThroughput() {
+    public ProvisionedThroughput provisionedThroughput() {
         return provisionedThroughput;
     }
 

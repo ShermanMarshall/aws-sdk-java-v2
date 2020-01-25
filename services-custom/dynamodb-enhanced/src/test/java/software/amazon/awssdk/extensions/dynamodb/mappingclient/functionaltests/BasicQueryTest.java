@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import static software.amazon.awssdk.extensions.dynamodb.mappingclient.operation
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.QueryConditional.equalTo;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.primaryPartitionKey;
 import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.AttributeTags.primarySortKey;
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.integerNumber;
-import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.string;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.integerNumberAttribute;
+import static software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.Attributes.stringAttribute;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,13 +47,15 @@ import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.Page;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.TableSchema;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.core.DynamoDbMappedDatabase;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.CreateTable;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.PutItem;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.operations.Query;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.staticmapper.StaticTableSchema;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest;
 
-public class BasicQueryTest extends LocalDynamoDbTestBase {
+public class BasicQueryTest extends LocalDynamoDbSyncTestBase {
     private static class Record {
         private String id;
         private Integer sort;
@@ -103,32 +105,32 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
     }
 
     private static final TableSchema<Record> TABLE_SCHEMA =
-        TableSchema.builder()
-                   .newItemSupplier(Record::new)
-                   .attributes(
-                       string("id", Record::getId, Record::setId).as(primaryPartitionKey()),
-                       integerNumber("sort", Record::getSort, Record::setSort).as(primarySortKey()),
-                       integerNumber("value", Record::getValue, Record::setValue))
-        .build();
+        StaticTableSchema.builder()
+                         .newItemSupplier(Record::new)
+                         .attributes(
+                             stringAttribute("id", Record::getId, Record::setId).as(primaryPartitionKey()),
+                             integerNumberAttribute("sort", Record::getSort, Record::setSort).as(primarySortKey()),
+                             integerNumberAttribute("value", Record::getValue, Record::setValue))
+                         .build();
 
     private static final List<Record> RECORDS =
         IntStream.range(0, 10)
                  .mapToObj(i -> new Record().setId("id-value").setSort(i).setValue(i))
                  .collect(Collectors.toList());
 
-    private MappedDatabase mappedDatabase = MappedDatabase.builder()
-                                                          .dynamoDbClient(getDynamoDbClient())
-                                                          .build();
+    private MappedDatabase mappedDatabase = DynamoDbMappedDatabase.builder()
+                                                                  .dynamoDbClient(getDynamoDbClient())
+                                                                  .build();
 
     private MappedTable<Record> mappedTable = mappedDatabase.table(getConcreteTableName("table-name"), TABLE_SCHEMA);
 
     private void insertRecords() {
-        RECORDS.forEach(record -> mappedTable.execute(PutItem.of(record)));
+        RECORDS.forEach(record -> mappedTable.execute(PutItem.create(record)));
     }
 
     @Before
     public void createTable() {
-        mappedTable.execute(CreateTable.of(getDefaultProvisionedThroughput()));
+        mappedTable.execute(CreateTable.create(getDefaultProvisionedThroughput()));
     }
 
     @After
@@ -143,14 +145,14 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         insertRecords();
 
         Iterator<Page<Record>> results =
-            mappedTable.execute(Query.of(equalTo(Key.of(stringValue("id-value"))))).iterator();
+            mappedTable.execute(Query.create(equalTo(Key.create(stringValue("id-value"))))).iterator();
 
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page.getItems(), is(RECORDS));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(RECORDS));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -167,7 +169,7 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
 
         Iterator<Page<Record>> results =
             mappedTable.execute(Query.builder()
-                                     .queryConditional(equalTo(Key.of(stringValue("id-value"))))
+                                     .queryConditional(equalTo(Key.create(stringValue("id-value"))))
                                      .filterExpression(expression)
                                      .build())
                        .iterator();
@@ -176,25 +178,25 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page.getItems(),
+        assertThat(page.items(),
                    is(RECORDS.stream().filter(r -> r.sort >= 3 && r.sort <= 5).collect(Collectors.toList())));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
     public void queryBetween() {
         insertRecords();
-        Key fromKey = Key.of(stringValue("id-value"), numberValue(3));
-        Key toKey = Key.of(stringValue("id-value"), numberValue(5));
-        Iterator<Page<Record>> results = mappedTable.execute(Query.of(between(fromKey, toKey))).iterator();
+        Key fromKey = Key.create(stringValue("id-value"), numberValue(3));
+        Key toKey = Key.create(stringValue("id-value"), numberValue(5));
+        Iterator<Page<Record>> results = mappedTable.execute(Query.create(between(fromKey, toKey))).iterator();
 
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
 
-        assertThat(page.getItems(),
+        assertThat(page.items(),
                    is(RECORDS.stream().filter(r -> r.sort >= 3 && r.sort <= 5).collect(Collectors.toList())));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -202,7 +204,7 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         insertRecords();
         Iterator<Page<Record>> results =
             mappedTable.execute(Query.builder()
-                                     .queryConditional(equalTo(Key.of(stringValue("id-value"))))
+                                     .queryConditional(equalTo(Key.create(stringValue("id-value"))))
                                      .limit(5)
                                      .build())
                        .iterator();
@@ -220,23 +222,23 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         Map<String, AttributeValue> expectedLastEvaluatedKey2 = new HashMap<>();
         expectedLastEvaluatedKey2.put("id", stringValue("id-value"));
         expectedLastEvaluatedKey2.put("sort", numberValue(9));
-        assertThat(page1.getItems(), is(RECORDS.subList(0, 5)));
-        assertThat(page1.getLastEvaluatedKey(), is(expectedLastEvaluatedKey1));
-        assertThat(page2.getItems(), is(RECORDS.subList(5, 10)));
-        assertThat(page2.getLastEvaluatedKey(), is(expectedLastEvaluatedKey2));
-        assertThat(page3.getItems(), is(empty()));
-        assertThat(page3.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page1.items(), is(RECORDS.subList(0, 5)));
+        assertThat(page1.lastEvaluatedKey(), is(expectedLastEvaluatedKey1));
+        assertThat(page2.items(), is(RECORDS.subList(5, 10)));
+        assertThat(page2.lastEvaluatedKey(), is(expectedLastEvaluatedKey2));
+        assertThat(page3.items(), is(empty()));
+        assertThat(page3.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
     public void queryEmpty() {
         Iterator<Page<Record>> results =
-            mappedTable.execute(Query.of(equalTo(Key.of(stringValue("id-value"))))).iterator();
+            mappedTable.execute(Query.create(equalTo(Key.create(stringValue("id-value"))))).iterator();
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
-        assertThat(page.getItems(), is(empty()));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(empty()));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 
     @Test
@@ -247,7 +249,7 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         insertRecords();
         Iterator<Page<Record>> results =
             mappedTable.execute(Query.builder()
-                                     .queryConditional(equalTo(Key.of(stringValue("id-value"))))
+                                     .queryConditional(equalTo(Key.create(stringValue("id-value"))))
                                      .exclusiveStartKey(exclusiveStartKey)
                                      .build())
                        .iterator();
@@ -255,7 +257,7 @@ public class BasicQueryTest extends LocalDynamoDbTestBase {
         assertThat(results.hasNext(), is(true));
         Page<Record> page = results.next();
         assertThat(results.hasNext(), is(false));
-        assertThat(page.getItems(), is(RECORDS.subList(8, 10)));
-        assertThat(page.getLastEvaluatedKey(), is(nullValue()));
+        assertThat(page.items(), is(RECORDS.subList(8, 10)));
+        assertThat(page.lastEvaluatedKey(), is(nullValue()));
     }
 }

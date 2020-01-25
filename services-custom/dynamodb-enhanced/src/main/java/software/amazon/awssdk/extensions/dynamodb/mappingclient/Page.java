@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ public class Page<T> {
      * @param <T> The modelled type of the object that has been read.
      * @return A newly constructed {@link Page} object.
      */
-    public static <T> Page<T> of(List<T> items, Map<String, AttributeValue> lastEvaluatedKey) {
+    public static <T> Page<T> create(List<T> items, Map<String, AttributeValue> lastEvaluatedKey) {
         return new Page<>(items, lastEvaluatedKey);
     }
 
@@ -53,7 +53,7 @@ public class Page<T> {
      * @param <T> The modelled type of the object that has been read.
      * @return A newly constructed {@link Page} object.
      */
-    public static <T> Page<T> of(List<T> items) {
+    public static <T> Page<T> create(List<T> items) {
         return new Page<>(items, null);
     }
 
@@ -61,7 +61,7 @@ public class Page<T> {
      * Returns a page of mapped objects that represent records from a database query or scan.
      * @return A list of mapped objects.
      */
-    public List<T> getItems() {
+    public List<T> items() {
         return items;
     }
 
@@ -70,7 +70,7 @@ public class Page<T> {
      * to continue the query or scan if passed into a request.
      * @return The 'lastEvaluatedKey' from the last query or scan operation or null if the no more pages are available.
      */
-    public Map<String, AttributeValue> getLastEvaluatedKey() {
+    public Map<String, AttributeValue> lastEvaluatedKey() {
         return lastEvaluatedKey;
     }
 

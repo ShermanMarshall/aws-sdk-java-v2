@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,36 +23,37 @@ import java.util.stream.Collectors;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.BatchableWriteOperation;
-import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTable;
+import software.amazon.awssdk.extensions.dynamodb.mappingclient.MappedTableResource;
 import software.amazon.awssdk.extensions.dynamodb.mappingclient.OperationContext;
 import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
 @SdkPublicApi
 public class WriteBatch<T> {
-    private final MappedTable<T> mappedTable;
+    private final MappedTableResource<T> mappedTableResource;
     private final Collection<BatchableWriteOperation<T>> writeOperations;
 
-    private WriteBatch(MappedTable<T> mappedTable, Collection<BatchableWriteOperation<T>> writeOperations) {
-        this.mappedTable = mappedTable;
+    private WriteBatch(MappedTableResource<T> mappedTableResource,
+                       Collection<BatchableWriteOperation<T>> writeOperations) {
+        this.mappedTableResource = mappedTableResource;
         this.writeOperations = writeOperations;
     }
 
-    public static <T> WriteBatch<T> of(MappedTable<T> mappedTable,
+    public static <T> WriteBatch<T> create(MappedTableResource<T> mappedTableResource,
                                        Collection<BatchableWriteOperation<T>> writeOperations) {
-        return new WriteBatch<>(mappedTable, writeOperations);
+        return new WriteBatch<>(mappedTableResource, writeOperations);
     }
 
     @SafeVarargs
-    public static <T> WriteBatch<T> of(MappedTable<T> mappedTable,
+    public static <T> WriteBatch<T> create(MappedTableResource<T> mappedTableResource,
                                        BatchableWriteOperation<T>... writeOperations) {
-        return new WriteBatch<>(mappedTable, Arrays.asList(writeOperations));
+        return new WriteBatch<>(mappedTableResource, Arrays.asList(writeOperations));
     }
 
-    public MappedTable<T> getMappedTable() {
-        return mappedTable;
+    public MappedTableResource<T> mappedTableResource() {
+        return mappedTableResource;
     }
 
-    public Collection<BatchableWriteOperation<T>> getWriteOperations() {
+    public Collection<BatchableWriteOperation<T>> writeOperations() {
         return writeOperations;
     }
 
@@ -67,7 +68,9 @@ public class WriteBatch<T> {
 
         WriteBatch<?> that = (WriteBatch<?>) o;
 
-        if (mappedTable != null ? ! mappedTable.equals(that.mappedTable) : that.mappedTable != null) {
+        if (mappedTableResource != null ? !mappedTableResource.equals(that.mappedTableResource)
+            : that.mappedTableResource != null) {
+
             return false;
         }
         return writeOperations != null ? writeOperations.equals(that.writeOperations) : that.writeOperations == null;
@@ -75,7 +78,7 @@ public class WriteBatch<T> {
 
     @Override
     public int hashCode() {
-        int result = mappedTable != null ? mappedTable.hashCode() : 0;
+        int result = mappedTableResource != null ? mappedTableResource.hashCode() : 0;
         result = 31 * result + (writeOperations != null ? writeOperations.hashCode() : 0);
         return result;
     }
@@ -90,13 +93,13 @@ public class WriteBatch<T> {
         writeRequestsForTable.addAll(
             writeOperations.stream()
                            .map(writeOperation ->
-                                    writeOperation.generateWriteRequest(mappedTable.getTableSchema(),
-                                                                        OperationContext.of(mappedTable.getTableName()),
-                                                                        mappedTable.getMapperExtension()))
+                                    writeOperation.generateWriteRequest(mappedTableResource.tableSchema(),
+                                                                        OperationContext.create(mappedTableResource.tableName()),
+                                                                        mappedTableResource.mapperExtension()))
                            .collect(Collectors.toList()));
     }
 
     String getTableName() {
-        return mappedTable.getTableName();
+        return mappedTableResource.tableName();
     }
 }

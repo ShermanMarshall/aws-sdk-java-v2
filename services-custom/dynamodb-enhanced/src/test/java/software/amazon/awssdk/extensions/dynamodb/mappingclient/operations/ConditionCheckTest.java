@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2010-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ public class ConditionCheckTest {
                                                    .expressionValues(singletonMap("key2", stringValue("value2")))
                                                    .build();
         ConditionCheck<FakeItem> operation =
-            ConditionCheck.of(Key.of(stringValue(fakeItem.getId())), conditionExpression);
-        OperationContext context = OperationContext.of("table-name", TableMetadata.getPrimaryIndexName());
+            ConditionCheck.create(Key.create(stringValue(fakeItem.getId())), conditionExpression);
+        OperationContext context = OperationContext.create("table-name", TableMetadata.primaryIndexName());
 
         TransactWriteItem result = operation.generateTransactWriteItem(FakeItem.getTableSchema(), context,
                                                                                   mockMapperExtension);
@@ -65,9 +65,9 @@ public class ConditionCheckTest {
                                      .builder()
                                      .tableName("table-name")
                                      .key(keyMap)
-                                     .conditionExpression(conditionExpression.getExpression())
-                                     .expressionAttributeValues(conditionExpression.getExpressionValues())
-                                     .expressionAttributeNames(conditionExpression.getExpressionNames())
+                                     .conditionExpression(conditionExpression.expression())
+                                     .expressionAttributeValues(conditionExpression.expressionValues())
+                                     .expressionAttributeNames(conditionExpression.expressionNames())
                                      .build())
                              .build();
         assertThat(result, is(expectedResult));
