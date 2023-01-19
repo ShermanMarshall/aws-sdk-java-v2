@@ -21,7 +21,7 @@ import java.util.Map;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.Document;
 import software.amazon.awssdk.enhanced.dynamodb.MappedTableResource;
-import software.amazon.awssdk.enhanced.dynamodb.internal.operations.OperationContext;
+import software.amazon.awssdk.enhanced.dynamodb.internal.operations.DefaultOperationContext;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @SdkInternalApi
@@ -36,10 +36,11 @@ public final class DefaultDocument implements Document {
         return new DefaultDocument(itemMap);
     }
 
+    @Override
     public <T> T getItem(MappedTableResource<T> mappedTableResource) {
         return readAndTransformSingleItem(itemMap,
                                           mappedTableResource.tableSchema(),
-                                          OperationContext.create(mappedTableResource.tableName()),
+                                          DefaultOperationContext.create(mappedTableResource.tableName()),
                                           mappedTableResource.mapperExtension());
     }
 

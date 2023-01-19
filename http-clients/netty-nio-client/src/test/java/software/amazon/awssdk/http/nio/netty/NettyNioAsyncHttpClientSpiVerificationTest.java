@@ -32,15 +32,14 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import software.amazon.awssdk.http.EmptyPublisher;
 import software.amazon.awssdk.http.SdkHttpConfigurationOption;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
@@ -69,7 +68,7 @@ public class NettyNioAsyncHttpClientSpiVerificationTest {
 
     // CONNECTION_RESET_BY_PEER does not work on JDK 11. See https://github.com/tomakehurst/wiremock/issues/1009
     @Test
-    public void signalsErrorViaOnErrorAndFuture() throws InterruptedException, ExecutionException, TimeoutException {
+    public void signalsErrorViaOnErrorAndFuture() throws Exception {
         stubFor(any(urlEqualTo("/")).willReturn(aResponse().withFault(Fault.RANDOM_DATA_THEN_CLOSE)));
 
         CompletableFuture<Boolean> errorSignaled = new CompletableFuture<>();
@@ -94,7 +93,7 @@ public class NettyNioAsyncHttpClientSpiVerificationTest {
     }
 
     @Test
-    public void callsOnStreamForEmptyResponseContent() throws InterruptedException, ExecutionException, TimeoutException {
+    public void callsOnStreamForEmptyResponseContent() throws Exception {
         stubFor(any(urlEqualTo("/")).willReturn(aResponse().withStatus(204).withHeader("foo", "bar")));
 
         CompletableFuture<Boolean> streamReceived = new CompletableFuture<>();

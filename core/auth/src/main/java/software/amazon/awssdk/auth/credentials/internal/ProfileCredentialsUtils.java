@@ -35,10 +35,15 @@ import software.amazon.awssdk.auth.credentials.ContainerCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.ProcessCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProviderFactory;
+import software.amazon.awssdk.auth.credentials.ProfileProviderCredentialsContext;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
+import software.amazon.awssdk.core.internal.util.ClassLoaderHelper;
 import software.amazon.awssdk.profiles.Profile;
+import software.amazon.awssdk.profiles.ProfileFile;
 import software.amazon.awssdk.profiles.ProfileProperty;
+import software.amazon.awssdk.profiles.internal.ProfileSection;
 import software.amazon.awssdk.utils.SdkAutoCloseable;
 import software.amazon.awssdk.utils.Validate;
 
@@ -49,7 +54,13 @@ import software.amazon.awssdk.utils.Validate;
 public final class ProfileCredentialsUtils {
     private static final String STS_PROFILE_CREDENTIALS_PROVIDER_FACTORY =
         "software.amazon.awssdk.services.sts.internal.StsProfileCredentialsProviderFactory";
+    private static final String SSO_PROFILE_CREDENTIALS_PROVIDER_FACTORY =
+        "software.amazon.awssdk.services.sso.auth.SsoProfileCredentialsProviderFactory";
 
+    /**
+     * The profile file containing {@code profile}.
+     */
+    private final ProfileFile profileFile;
     private final Profile profile;
 
     /**
@@ -70,7 +81,10 @@ public final class ProfileCredentialsUtils {
      */
     private final Function<String, Optional<Profile>> credentialsSourceResolver;
 
-    public ProfileCredentialsUtils(Profile profile, Function<String, Optional<Profile>> credentialsSourceResolver) {
+    public ProfileCredentialsUtils(ProfileFile profileFile,
+                                   Profile profile,
+                                   Function<String, Optional<Profile>> credentialsSourceResolver) {
+        this.profileFile = Validate.paramNotNull(profileFile, "profileFile");
         this.profile = Validate.paramNotNull(profile, "profile");
         this.name = profile.name();
         this.properties = profile.properties();
@@ -94,18 +108,24 @@ public final class ProfileCredentialsUtils {
      * @param children The child profiles that source credentials from this profile.
      */
     private Optional<AwsCredentialsProvider> credentialsProvider(Set<String> children) {
+        if (properties.containsKey(ProfileProperty.ROLE_ARN) && properties.containsKey(ProfileProperty.WEB_IDENTITY_TOKEN_FILE)) {
+            return Optional.ofNullable(roleAndWebIdentityTokenProfileCredentialsProvider());
+        }
+
+        if (properties.containsKey(ProfileProperty.SSO_ROLE_NAME)
+            || properties.containsKey(ProfileProperty.SSO_ACCOUNT_ID)
+            || properties.containsKey(ProfileProperty.SSO_REGION)
+            || properties.containsKey(ProfileProperty.SSO_START_URL)
+            || properties.containsKey(ProfileSection.SSO_SESSION.getPropertyKeyName())) {
+            return Optional.ofNullable(ssoProfileCredentialsProvider());
+        }
+
         if (properties.containsKey(ProfileProperty.ROLE_ARN)) {
             boolean hasSourceProfile = properties.containsKey(ProfileProperty.SOURCE_PROFILE);
             boolean hasCredentialSource = properties.containsKey(ProfileProperty.CREDENTIAL_SOURCE);
-            boolean hasWebIdentityTokenFile = properties.containsKey(ProfileProperty.WEB_IDENTITY_TOKEN_FILE);
-            boolean hasRoleArn = properties.containsKey(ProfileProperty.ROLE_ARN);
             Validate.validState(!(hasSourceProfile && hasCredentialSource),
                                 "Invalid profile file: profile has both %s and %s.",
                                 ProfileProperty.SOURCE_PROFILE, ProfileProperty.CREDENTIAL_SOURCE);
-
-            if (hasWebIdentityTokenFile && hasRoleArn) {
-                return Optional.ofNullable(roleAndWebIdentityTokenProfileCredentialsProvider());
-            }
 
             if (hasSourceProfile) {
                 return Optional.ofNullable(roleAndSourceProfileBasedProfileCredentialsProvider(children));
@@ -163,6 +183,27 @@ public final class ProfileCredentialsUtils {
                                          .build();
     }
 
+    /**
+     * Create the SSO credentials provider based on the related profile properties.
+     */
+    private AwsCredentialsProvider ssoProfileCredentialsProvider() {
+        validateRequiredPropertiesForSsoCredentialsProvider();
+        return ssoCredentialsProviderFactory().create(
+            ProfileProviderCredentialsContext.builder()
+                                             .profile(profile)
+                                             .profileFile(profileFile)
+                                             .build());
+    }
+
+    private void validateRequiredPropertiesForSsoCredentialsProvider() {
+        requireProperties(ProfileProperty.SSO_ACCOUNT_ID,
+                          ProfileProperty.SSO_ROLE_NAME);
+
+        if (!properties.containsKey(ProfileSection.SSO_SESSION.getPropertyKeyName())) {
+            requireProperties(ProfileProperty.SSO_REGION, ProfileProperty.SSO_START_URL);
+        }
+    }
+
     private AwsCredentialsProvider roleAndWebIdentityTokenProfileCredentialsProvider() {
         requireProperties(ProfileProperty.ROLE_ARN, ProfileProperty.WEB_IDENTITY_TOKEN_FILE);
 
@@ -197,7 +238,7 @@ public final class ProfileCredentialsUtils {
         children.add(name);
         AwsCredentialsProvider sourceCredentialsProvider =
             credentialsSourceResolver.apply(properties.get(ProfileProperty.SOURCE_PROFILE))
-                                     .flatMap(p -> new ProfileCredentialsUtils(p, credentialsSourceResolver)
+                                     .flatMap(p -> new ProfileCredentialsUtils(profileFile, p, credentialsSourceResolver)
                                          .credentialsProvider(children))
                                      .orElseThrow(this::noSourceCredentialsException);
 
@@ -221,7 +262,15 @@ public final class ProfileCredentialsUtils {
             case ECS_CONTAINER:
                 return ContainerCredentialsProvider.builder().build();
             case EC2_INSTANCE_METADATA:
-                return InstanceProfileCredentialsProvider.create();
+                // The IMDS credentials provider should source the endpoint config properties from the currently active profile
+                Ec2MetadataConfigProvider configProvider = Ec2MetadataConfigProvider.builder()
+                        .profileFile(() -> profileFile)
+                        .profileName(name)
+                        .build();
+
+                return InstanceProfileCredentialsProvider.builder()
+                        .endpoint(configProvider.getEndpoint())
+                        .build();
             case ENVIRONMENT:
                 return AwsCredentialsProviderChain.builder()
                     .addCredentialsProvider(SystemPropertyCredentialsProvider.create())
@@ -252,12 +301,28 @@ public final class ProfileCredentialsUtils {
      */
     private ChildProfileCredentialsProviderFactory stsCredentialsProviderFactory() {
         try {
-            Class<?> stsCredentialsProviderFactory = Class.forName(STS_PROFILE_CREDENTIALS_PROVIDER_FACTORY, true,
-                                                                   Thread.currentThread().getContextClassLoader());
+            Class<?> stsCredentialsProviderFactory = ClassLoaderHelper.loadClass(STS_PROFILE_CREDENTIALS_PROVIDER_FACTORY,
+                    getClass());
             return (ChildProfileCredentialsProviderFactory) stsCredentialsProviderFactory.getConstructor().newInstance();
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("To use assumed roles in the '" + name + "' profile, the 'sts' service module must "
                                             + "be on the class path.", e);
+        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            throw new IllegalStateException("Failed to create the '" + name + "' profile credentials provider.", e);
+        }
+    }
+
+    /**
+     * Load the factory that can be used to create the SSO credentials provider, assuming it is on the classpath.
+     */
+    private ProfileCredentialsProviderFactory ssoCredentialsProviderFactory() {
+        try {
+            Class<?> ssoProfileCredentialsProviderFactory = ClassLoaderHelper.loadClass(SSO_PROFILE_CREDENTIALS_PROVIDER_FACTORY,
+                                                                                 getClass());
+            return (ProfileCredentialsProviderFactory) ssoProfileCredentialsProviderFactory.getConstructor().newInstance();
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("To use Sso related properties in the '" + name + "' profile, the 'sso' service "
+                                            + "module must be on the class path.", e);
         } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
             throw new IllegalStateException("Failed to create the '" + name + "' profile credentials provider.", e);
         }

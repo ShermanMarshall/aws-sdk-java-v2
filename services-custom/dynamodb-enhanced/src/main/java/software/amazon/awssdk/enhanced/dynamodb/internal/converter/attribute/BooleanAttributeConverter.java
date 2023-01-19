@@ -16,16 +16,15 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.TypeToken;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.PrimitiveConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.string.BooleanStringConverter;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -56,8 +55,8 @@ public final class BooleanAttributeConverter implements AttributeConverter<Boole
     }
 
     @Override
-    public TypeToken<Boolean> type() {
-        return TypeToken.of(Boolean.class);
+    public EnhancedType<Boolean> type() {
+        return EnhancedType.of(Boolean.class);
     }
 
     @Override
@@ -67,7 +66,7 @@ public final class BooleanAttributeConverter implements AttributeConverter<Boole
 
     @Override
     public AttributeValue transformFrom(Boolean input) {
-        return EnhancedAttributeValue.fromBoolean(input).toAttributeValue();
+        return AttributeValue.builder().bool(input).build();
     }
 
     @Override
@@ -79,8 +78,8 @@ public final class BooleanAttributeConverter implements AttributeConverter<Boole
     }
 
     @Override
-    public TypeToken<Boolean> primitiveType() {
-        return TypeToken.of(boolean.class);
+    public EnhancedType<Boolean> primitiveType() {
+        return EnhancedType.of(boolean.class);
     }
 
     private static final class Visitor extends TypeConvertingVisitor<Boolean> {
@@ -91,6 +90,15 @@ public final class BooleanAttributeConverter implements AttributeConverter<Boole
         @Override
         public Boolean convertString(String value) {
             return STRING_CONVERTER.fromString(value);
+        }
+
+        @Override
+        public Boolean convertNumber(String value) {
+            switch (value) {
+                case "0": return false;
+                case "1": return true;
+                default: throw new IllegalArgumentException("Number could not be converted to boolean: " + value);
+            }
         }
 
         @Override

@@ -15,29 +15,34 @@
 
 package software.amazon.awssdk.codegen.poet.model;
 
+import static software.amazon.awssdk.codegen.poet.model.TypeProvider.ShapeTransformation.USE_BUILDER;
+
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Modifier;
 import software.amazon.awssdk.codegen.model.intermediate.MemberModel;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
+import software.amazon.awssdk.codegen.poet.model.TypeProvider.TypeNameOptions;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.utils.CollectionUtils;
+import software.amazon.awssdk.core.util.SdkAutoConstructList;
+import software.amazon.awssdk.core.util.SdkAutoConstructMap;
 
 public final class BeanGetterHelper {
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
+    private final ServiceModelCopiers copiers;
     private final TypeProvider typeProvider;
 
-    public BeanGetterHelper(PoetExtensions poetExtensions, TypeProvider typeProvider) {
+    public BeanGetterHelper(PoetExtension poetExtensions, ServiceModelCopiers copiers, TypeProvider typeProvider) {
         this.poetExtensions = poetExtensions;
+        this.copiers = copiers;
         this.typeProvider = typeProvider;
     }
 
@@ -45,8 +50,8 @@ public final class BeanGetterHelper {
         if (memberModel.hasBuilder()) {
             return builderGetter(memberModel);
         }
-        if (memberModel.isCollectionWithBuilderMember()) {
-            return memberModel.isList() ? listOfBuildersGetter(memberModel) : mapOfBuildersGetter(memberModel);
+        if (memberModel.containsBuildable()) {
+            return buildableContainerGetter(memberModel);
         }
         if (memberModel.isSdkBytesType()) {
             return byteBufferGetter(memberModel);
@@ -60,23 +65,57 @@ public final class BeanGetterHelper {
         return regularGetter(memberModel);
     }
 
+    private MethodSpec buildableContainerGetter(MemberModel memberModel) {
+        TypeName returnType = typeProvider.typeName(memberModel, new TypeNameOptions().shapeTransformation(USE_BUILDER)
+                                                                                      .useByteBufferTypes(true));
+
+        ClassName copierClass = copiers.copierClassFor(memberModel)
+                                       .orElseThrow(() -> new IllegalStateException("Copier class not found for " + memberModel));
+
+        String variableName = memberModel.getVariable().getVariableName();
+
+        CodeBlock.Builder code = CodeBlock.builder();
+
+        code.add("$T result = $T.$N(this.$N);", returnType, copierClass, copiers.copyToBuilderMethodName(), variableName);
+
+        if (memberModel.isList()) {
+            code.add("if (result instanceof $T) {", SdkAutoConstructList.class)
+                .add("return null;")
+                .add("}");
+        }
+
+        if (memberModel.isMap()) {
+            code.add("if (result instanceof $T) {", SdkAutoConstructMap.class)
+                .add("return null;")
+                .add("}");
+        }
+
+        code.add("return result;");
+
+        return MethodSpec.methodBuilder(memberModel.getBeanStyleGetterMethodName())
+                         .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                         .returns(returnType)
+                         .addCode(code.build())
+                         .build();
+    }
+
     private MethodSpec byteBufferGetter(MemberModel memberModel) {
         return basicGetter(memberModel,
                            ClassName.get(ByteBuffer.class),
-                           CodeBlock.of("return $1N == null ? null : $1N.asByteBuffer()",
+                           CodeBlock.of("return $1N == null ? null : $1N.asByteBuffer();",
                                         memberModel.getVariable().getVariableName()));
     }
 
     private MethodSpec listByteBufferGetter(MemberModel memberModel) {
         return basicGetter(memberModel,
                            ParameterizedTypeName.get(List.class, ByteBuffer.class),
-                           CodeBlock.of("return $1N == null ? null : $1N.stream().map($2T::asByteBuffer).collect($3T.toList())",
+                           CodeBlock.of("return $1N == null ? null : $1N.stream().map($2T::asByteBuffer).collect($3T.toList());",
                                         memberModel.getVariable().getVariableName(), SdkBytes.class, Collectors.class));
     }
 
     private MethodSpec mapByteBufferGetter(MemberModel memberModel) {
         String body = "return $1N == null ? null : " +
-                      "$1N.entrySet().stream().collect($2T.toMap(e -> e.getKey(), e -> e.getValue().asByteBuffer()))";
+                      "$1N.entrySet().stream().collect($2T.toMap(e -> e.getKey(), e -> e.getValue().asByteBuffer()));";
         String keyType = memberModel.getMapModel().getKeyModel().getVariable().getVariableType();
         return basicGetter(memberModel,
                            PoetUtils.createParameterizedTypeName(Map.class, keyType, ByteBuffer.class.getSimpleName()),
@@ -86,51 +125,31 @@ public final class BeanGetterHelper {
     private MethodSpec regularGetter(MemberModel memberModel) {
         return basicGetter(memberModel,
                            typeProvider.parameterType(memberModel),
-                           CodeBlock.of("return $N", memberModel.getVariable().getVariableName()));
+                           CodeBlock.of("return $N;", memberModel.getVariable().getVariableName()));
     }
 
     private MethodSpec builderGetter(MemberModel memberModel) {
         return basicGetter(memberModel,
                            poetExtensions.getModelClass(memberModel.getC2jShape()).nestedClass("Builder"),
-                           CodeBlock.builder().add("return $1N != null ? $1N.toBuilder() : null",
-                                                   memberModel.getVariable().getVariableName())
-                                    .build());
+                           CodeBlock.of("return $1N != null ? $1N.toBuilder() : null;",
+                                        memberModel.getVariable().getVariableName()));
     }
 
-    private MethodSpec mapOfBuildersGetter(MemberModel memberModel) {
-        TypeName keyType = typeProvider.getTypeNameForSimpleType(memberModel.getMapModel().getKeyModel()
-                                                                            .getVariable().getVariableType());
-        ClassName valueType = poetExtensions.getModelClass(memberModel.getMapModel().getValueModel().getC2jShape());
-        TypeName returnType = ParameterizedTypeName.get(ClassName.get(Map.class), keyType, valueType.nestedClass("Builder"));
+    private MethodSpec basicGetter(MemberModel memberModel, TypeName returnType, CodeBlock body) {
+        CodeBlock.Builder getterBody = CodeBlock.builder();
 
-        return basicGetter(memberModel,
-                           returnType,
-                           CodeBlock.builder().add("return $1N != null ? $2T.mapValues($1N, $3T::toBuilder) : null",
-                                                   memberModel.getVariable().getVariableName(),
-                                                   CollectionUtils.class,
-                                                   valueType)
-                                    .build());
-    }
+        memberModel.getAutoConstructClassIfExists().ifPresent(autoConstructClass -> {
+            getterBody.add("if ($N instanceof $T) {", memberModel.getVariable().getVariableName(), autoConstructClass)
+                      .add("return null;")
+                      .add("}");
+        });
 
-    private MethodSpec listOfBuildersGetter(MemberModel memberModel) {
-        ClassName memberType = poetExtensions.getModelClass(memberModel.getListModel().getListMemberModel().getC2jShape());
-        TypeName returnType = ParameterizedTypeName.get(ClassName.get(Collection.class), memberType.nestedClass("Builder"));
+        getterBody.add(body);
 
-        return basicGetter(memberModel,
-                           returnType,
-                           CodeBlock.builder().add(
-                               "return $1N != null ? $1N.stream().map($2T::toBuilder).collect($3T.toList()) : null",
-                               memberModel.getVariable().getVariableName(),
-                               memberType,
-                               Collectors.class)
-                               .build());
-    }
-
-    private MethodSpec basicGetter(MemberModel memberModel, TypeName returnType, CodeBlock statement) {
         return MethodSpec.methodBuilder(memberModel.getBeanStyleGetterMethodName())
                          .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                          .returns(returnType)
-                         .addStatement(statement)
+                         .addCode(getterBody.build())
                          .build();
     }
 }

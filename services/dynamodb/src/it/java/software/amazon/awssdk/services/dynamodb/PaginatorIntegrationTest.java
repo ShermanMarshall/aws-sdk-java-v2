@@ -24,10 +24,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import software.amazon.awssdk.core.async.SdkPublisher;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -43,6 +48,7 @@ import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
 import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 import software.amazon.awssdk.services.dynamodb.paginators.ScanIterable;
+import software.amazon.awssdk.services.dynamodb.paginators.ScanPublisher;
 import utils.resources.tables.BasicTempTable;
 import utils.test.util.DynamoDBTestBase;
 import utils.test.util.TableUtils;
@@ -107,7 +113,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
 
     @Test
     public void test_MultipleIteration_On_Responses_Iterable() {
-        ScanRequest request = ScanRequest.builder().tableName(TABLE_NAME).limit(2).build();
+        ScanRequest request = scanRequest(2);
         ScanIterable scanResponses = dynamo.scanPaginator(request);
 
         int count = 0;
@@ -128,7 +134,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
 
     @Test
     public void test_MultipleIteration_On_PaginatedMember_Iterable() {
-        ScanRequest request = ScanRequest.builder().tableName(TABLE_NAME).limit(2).build();
+        ScanRequest request = scanRequest(2);
         SdkIterable<Map<String, AttributeValue>> items = dynamo.scanPaginator(request).items();
 
         int count = 0;
@@ -150,7 +156,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
     @Test
     public void test_MultipleIteration_On_Responses_Stream() {
         int results_per_page = 2;
-        ScanRequest request = ScanRequest.builder().tableName(TABLE_NAME).limit(results_per_page).build();
+        ScanRequest request = scanRequest(results_per_page);
         ScanIterable scanResponses = dynamo.scanPaginator(request);
 
         // Iterate once
@@ -169,8 +175,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
 
     @Test
     public void test_MultipleIteration_On_PaginatedMember_Stream() {
-        int results_per_page = 2;
-        ScanRequest request = ScanRequest.builder().tableName(TABLE_NAME).limit(results_per_page).build();
+        ScanRequest request = scanRequest(2);
         SdkIterable<Map<String, AttributeValue>> items = dynamo.scanPaginator(request).items();
 
         // Iterate once
@@ -195,7 +200,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
 
     @Test
     public void mix_Iterator_And_Stream_Calls() {
-        ScanRequest request = ScanRequest.builder().tableName(TABLE_NAME).limit(2).build();
+        ScanRequest request = scanRequest(2);
         ScanIterable scanResponses = dynamo.scanPaginator(request);
 
         assertEquals(ITEM_COUNT, scanResponses.stream().flatMap(r -> r.items().stream())
@@ -212,6 +217,46 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
         }
         assertEquals(ITEM_COUNT, count);
     }
+    
+    @Test
+    public void sdkPublisher_subscribe_handlesExceptions() throws Exception {
+        RuntimeException innerException = new RuntimeException();
+        ScanRequest request = scanRequest(2);
+        try {
+            dynamoAsync.scanPaginator(request).subscribe(r -> {
+                throw innerException;
+            }).get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException executionException) {
+            assertThat(executionException.getCause()).isSameAs(innerException);
+        }
+    }
+
+    @Test
+    public void sdkPublisher_filter_handlesExceptions()  {
+        sdkPublisherFunctionHandlesException((p, t) -> p.filter(f -> { throw t; }));
+    }
+
+    @Test
+    public void sdkPublisher_map_handlesExceptions() {
+        sdkPublisherFunctionHandlesException((p, t) -> p.map(f -> { throw t; }));
+    }
+
+    @Test
+    public void sdkPublisher_flatMapIterable_handlesExceptions() {
+        sdkPublisherFunctionHandlesException((p, t) -> p.flatMapIterable(f -> { throw t; }));
+    }
+
+    public void sdkPublisherFunctionHandlesException(BiFunction<ScanPublisher, RuntimeException, SdkPublisher<?>> function) {
+        RuntimeException innerException = new RuntimeException();
+        ScanRequest request = scanRequest(2);
+        try {
+            function.apply(dynamoAsync.scanPaginator(request), innerException).subscribe(r -> {}).get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException executionException) {
+            assertThat(executionException.getCause()).isSameAs(innerException);
+        } catch (InterruptedException | TimeoutException e) {
+            throw new AssertionError("SDK Publisher function did not handle exceptions correctly.", e);
+        }
+    }
 
     private static void putTestData() {
         Map<String, AttributeValue> item = new HashMap();
@@ -226,4 +271,7 @@ public class PaginatorIntegrationTest extends DynamoDBTestBase {
         }
     }
 
+    private ScanRequest scanRequest(int limit) {
+        return ScanRequest.builder().tableName(TABLE_NAME).consistentRead(true).limit(limit).build();
+    }
 }

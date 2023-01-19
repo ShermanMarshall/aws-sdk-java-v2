@@ -17,11 +17,16 @@ package software.amazon.awssdk.codegen.poet.client;
 
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_CLIENT_SOURCE_PATH_PARAM_NAME;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_STREAMING_INPUT_PARAM;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_STREAMING_OUTPUT_PARAM;
 import static software.amazon.awssdk.codegen.poet.client.AsyncClientInterface.STREAMING_TYPE_VARIABLE;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -31,17 +36,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import javax.lang.model.element.Modifier;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.codegen.docs.ClientType;
 import software.amazon.awssdk.codegen.docs.DocConfiguration;
 import software.amazon.awssdk.codegen.docs.SimpleMethodOverload;
+import software.amazon.awssdk.codegen.docs.WaiterDocs;
 import software.amazon.awssdk.codegen.model.config.customization.UtilitiesMethod;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
+import software.amazon.awssdk.codegen.poet.model.DeprecationUtils;
 import software.amazon.awssdk.codegen.utils.PaginatorUtils;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -50,6 +59,7 @@ import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.ServiceMetadata;
+import software.amazon.awssdk.regions.ServiceMetadataProvider;
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 
 public final class SyncClientInterface implements ClassSpec {
@@ -57,24 +67,33 @@ public final class SyncClientInterface implements ClassSpec {
     private final IntermediateModel model;
     private final ClassName className;
     private final String clientPackageName;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
 
     public SyncClientInterface(IntermediateModel model) {
         this.model = model;
         this.clientPackageName = model.getMetadata().getFullClientPackageName();
         this.className = ClassName.get(clientPackageName, model.getMetadata().getSyncInterface());
-        this.poetExtensions = new PoetExtensions(model);
+        this.poetExtensions = new PoetExtension(model);
     }
 
     @Override
     public TypeSpec poetSpec() {
         TypeSpec.Builder result = PoetUtils.createInterfaceBuilder(className);
 
+
         result.addSuperinterface(SdkClient.class)
+              .addAnnotation(SdkPublicApi.class)
+              .addAnnotation(ThreadSafe.class)
               .addField(FieldSpec.builder(String.class, "SERVICE_NAME")
                                  .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
                                  .initializer("$S", model.getMetadata().getSigningName())
-                                 .build());
+                                 .build())
+               .addField(FieldSpec.builder(String.class, "SERVICE_METADATA_ID")
+                                  .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                                  .initializer("$S", model.getMetadata().getEndpointPrefix())
+                                  .addJavadoc("Value for looking up the service's metadata from the {@link $T}.",
+                                              ServiceMetadataProvider.class)
+                                  .build());
 
         PoetUtils.addJavadoc(result::addJavadoc, getJavadoc());
 
@@ -90,9 +109,12 @@ public final class SyncClientInterface implements ClassSpec {
             result.addMethod(utilitiesMethod());
         }
 
+        if (model.hasWaiters()) {
+            result.addMethod(waiterMethod());
+        }
+
         return result.build();
     }
-
 
     @Override
     public ClassName className() {
@@ -141,7 +163,7 @@ public final class SyncClientInterface implements ClassSpec {
         return MethodSpec.methodBuilder("serviceMetadata")
                          .returns(ServiceMetadata.class)
                          .addModifiers(Modifier.STATIC, Modifier.PUBLIC)
-                         .addStatement("return $T.of($S)", ServiceMetadata.class, model.getMetadata().getEndpointPrefix())
+                         .addStatement("return $T.of(SERVICE_METADATA_ID)", ServiceMetadata.class)
                          .build();
     }
 
@@ -157,7 +179,10 @@ public final class SyncClientInterface implements ClassSpec {
         methods.addAll(streamingSimpleMethods(opModel));
         methods.addAll(paginatedMethods(opModel));
 
-        return methods;
+        return methods.stream()
+                      // Add Deprecated annotation if needed to all overloads
+                      .map(m -> DeprecationUtils.checkDeprecated(opModel, m))
+                      .collect(toList());
     }
 
     private MethodSpec simpleMethod(OperationModel opModel) {
@@ -278,13 +303,13 @@ public final class SyncClientInterface implements ClassSpec {
 
     private static void streamingMethod(MethodSpec.Builder methodBuilder, OperationModel opModel, TypeName responseType) {
         if (opModel.hasStreamingInput()) {
-            methodBuilder.addParameter(ClassName.get(RequestBody.class), "requestBody");
+            methodBuilder.addParameter(ClassName.get(RequestBody.class), SYNC_STREAMING_INPUT_PARAM);
         }
         if (opModel.hasStreamingOutput()) {
             methodBuilder.addTypeVariable(STREAMING_TYPE_VARIABLE);
             ParameterizedTypeName streamingResponseHandlerType = ParameterizedTypeName
                     .get(ClassName.get(ResponseTransformer.class), responseType, STREAMING_TYPE_VARIABLE);
-            methodBuilder.addParameter(streamingResponseHandlerType, "responseTransformer");
+            methodBuilder.addParameter(streamingResponseHandlerType, SYNC_STREAMING_OUTPUT_PARAM);
         }
     }
 
@@ -338,17 +363,21 @@ public final class SyncClientInterface implements ClassSpec {
      * @return Simple method for streaming input operations to read data from a file.
      */
     private MethodSpec uploadFromFileSimpleMethod(OperationModel opModel, TypeName responseType, ClassName requestType) {
-        return MethodSpec.methodBuilder(opModel.getMethodName())
+        String methodName = opModel.getMethodName();
+        ParameterSpec inputVarParam = ParameterSpec.builder(requestType, opModel.getInput().getVariableName()).build();
+        ParameterSpec srcPathParam = ParameterSpec.builder(ClassName.get(Path.class),
+                                                              SYNC_CLIENT_SOURCE_PATH_PARAM_NAME).build();
+        return MethodSpec.methodBuilder(methodName)
                          .returns(responseType)
                          .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                         .addParameter(requestType, opModel.getInput().getVariableName())
-                         .addParameter(ClassName.get(Path.class), "filePath")
+                         .addParameter(inputVarParam)
+                         .addParameter(srcPathParam)
                          .addJavadoc(opModel.getDocs(model, ClientType.SYNC, SimpleMethodOverload.FILE))
                          .addExceptions(getExceptionClasses(model, opModel))
-                         .addStatement("return $L($L, $T.fromFile($L))", opModel.getMethodName(),
-                                       opModel.getInput().getVariableName(),
+                         .addStatement("return $L($N, $T.fromFile($N))", methodName,
+                                       inputVarParam,
                                        ClassName.get(RequestBody.class),
-                                       "filePath")
+                                       srcPathParam)
                          .build();
     }
 
@@ -390,17 +419,21 @@ public final class SyncClientInterface implements ClassSpec {
      * @return Simple method for streaming output operations to write response content to a file.
      */
     private MethodSpec downloadToFileSimpleMethod(OperationModel opModel, TypeName responseType, ClassName requestType) {
-        return MethodSpec.methodBuilder(opModel.getMethodName())
+        String methodName = opModel.getMethodName();
+        ParameterSpec inputVarParam = ParameterSpec.builder(requestType, opModel.getInput().getVariableName()).build();
+        ParameterSpec dstFileParam =
+            ParameterSpec.builder(ClassName.get(Path.class), SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME).build();
+        return MethodSpec.methodBuilder(methodName)
                          .returns(responseType)
                          .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                         .addParameter(requestType, opModel.getInput().getVariableName())
-                         .addParameter(ClassName.get(Path.class), "filePath")
+                         .addParameter(inputVarParam)
+                         .addParameter(dstFileParam)
                          .addJavadoc(opModel.getDocs(model, ClientType.SYNC, SimpleMethodOverload.FILE))
                          .addExceptions(getExceptionClasses(model, opModel))
-                         .addStatement("return $L($L, $T.toFile($L))", opModel.getMethodName(),
-                                       opModel.getInput().getVariableName(),
+                         .addStatement("return $L($N, $T.toFile($N))", methodName,
+                                       inputVarParam,
                                        ClassName.get(ResponseTransformer.class),
-                                       "filePath")
+                                       dstFileParam)
                          .build();
     }
 
@@ -411,19 +444,25 @@ public final class SyncClientInterface implements ClassSpec {
     private MethodSpec streamingInputOutputFileSimpleMethod(OperationModel opModel,
                                                             TypeName responseType,
                                                             ClassName requestType) {
-        return MethodSpec.methodBuilder(opModel.getMethodName())
+        String methodName = opModel.getMethodName();
+        ParameterSpec inputVarParam = ParameterSpec.builder(requestType, opModel.getInput().getVariableName()).build();
+        ParameterSpec srcFileParam = ParameterSpec.builder(ClassName.get(Path.class), SYNC_CLIENT_SOURCE_PATH_PARAM_NAME).build();
+        ParameterSpec dstFileParam =
+            ParameterSpec.builder(ClassName.get(Path.class), SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME).build();
+        return MethodSpec.methodBuilder(methodName)
                          .returns(responseType)
                          .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                         .addParameter(requestType, opModel.getInput().getVariableName())
-                         .addParameter(ClassName.get(Path.class), "sourcePath")
-                         .addParameter(ClassName.get(Path.class), "destinationPath")
+                         .addParameter(inputVarParam)
+                         .addParameter(srcFileParam)
+                         .addParameter(dstFileParam)
                          .addJavadoc(opModel.getDocs(model, ClientType.SYNC, SimpleMethodOverload.FILE))
                          .addExceptions(getExceptionClasses(model, opModel))
-                         .addStatement("return $L($L, $T.fromFile(sourcePath), $T.toFile(destinationPath))",
-                                       opModel.getMethodName(),
-                                       opModel.getInput().getVariableName(),
-                                       ClassName.get(RequestBody.class),
-                                       ClassName.get(ResponseTransformer.class))
+                         .addStatement("return $L($N, $T.fromFile($N), $T.toFile($N))",
+                                       methodName,
+                                       inputVarParam,
+                                       ClassName.get(RequestBody.class), srcFileParam,
+                                       ClassName.get(ResponseTransformer.class),
+                                       dstFileParam)
                          .build();
     }
 
@@ -454,6 +493,15 @@ public final class SyncClientInterface implements ClassSpec {
                          .addStatement("throw new $T()", UnsupportedOperationException.class)
                          .addJavadoc("Creates an instance of {@link $T} object with the "
                                      + "configuration set on this client.", returnType)
+                         .build();
+    }
+
+    private MethodSpec waiterMethod() {
+        return MethodSpec.methodBuilder("waiter")
+                         .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                         .addStatement("throw new $T()", UnsupportedOperationException.class)
+                         .returns(poetExtensions.getSyncWaiterInterface())
+                         .addJavadoc(WaiterDocs.waiterMethodInClient(poetExtensions.getSyncWaiterInterface()))
                          .build();
     }
 }

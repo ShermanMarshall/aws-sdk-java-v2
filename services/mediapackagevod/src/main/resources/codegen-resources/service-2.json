@@ -13,6 +13,42 @@
     "uid": "mediapackage-vod-2018-11-07"
   },
   "operations": {
+    "ConfigureLogs": {
+      "documentation": "Changes the packaging group's properities to configure log subscription",
+      "errors": [
+        {
+          "shape": "UnprocessableEntityException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ],
+      "http": {
+        "method": "PUT",
+        "requestUri": "/packaging_groups/{id}/configure_logs",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ConfigureLogsRequest"
+      },
+      "name": "ConfigureLogs",
+      "output": {
+        "documentation": "The updated MediaPackage VOD PackagingGroup resource.",
+        "shape": "ConfigureLogsResponse"
+      }
+    },
     "CreateAsset": {
       "documentation": "Creates a new MediaPackage VOD Asset resource.",
       "errors": [
@@ -444,6 +480,85 @@
         "documentation": "A collection of MediaPackage VOD PackagingGroup resources.",
         "shape": "ListPackagingGroupsResponse"
       }
+    },
+    "ListTagsForResource": {
+      "documentation": "Returns a list of the tags assigned to the specified resource.",
+      "errors": [],
+      "http": {
+        "method": "GET",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "ListTagsForResourceRequest"
+      },
+      "name": "ListTagsForResource",
+      "output": {
+        "documentation": "200 response",
+        "shape": "ListTagsForResourceResponse"
+      }
+    },
+    "TagResource": {
+      "documentation": "Adds tags to the specified resource. You can specify one or more tags to add.",
+      "errors": [],
+      "http": {
+        "method": "POST",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "TagResourceRequest"
+      },
+      "name": "TagResource"
+    },
+    "UntagResource": {
+      "documentation": "Removes tags from the specified resource. You can specify one or more tags to remove.",
+      "errors": [],
+      "http": {
+        "method": "DELETE",
+        "requestUri": "/tags/{resource-arn}",
+        "responseCode": 204
+      },
+      "input": {
+        "shape": "UntagResourceRequest"
+      },
+      "name": "UntagResource"
+    },
+    "UpdatePackagingGroup": {
+      "documentation": "Updates a specific packaging group. You can't change the id attribute or any other system-generated attributes.",
+      "errors": [
+        {
+          "shape": "UnprocessableEntityException"
+        },
+        {
+          "shape": "InternalServerErrorException"
+        },
+        {
+          "shape": "ForbiddenException"
+        },
+        {
+          "shape": "NotFoundException"
+        },
+        {
+          "shape": "ServiceUnavailableException"
+        },
+        {
+          "shape": "TooManyRequestsException"
+        }
+      ],
+      "http": {
+        "method": "PUT",
+        "requestUri": "/packaging_groups/{id}",
+        "responseCode": 200
+      },
+      "input": {
+        "shape": "UpdatePackagingGroupRequest"
+      },
+      "name": "UpdatePackagingGroup",
+      "output": {
+        "documentation": "The updated MediaPackage VOD PackagingGroup resource.",
+        "shape": "UpdatePackagingGroupResponse"
+      }
     }
   },
   "shapes": {
@@ -497,6 +612,10 @@
           "documentation": "The IAM role_arn used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -528,6 +647,10 @@
           "documentation": "The IAM role ARN used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -591,13 +714,42 @@
           "documentation": "The IAM role ARN used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
+      "type": "structure"
+    },
+    "Authorization": {
+      "documentation": "CDN Authorization credentials",
+      "members": {
+        "CdnIdentifierSecret": {
+          "documentation": "The Amazon Resource Name (ARN) for the secret in AWS Secrets Manager that is used for CDN authorization.",
+          "locationName": "cdnIdentifierSecret",
+          "shape": "__string"
+        },
+        "SecretsRoleArn": {
+          "documentation": "The Amazon Resource Name (ARN) for the IAM role that allows MediaPackage to communicate with AWS Secrets Manager.",
+          "locationName": "secretsRoleArn",
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "SecretsRoleArn",
+        "CdnIdentifierSecret"
+      ],
       "type": "structure"
     },
     "CmafEncryption": {
       "documentation": "A CMAF encryption configuration.",
       "members": {
+        "ConstantInitializationVector": {
+          "documentation": "An optional 128-bit, 16-byte hex value represented by a 32-character string, used in conjunction with the key for encrypting blocks. If you don't specify a value, then MediaPackage creates the constant initialization vector (IV).",
+          "locationName": "constantInitializationVector",
+          "shape": "__string"
+        },
         "SpekeKeyProvider": {
           "locationName": "spekeKeyProvider",
           "shape": "SpekeKeyProvider"
@@ -620,6 +772,11 @@
           "locationName": "hlsManifests",
           "shape": "__listOfHlsManifest"
         },
+        "IncludeEncoderConfigurationInSegments": {
+          "documentation": "When includeEncoderConfigurationInSegments is set to true, MediaPackage places your encoder's Sequence Parameter Set (SPS), Picture Parameter Set (PPS), and Video Parameter Set (VPS) metadata in every video segment instead of in the init fragment. This lets you use different SPS/PPS/VPS settings for your assets during content playback.\n",
+          "locationName": "includeEncoderConfigurationInSegments",
+          "shape": "__boolean"
+        },
         "SegmentDurationSeconds": {
           "documentation": "Duration (in seconds) of each fragment. Actual fragments will be\nrounded to the nearest multiple of the source fragment duration.\n",
           "locationName": "segmentDurationSeconds",
@@ -629,6 +786,67 @@
       "required": [
         "HlsManifests"
       ],
+      "type": "structure"
+    },
+    "ConfigureLogsParameters": {
+      "documentation": "The configuration parameters for egress access logging.",
+      "members": {
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        }
+      },
+      "type": "structure"
+    },
+    "ConfigureLogsRequest": {
+      "documentation": "The option to configure log subscription.",
+      "members": {
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
+        "Id": {
+          "documentation": "The ID of a MediaPackage VOD PackagingGroup resource.",
+          "location": "uri",
+          "locationName": "id",
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "type": "structure"
+    },
+    "ConfigureLogsResponse": {
+      "members": {
+        "Arn": {
+          "documentation": "The ARN of the PackagingGroup.",
+          "locationName": "arn",
+          "shape": "__string"
+        },
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
+        "DomainName": {
+          "documentation": "The fully qualified domain name for Assets in the PackagingGroup.",
+          "locationName": "domainName",
+          "shape": "__string"
+        },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
+        "Id": {
+          "documentation": "The ID of the PackagingGroup.",
+          "locationName": "id",
+          "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
+        }
+      },
       "type": "structure"
     },
     "CreateAssetRequest": {
@@ -658,6 +876,10 @@
           "documentation": "The IAM role ARN used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -709,6 +931,10 @@
           "documentation": "The IAM role_arn used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -741,6 +967,10 @@
           "documentation": "The ID of a PackagingGroup.",
           "locationName": "packagingGroupId",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -781,6 +1011,10 @@
           "documentation": "The ID of a PackagingGroup.",
           "locationName": "packagingGroupId",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -788,10 +1022,22 @@
     "CreatePackagingGroupRequest": {
       "documentation": "A new MediaPackage VOD PackagingGroup resource configuration.",
       "members": {
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
         "Id": {
           "documentation": "The ID of the PackagingGroup.",
           "locationName": "id",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -806,15 +1052,27 @@
           "locationName": "arn",
           "shape": "__string"
         },
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
         "DomainName": {
           "documentation": "The fully qualified domain name for Assets in the PackagingGroup.",
           "locationName": "domainName",
           "shape": "__string"
         },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
         "Id": {
           "documentation": "The ID of the PackagingGroup.",
           "locationName": "id",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -855,6 +1113,11 @@
           "locationName": "profile",
           "shape": "Profile"
         },
+        "ScteMarkersSource": {
+          "documentation": "The source of scte markers used. When set to SEGMENTS, the scte markers are sourced from the segments of the ingested content. When set to MANIFEST, the scte markers are sourced from the manifest of the ingested content. The MANIFEST value is compatible with source HLS playlists using the SCTE-35 Enhanced syntax (#EXT-OATCLS-SCTE35 tags). SCTE-35 Elemental and SCTE-35 Daterange syntaxes are not supported with this option.",
+          "locationName": "scteMarkersSource",
+          "shape": "ScteMarkersSource"
+        },
         "StreamSelection": {
           "locationName": "streamSelection",
           "shape": "StreamSelection"
@@ -873,6 +1136,16 @@
         "Encryption": {
           "locationName": "encryption",
           "shape": "DashEncryption"
+        },
+        "IncludeEncoderConfigurationInSegments": {
+          "documentation": "When includeEncoderConfigurationInSegments is set to true, MediaPackage places your encoder's Sequence Parameter Set (SPS), Picture Parameter Set (PPS), and Video Parameter Set (VPS) metadata in every video segment instead of in the init fragment. This lets you use different SPS/PPS/VPS settings for your assets during content playback.\n",
+          "locationName": "includeEncoderConfigurationInSegments",
+          "shape": "__boolean"
+        },
+        "IncludeIframeOnlyStream": {
+          "documentation": "When enabled, an I-Frame only stream will be included in the output.",
+          "locationName": "includeIframeOnlyStream",
+          "shape": "__boolean"
         },
         "PeriodTriggers": {
           "documentation": "A list of triggers that controls when the outgoing Dynamic Adaptive Streaming over HTTP (DASH)\nMedia Presentation Description (MPD) will be partitioned into multiple periods. If empty, the content will not\nbe partitioned into more than one period. If the list contains \"ADS\", new periods will be created where\nthe Asset contains SCTE-35 ad markers.\n",
@@ -1004,6 +1277,10 @@
           "documentation": "The IAM role_arn used to access the source S3 bucket.",
           "locationName": "sourceRoleArn",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -1054,6 +1331,10 @@
           "documentation": "The ID of a PackagingGroup.",
           "locationName": "packagingGroupId",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -1074,19 +1355,47 @@
     },
     "DescribePackagingGroupResponse": {
       "members": {
+        "ApproximateAssetCount": {
+          "documentation": "The approximate asset count of the PackagingGroup.",
+          "locationName": "approximateAssetCount",
+          "shape": "__integer"
+        },
         "Arn": {
           "documentation": "The ARN of the PackagingGroup.",
           "locationName": "arn",
           "shape": "__string"
+        },
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
         },
         "DomainName": {
           "documentation": "The fully qualified domain name for Assets in the PackagingGroup.",
           "locationName": "domainName",
           "shape": "__string"
         },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
         "Id": {
           "documentation": "The ID of the PackagingGroup.",
           "locationName": "id",
+          "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
+        }
+      },
+      "type": "structure"
+    },
+    "EgressAccessLogs": {
+      "documentation": "Configure egress access logging.",
+      "members": {
+        "LogGroupName": {
+          "documentation": "Customize the log group name.",
+          "locationName": "logGroupName",
           "shape": "__string"
         }
       },
@@ -1100,12 +1409,37 @@
           "locationName": "packagingConfigurationId",
           "shape": "__string"
         },
+        "Status": {
+          "documentation": "The current processing status of the asset used for the packaging configuration. The status can be either QUEUED, PROCESSING, PLAYABLE, or FAILED. Status information won't be available for most assets ingested before 2021-09-30.",
+          "locationName": "status",
+          "shape": "__string"
+        },
         "Url": {
           "documentation": "The URL of the parent manifest for the repackaged Asset.",
           "locationName": "url",
           "shape": "__string"
         }
       },
+      "type": "structure"
+    },
+    "EncryptionContractConfiguration": {
+      "documentation": "Use encryptionContractConfiguration to configure one or more content encryption keys for your endpoints that use SPEKE 2.0. \nThe encryption contract defines which content keys are used to encrypt the audio and video tracks in your stream. \nTo configure the encryption contract, specify which audio and video encryption presets to use.\nNote the following considerations when using encryptionContractConfiguration:\nencryptionContractConfiguration can be used for DASH endpoints that use SPEKE 2.0. SPEKE 2.0 relies on the CPIX 2.3 specification.\nYou must disable key rotation for this endpoint by setting keyRotationIntervalSeconds to 0.\n",
+      "members": {
+        "PresetSpeke20Audio": {
+          "documentation": "A collection of audio encryption presets.",
+          "locationName": "presetSpeke20Audio",
+          "shape": "PresetSpeke20Audio"
+        },
+        "PresetSpeke20Video": {
+          "documentation": "A collection of video encryption presets.",
+          "locationName": "presetSpeke20Video",
+          "shape": "PresetSpeke20Video"
+        }
+      },
+      "required": [
+        "PresetSpeke20Audio",
+        "PresetSpeke20Video"
+      ],
       "type": "structure"
     },
     "EncryptionMethod": {
@@ -1198,6 +1532,11 @@
           "documentation": "A list of HLS manifest configurations.",
           "locationName": "hlsManifests",
           "shape": "__listOfHlsManifest"
+        },
+        "IncludeDvbSubtitles": {
+          "documentation": "When enabled, MediaPackage passes through digital video broadcasting (DVB) subtitles into the output.",
+          "locationName": "includeDvbSubtitles",
+          "shape": "__boolean"
         },
         "SegmentDurationSeconds": {
           "documentation": "Duration (in seconds) of each fragment. Actual fragments will be\nrounded to the nearest multiple of the source fragment duration.\n",
@@ -1337,6 +1676,30 @@
       },
       "type": "structure"
     },
+    "ListTagsForResourceRequest": {
+      "members": {
+        "ResourceArn": {
+          "documentation": "The Amazon Resource Name (ARN) for the resource. You can get this from the response to any request to the resource.",
+          "location": "uri",
+          "locationName": "resource-arn",
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "ResourceArn"
+      ],
+      "type": "structure"
+    },
+    "ListTagsForResourceResponse": {
+      "members": {
+        "Tags": {
+          "documentation": "A collection of tags associated with a resource",
+          "locationName": "tags",
+          "shape": "__mapOf__string"
+        }
+      },
+      "type": "structure"
+    },
     "ManifestLayout": {
       "enum": [
         "FULL",
@@ -1447,6 +1810,10 @@
           "documentation": "The ID of a PackagingGroup.",
           "locationName": "packagingGroupId",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -1479,6 +1846,10 @@
           "documentation": "The ID of a PackagingGroup.",
           "locationName": "packagingGroupId",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -1506,20 +1877,37 @@
     "PackagingGroup": {
       "documentation": "A MediaPackage VOD PackagingGroup resource.",
       "members": {
+        "ApproximateAssetCount": {
+          "documentation": "The approximate asset count of the PackagingGroup.",
+          "locationName": "approximateAssetCount",
+          "shape": "__integer"
+        },
         "Arn": {
           "documentation": "The ARN of the PackagingGroup.",
           "locationName": "arn",
           "shape": "__string"
+        },
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
         },
         "DomainName": {
           "documentation": "The fully qualified domain name for Assets in the PackagingGroup.",
           "locationName": "domainName",
           "shape": "__string"
         },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
         "Id": {
           "documentation": "The ID of the PackagingGroup.",
           "locationName": "id",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -1527,10 +1915,22 @@
     "PackagingGroupCreateParameters": {
       "documentation": "Parameters used to create a new MediaPackage VOD PackagingGroup resource.",
       "members": {
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
         "Id": {
           "documentation": "The ID of the PackagingGroup.",
           "locationName": "id",
           "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "required": [
@@ -1554,10 +1954,52 @@
       },
       "type": "structure"
     },
+    "PackagingGroupUpdateParameters": {
+      "documentation": "Parameters used to update a MediaPackage packaging group.",
+      "members": {
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        }
+      },
+      "type": "structure"
+    },
+    "PresetSpeke20Audio": {
+      "enum": [
+        "PRESET-AUDIO-1",
+        "PRESET-AUDIO-2",
+        "PRESET-AUDIO-3",
+        "SHARED",
+        "UNENCRYPTED"
+      ],
+      "type": "string"
+    },
+    "PresetSpeke20Video": {
+      "enum": [
+        "PRESET-VIDEO-1",
+        "PRESET-VIDEO-2",
+        "PRESET-VIDEO-3",
+        "PRESET-VIDEO-4",
+        "PRESET-VIDEO-5",
+        "PRESET-VIDEO-6",
+        "PRESET-VIDEO-7",
+        "PRESET-VIDEO-8",
+        "SHARED",
+        "UNENCRYPTED"
+      ],
+      "type": "string"
+    },
     "Profile": {
       "enum": [
         "NONE",
         "HBBTV_1_5"
+      ],
+      "type": "string"
+    },
+    "ScteMarkersSource": {
+      "enum": [
+        "SEGMENTS",
+        "MANIFEST"
       ],
       "type": "string"
     },
@@ -1586,6 +2028,10 @@
     "SpekeKeyProvider": {
       "documentation": "A configuration for accessing an external Secure Packager and Encoder Key Exchange (SPEKE) service that will provide encryption keys.",
       "members": {
+        "EncryptionContractConfiguration": {
+          "locationName": "encryptionContractConfiguration",
+          "shape": "EncryptionContractConfiguration"
+        },
         "RoleArn": {
           "documentation": "An Amazon Resource Name (ARN) of an IAM role that AWS Elemental\nMediaPackage will assume when accessing the key provider service.\n",
           "locationName": "roleArn",
@@ -1638,6 +2084,49 @@
       },
       "type": "structure"
     },
+    "TagResourceRequest": {
+      "members": {
+        "ResourceArn": {
+          "documentation": "The Amazon Resource Name (ARN) for the resource. You can get this from the response to any request to the resource.",
+          "location": "uri",
+          "locationName": "resource-arn",
+          "shape": "__string"
+        },
+        "Tags": {
+          "documentation": "A collection of tags associated with a resource",
+          "locationName": "tags",
+          "shape": "__mapOf__string"
+        }
+      },
+      "required": [
+        "ResourceArn",
+        "Tags"
+      ],
+      "type": "structure"
+    },
+    "Tags": {
+      "documentation": "A collection of tags associated with a resource",
+      "key": {
+        "shape": "__string"
+      },
+      "type": "map",
+      "value": {
+        "shape": "__string"
+      }
+    },
+    "TagsModel": {
+      "members": {
+        "Tags": {
+          "documentation": "A collection of tags associated with a resource",
+          "locationName": "tags",
+          "shape": "__mapOf__string"
+        }
+      },
+      "required": [
+        "Tags"
+      ],
+      "type": "structure"
+    },
     "TooManyRequestsException": {
       "documentation": "The client has exceeded their resource or throttling limits.",
       "error": {
@@ -1662,6 +2151,83 @@
         "Message": {
           "locationName": "message",
           "shape": "__string"
+        }
+      },
+      "type": "structure"
+    },
+    "UntagResourceRequest": {
+      "members": {
+        "ResourceArn": {
+          "documentation": "The Amazon Resource Name (ARN) for the resource. You can get this from the response to any request to the resource.",
+          "location": "uri",
+          "locationName": "resource-arn",
+          "shape": "__string"
+        },
+        "TagKeys": {
+          "documentation": "A comma-separated list of the tag keys to remove from the resource.",
+          "location": "querystring",
+          "locationName": "tagKeys",
+          "shape": "__listOf__string"
+        }
+      },
+      "required": [
+        "TagKeys",
+        "ResourceArn"
+      ],
+      "type": "structure"
+    },
+    "UpdatePackagingGroupRequest": {
+      "documentation": "A MediaPackage VOD PackagingGroup resource configuration.",
+      "members": {
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
+        "Id": {
+          "documentation": "The ID of a MediaPackage VOD PackagingGroup resource.",
+          "location": "uri",
+          "locationName": "id",
+          "shape": "__string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "type": "structure"
+    },
+    "UpdatePackagingGroupResponse": {
+      "members": {
+        "ApproximateAssetCount": {
+          "documentation": "The approximate asset count of the PackagingGroup.",
+          "locationName": "approximateAssetCount",
+          "shape": "__integer"
+        },
+        "Arn": {
+          "documentation": "The ARN of the PackagingGroup.",
+          "locationName": "arn",
+          "shape": "__string"
+        },
+        "Authorization": {
+          "locationName": "authorization",
+          "shape": "Authorization"
+        },
+        "DomainName": {
+          "documentation": "The fully qualified domain name for Assets in the PackagingGroup.",
+          "locationName": "domainName",
+          "shape": "__string"
+        },
+        "EgressAccessLogs": {
+          "locationName": "egressAccessLogs",
+          "shape": "EgressAccessLogs"
+        },
+        "Id": {
+          "documentation": "The ID of the PackagingGroup.",
+          "locationName": "id",
+          "shape": "__string"
+        },
+        "Tags": {
+          "locationName": "tags",
+          "shape": "Tags"
         }
       },
       "type": "structure"
@@ -1737,6 +2303,15 @@
     },
     "__long": {
       "type": "long"
+    },
+    "__mapOf__string": {
+      "key": {
+        "shape": "__string"
+      },
+      "type": "map",
+      "value": {
+        "shape": "__string"
+      }
     },
     "__string": {
       "type": "string"

@@ -20,15 +20,25 @@ import software.amazon.awssdk.annotations.SdkPublicApi;
 
 /**
  * A class that lazily constructs a value the first time {@link #getValue()} is invoked.
+ *
+ * This should be {@link #close()}d if the initializer returns value that needs to be {@link AutoCloseable#close()}d.
  */
 @SdkPublicApi
-public class Lazy<T> {
+public class Lazy<T> implements SdkAutoCloseable {
     private final Supplier<T> initializer;
 
     private volatile T value;
 
     public Lazy(Supplier<T> initializer) {
         this.initializer = initializer;
+    }
+
+    public static <T> Lazy<T> withValue(T initialValue) {
+        return new ResolvedLazy<>(initialValue);
+    }
+
+    public boolean hasValue() {
+        return value != null;
     }
 
     public T getValue() {
@@ -52,5 +62,49 @@ public class Lazy<T> {
         return ToString.builder("Lazy")
                        .add("value", value == null ? "Uninitialized" : value)
                        .build();
+    }
+
+    @Override
+    public void close() {
+        try {
+            // Make sure the value has been initialized before we attempt to close it
+            getValue();
+        } catch (RuntimeException e) {
+            // Failed to initialize the value.
+        }
+
+        IoUtils.closeIfCloseable(initializer, null);
+        IoUtils.closeIfCloseable(value, null);
+    }
+
+    private static class ResolvedLazy<T> extends Lazy<T> {
+        private final T initialValue;
+
+        private ResolvedLazy(T initialValue) {
+            super(null);
+            this.initialValue = initialValue;
+        }
+
+        @Override
+        public boolean hasValue() {
+            return true;
+        }
+
+        @Override
+        public T getValue() {
+            return initialValue;
+        }
+
+        @Override
+        public String toString() {
+            return ToString.builder("Lazy")
+                           .add("value", initialValue)
+                           .build();
+        }
+
+        @Override
+        public void close() {
+            IoUtils.closeIfCloseable(initialValue, null);
+        }
     }
 }

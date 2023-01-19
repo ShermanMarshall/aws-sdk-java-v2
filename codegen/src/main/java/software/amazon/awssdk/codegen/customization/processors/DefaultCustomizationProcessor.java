@@ -33,7 +33,11 @@ public final class DefaultCustomizationProcessor {
                 new ShapeModifiersProcessor(config.getShapeModifiers()),
                 new ShapeSubstitutionsProcessor(config.getShapeSubstitutions()),
                 new OperationModifiersProcessor(config.getOperationModifiers()),
-                new RemoveExceptionMessagePropertyProcessor()
-        );
+                new RemoveExceptionMessagePropertyProcessor(),
+                new UseLegacyEventGenerationSchemeProcessor(),
+                new NewAndLegacyEventStreamProcessor(),
+                new S3RemoveBucketFromUriProcessor(),
+                new S3ControlRemoveAccountIdHostPrefixProcessor()
+                );
     }
 }

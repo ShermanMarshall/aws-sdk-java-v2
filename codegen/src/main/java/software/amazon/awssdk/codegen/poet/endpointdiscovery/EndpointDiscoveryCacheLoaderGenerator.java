@@ -27,24 +27,27 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.awscore.AwsRequestOverrideConfiguration;
 import software.amazon.awssdk.codegen.emitters.GeneratorTaskParams;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
 import software.amazon.awssdk.core.endpointdiscovery.EndpointDiscoveryCacheLoader;
 import software.amazon.awssdk.core.endpointdiscovery.EndpointDiscoveryEndpoint;
 import software.amazon.awssdk.core.endpointdiscovery.EndpointDiscoveryRequest;
+import software.amazon.awssdk.utils.Validate;
 
 public class EndpointDiscoveryCacheLoaderGenerator implements ClassSpec {
 
     private static final String CLIENT_FIELD = "client";
 
     private final IntermediateModel model;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
 
     public EndpointDiscoveryCacheLoaderGenerator(GeneratorTaskParams generatorTaskParams) {
         this.model = generatorTaskParams.getModel();
@@ -101,14 +104,20 @@ public class EndpointDiscoveryCacheLoaderGenerator implements ClassSpec {
                                                      .returns(returnType);
 
         if (!opModel.getInputShape().isHasHeaderMember()) {
+            ClassName endpointClass = poetExtensions.getModelClass("Endpoint");
             methodBuilder.addCode("return $T.supplyAsync(() -> {", CompletableFuture.class)
-                         .addStatement("$T response = $L.$L($L.builder().build())",
+                         .addStatement("$1T requestConfig = $1T.from(endpointDiscoveryRequest.overrideConfiguration()"
+                                       + ".orElse(null))", AwsRequestOverrideConfiguration.class)
+                         .addStatement("$T response = $L.$L($L.builder().overrideConfiguration(requestConfig).build())",
                                        poetExtensions.getModelClass(opModel.getOutputShape().getC2jName()),
                                        CLIENT_FIELD,
                                        opModel.getMethodName(),
                                        poetExtensions.getModelClass(opModel.getInputShape().getC2jName()))
-                         .addStatement("$T endpoint = response.endpoints().get(0)",
-                                       poetExtensions.getModelClass("Endpoint"))
+                         .addStatement("$T<$T> endpoints = response.endpoints()", List.class, endpointClass)
+                         .addStatement("$T.notEmpty(endpoints, \"Endpoints returned by service for endpoint discovery must "
+                                       + "not be empty.\")", Validate.class)
+                         .addStatement("$T endpoint = endpoints.get(0)",
+                                       endpointClass)
                          .addStatement("return $T.builder().endpoint(toUri(endpoint.address(), $L.defaultEndpoint()))" +
                                        ".expirationTime($T.now().plus(endpoint.cachePeriodInMinutes(), $T.MINUTES)).build()",
                                        EndpointDiscoveryEndpoint.class,

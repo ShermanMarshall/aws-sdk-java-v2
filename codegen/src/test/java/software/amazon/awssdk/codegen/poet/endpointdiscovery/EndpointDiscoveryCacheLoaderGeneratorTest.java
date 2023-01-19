@@ -17,7 +17,7 @@ package software.amazon.awssdk.codegen.poet.endpointdiscovery;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static software.amazon.awssdk.codegen.poet.PoetMatchers.generatesTo;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.codegen.emitters.GeneratorTaskParams;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.poet.ClientTestModels;
@@ -27,7 +27,7 @@ public class EndpointDiscoveryCacheLoaderGeneratorTest {
     @Test
     public void syncEndpointDiscoveryCacheLoaderGenerator() {
         IntermediateModel model = ClientTestModels.endpointDiscoveryModels();
-        GeneratorTaskParams dependencies = GeneratorTaskParams.create(model, "sources/", "tests/");
+        GeneratorTaskParams dependencies = GeneratorTaskParams.create(model, "sources/", "tests/", "resources/");
         EndpointDiscoveryCacheLoaderGenerator cacheLoader = new EndpointDiscoveryCacheLoaderGenerator(dependencies);
         assertThat(cacheLoader, generatesTo("test-sync-cache-loader.java"));
     }
@@ -35,7 +35,7 @@ public class EndpointDiscoveryCacheLoaderGeneratorTest {
     @Test
     public void asyncEndpointDiscoveryCacheLoaderGenerator() {
         IntermediateModel model = ClientTestModels.endpointDiscoveryModels();
-        GeneratorTaskParams dependencies = GeneratorTaskParams.create(model, "sources/", "tests/");
+        GeneratorTaskParams dependencies = GeneratorTaskParams.create(model, "sources/", "tests/", "resources/");
         EndpointDiscoveryAsyncCacheLoaderGenerator cacheLoader = new EndpointDiscoveryAsyncCacheLoaderGenerator(dependencies);
         assertThat(cacheLoader, generatesTo("test-async-cache-loader.java"));
     }

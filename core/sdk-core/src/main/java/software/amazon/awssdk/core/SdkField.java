@@ -36,7 +36,7 @@ import software.amazon.awssdk.core.traits.Trait;
  */
 @SdkProtectedApi
 public final class SdkField<TypeT> {
-
+    private final String memberName;
     private final MarshallingType<? super TypeT> marshallingType;
     private final MarshallLocation location;
     private final String locationName;
@@ -47,6 +47,7 @@ public final class SdkField<TypeT> {
     private final Map<Class<? extends Trait>, Trait> traits;
 
     private SdkField(Builder<TypeT> builder) {
+        this.memberName = builder.memberName;
         this.marshallingType = builder.marshallingType;
         this.traits = new HashMap<>(builder.traits);
         this.constructor = builder.constructor;
@@ -58,6 +59,10 @@ public final class SdkField<TypeT> {
         this.location = locationTrait.location();
         this.locationName = locationTrait.locationName();
         this.unmarshallLocationName = locationTrait.unmarshallLocationName();
+    }
+
+    public String memberName() {
+        return memberName;
     }
 
     /**
@@ -115,6 +120,23 @@ public final class SdkField<TypeT> {
     @SuppressWarnings("unchecked")
     public <T extends Trait> Optional<T> getOptionalTrait(Class<T> clzz) {
         return Optional.ofNullable((T) traits.get(clzz));
+    }
+
+    /**
+     * Gets the trait of the specified class, or throw {@link IllegalStateException} if not available.
+     *
+     * @param clzz Trait class to get.
+     * @param <T> Type of trait.
+     * @return Trait instance.
+     * @throws IllegalStateException if trait is not present.
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends Trait> T getRequiredTrait(Class<T> clzz) throws IllegalStateException {
+        T trait = (T) traits.get(clzz);
+        if (trait == null) {
+            throw new IllegalStateException(memberName + " member is missing " + clzz.getSimpleName());
+        }
+        return trait;
     }
 
     /**
@@ -181,6 +203,7 @@ public final class SdkField<TypeT> {
     public static final class Builder<TypeT> {
 
         private final MarshallingType<? super TypeT> marshallingType;
+        private String memberName;
         private Supplier<SdkPojo> constructor;
         private BiConsumer<Object, TypeT> setter;
         private Function<Object, TypeT> getter;
@@ -188,6 +211,11 @@ public final class SdkField<TypeT> {
 
         private Builder(MarshallingType<? super TypeT> marshallingType) {
             this.marshallingType = marshallingType;
+        }
+
+        public Builder<TypeT> memberName(String memberName) {
+            this.memberName = memberName;
+            return this;
         }
 
         /**

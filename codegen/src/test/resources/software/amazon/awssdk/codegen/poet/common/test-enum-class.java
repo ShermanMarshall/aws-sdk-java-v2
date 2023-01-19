@@ -1,10 +1,10 @@
 package software.amazon.awssdk.codegen.poet.common.model;
 
-import static java.util.stream.Collectors.toSet;
-
+import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import software.amazon.awssdk.annotations.Generated;
+import software.amazon.awssdk.utils.internal.EnumUtils;
 
 /**
  * Some comment on the class itself
@@ -16,6 +16,8 @@ public enum TestEnumClass {
     PERMANENT_FAILURE("permanent-failure"),
 
     UNKNOWN_TO_SDK_VERSION(null);
+
+    private static final Map<String, TestEnumClass> VALUE_MAP = EnumUtils.uniqueIndex(TestEnumClass.class, TestEnumClass::toString);
 
     private final String value;
 
@@ -39,16 +41,19 @@ public enum TestEnumClass {
         if (value == null) {
             return null;
         }
-        return Stream.of(TestEnumClass.values()).filter(e -> e.toString().equals(value)).findFirst().orElse(UNKNOWN_TO_SDK_VERSION);
+        return VALUE_MAP.getOrDefault(value, UNKNOWN_TO_SDK_VERSION);
     }
 
     /**
-     * Use this in place of {@link #values()} to return a {@link Set} of all values known to the SDK.
-     * This will return all known enum values except {@link #UNKNOWN_TO_SDK_VERSION}.
+     * Use this in place of {@link #values()} to return a {@link Set} of all values known to the SDK. This will return
+     * all known enum values except {@link #UNKNOWN_TO_SDK_VERSION}.
      *
      * @return a {@link Set} of known {@link TestEnumClass}s
      */
     public static Set<TestEnumClass> knownValues() {
-        return Stream.of(values()).filter(v -> v != UNKNOWN_TO_SDK_VERSION).collect(toSet());
+        Set<TestEnumClass> knownValues = EnumSet.allOf(TestEnumClass.class);
+        knownValues.remove(UNKNOWN_TO_SDK_VERSION);
+        return knownValues;
     }
 }
+

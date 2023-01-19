@@ -51,6 +51,15 @@
       "input": {"shape": "DeprecatedRenameRequest"},
       "output": {"shape": "DeprecatedRenameResponse"}
     },
+    "OperationWithDeprecatedMember": {
+      "name": "OperationWithDeprecatedMember",
+      "http": {
+        "method": "POST",
+        "requestUri": "/"
+      },
+      "input": {"shape": "OperationWithDeprecatedMemberRequest"},
+      "output": {"shape": "OperationWithDeprecatedMemberResponse"}
+    },
     "StreamingInputOperation":{
       "name":"StreamingInputOperation",
       "http":{
@@ -101,7 +110,23 @@
       },
       "output": {
         "shape": "ExistenceCheckNamingResponse"
+      },
+      "DocumentInputOperation":{
+        "name":"DocumentInputOperation",
+        "http":{
+          "method":"POST",
+          "requestUri":"/2016-03-11/documentInputOperation"
+        },
+        "input":{"shape":"StructureWithDocumentMember"}
       }
+    },
+    "QueryParameterOperation":{
+      "name":"QueryParameterOperation",
+      "http":{
+        "method":"DELETE",
+        "requestUri":"/2016-03-11/queryParameterOperation/{PathParam}"
+      },
+      "input":{"shape":"QueryParameterOperationRequest"}
     }
   },
   "shapes":{
@@ -114,11 +139,13 @@
         "FloatMember":{"shape":"Float"},
         "DoubleMember":{"shape":"Double"},
         "LongMember":{"shape":"Long"},
+        "ShortMember":{"shape":"Short"},
         "SimpleList":{"shape":"ListOfStrings"},
         "ListOfEnums":{"shape":"ListOfEnums"},
         "ListOfMaps":{"shape":"ListOfMapStringToString"},
         "ListOfStructs":{"shape":"ListOfSimpleStructs"},
         "ListOfMapOfEnumToString":{"shape":"ListOfMapOfEnumToString"},
+        "ListOfMapOfStringToStruct":{"shape":"ListOfMapOfStringToStruct"},
         "MapOfStringToIntegerList":{"shape":"MapOfStringToIntegerList"},
         "MapOfStringToString":{"shape":"MapOfStringToString"},
         "MapOfStringToSimpleStruct":{"shape":"MapOfStringToSimpleStruct"},
@@ -137,7 +164,51 @@
         "RecursiveStruct":{"shape":"RecursiveStructType"},
         "PolymorphicTypeWithSubTypes":{"shape":"BaseType"},
         "PolymorphicTypeWithoutSubTypes":{"shape":"SubTypeOne"},
-        "EnumType":{"shape":"EnumType"}
+        "EnumType":{"shape":"EnumType"},
+        "Underscore_Name_Type":{"shape":"Underscore_Name_Type"},
+        "MyDocument":{"shape":"MyDocument"},
+        "AllTypesUnionStructure":{"shape":"AllTypesUnionStructure"}
+      }
+    },
+    "AllTypesUnionStructure":{
+      "type":"structure",
+      "union":true,
+      "members":{
+        "StringMember":{"shape":"String"},
+        "IntegerMember":{"shape":"Integer"},
+        "BooleanMember":{"shape":"Boolean"},
+        "FloatMember":{"shape":"Float"},
+        "DoubleMember":{"shape":"Double"},
+        "LongMember":{"shape":"Long"},
+        "ShortMember":{"shape":"Short"},
+        "SimpleList":{"shape":"ListOfStrings"},
+        "ListOfEnums":{"shape":"ListOfEnums"},
+        "ListOfMaps":{"shape":"ListOfMapStringToString"},
+        "ListOfStructs":{"shape":"ListOfSimpleStructs"},
+        "ListOfMapOfEnumToString":{"shape":"ListOfMapOfEnumToString"},
+        "ListOfMapOfStringToStruct":{"shape":"ListOfMapOfStringToStruct"},
+        "MapOfStringToIntegerList":{"shape":"MapOfStringToIntegerList"},
+        "MapOfStringToString":{"shape":"MapOfStringToString"},
+        "MapOfStringToSimpleStruct":{"shape":"MapOfStringToSimpleStruct"},
+        "MapOfEnumToEnum":{"shape":"MapOfEnumToEnum"},
+        "MapOfEnumToString":{"shape":"MapOfEnumToString"},
+        "MapOfStringToEnum":{"shape":"MapOfStringToEnum"},
+        "MapOfEnumToSimpleStruct":{"shape":"MapOfEnumToSimpleStruct"},
+        "MapOfEnumToListOfEnums":{"shape":"MapOfEnumToListOfEnums"},
+        "MapOfEnumToMapOfStringToEnum":{"shape":"MapOfEnumToMapOfStringToEnum"},
+        "TimestampMember":{"shape":"Timestamp"},
+        "StructWithNestedTimestampMember":{"shape":"StructWithTimestamp"},
+        "BlobArg":{"shape":"BlobType"},
+        "StructWithNestedBlob":{"shape":"StructWithNestedBlobType"},
+        "BlobMap":{"shape":"BlobMapType"},
+        "ListOfBlobs":{"shape":"ListOfBlobsType"},
+        "RecursiveStruct":{"shape":"RecursiveStructType"},
+        "PolymorphicTypeWithSubTypes":{"shape":"BaseType"},
+        "PolymorphicTypeWithoutSubTypes":{"shape":"SubTypeOne"},
+        "EnumType":{"shape":"EnumType"},
+        "Underscore_Name_Type":{"shape":"Underscore_Name_Type"},
+        "MyDocument":{"shape":"MyDocument"},
+        "AllTypesUnionStructure":{"shape":"AllTypesUnionStructure"}
       }
     },
     "BaseType":{
@@ -165,6 +236,30 @@
       "members": {
         "OriginalNameNoDeprecation":{"shape": "String"},
         "OriginalNameDeprecated": {"shape": "String"}
+      }
+    },
+    "OperationWithDeprecatedMemberRequest":{
+      "type": "structure",
+      "members": {
+        "MemberModeledAsDeprecated": {
+          "shape": "String",
+          "deprecated": true,
+          "deprecatedMessage": "This field is modeled as deprecated."
+        },
+        "MemberModifiedAsDeprecated":{"shape": "String"},
+        "UndeprecatedMember": {"shape": "String"}
+      }
+    },
+    "OperationWithDeprecatedMemberResponse":{
+      "type": "structure",
+      "members": {
+        "MemberModeledAsDeprecated": {
+          "shape": "String",
+          "deprecated": true,
+          "deprecatedMessage": "This field is modeled as deprecated."
+        },
+        "MemberModifiedAsDeprecated":{"shape": "String"},
+        "UndeprecatedMember": {"shape": "String"}
       }
     },
     "Double":{"type":"double"},
@@ -239,7 +334,12 @@
       "type":"list",
       "member":{"shape":"MapOfEnumToString"}
     },
+    "ListOfMapOfStringToStruct":{
+      "type":"list",
+      "member":{"shape":"MapOfStringToSimpleStruct"}
+    },
     "Long":{"type":"long"},
+    "Short":{"type":"short"},
     "MapOfStringToIntegerList":{
       "type":"map",
       "key":{"shape":"String"},
@@ -408,7 +508,16 @@
         "EventOne": {
           "shape": "EventOne"
         },
+        "SecondEventOne": {
+          "shape": "EventOne"
+        },
         "EventTwo": {
+          "shape": "EventTwo"
+        },
+        "SecondEventTwo": {
+          "shape": "EventTwo"
+        },
+        "eventthree": {
           "shape": "EventTwo"
         }
       },
@@ -468,6 +577,81 @@
       },
       "event": true
     },
-    "ImplicitPayloadMemberOne":{"type":"blob"}
+    "ImplicitPayloadMemberOne":{"type":"blob"},
+    "Underscore_Name_Type": {
+      "type": "structure"
+    },
+    "MyDocument": {
+      "type": "structure",
+      "document": true
+    },
+    "StructureWithDocumentMember":{
+      "type":"structure",
+      "members":{
+        "DocumentMember":{"shape":"MyDocument"}
+      },
+      "payload":"DocumentMember"
+    },
+    "NestedQueryParameterOperation":{
+      "type":"structure",
+      "required":[
+        "QueryParamOne"
+      ],
+      "members":{
+        "QueryParamOne":{
+          "shape":"String",
+          "location":"querystring",
+          "locationName":"QueryParamOne"
+        },
+        "QueryParamTwo":{
+          "shape":"String",
+          "location":"querystring",
+          "locationName":"QueryParamTwo"
+        }
+      }
+    },
+    "QueryParameterOperationRequest":{
+      "type":"structure",
+      "required":[
+        "PathParam",
+        "QueryParamOne",
+        "StringHeaderMember",
+        "RequiredListQueryParams"
+      ],
+      "members":{
+        "PathParam":{
+          "shape":"String",
+          "location":"uri",
+          "locationName":"PathParam"
+        },
+        "QueryParamOne":{
+          "shape":"String",
+          "location":"querystring",
+          "locationName":"QueryParamOne"
+        },
+        "QueryParamTwo":{
+          "shape":"String",
+          "location":"querystring",
+          "locationName":"QueryParamTwo"
+        },
+        "StringHeaderMember":{
+          "shape":"String",
+          "location":"header",
+          "locationName":"x-amz-header-string"
+        },
+        "NestedQueryParameterOperation":{
+          "shape":"NestedQueryParameterOperation"
+        },
+        "RequiredListQueryParams":{
+          "shape":"ListOfIntegers",
+          "location":"querystring"
+        },
+        "OptionalListQueryParams":{
+          "shape":"ListOfIntegers",
+          "location":"querystring"
+        }
+      },
+      "payload":"NestedQueryParameterOperation"
+    }
   }
 }

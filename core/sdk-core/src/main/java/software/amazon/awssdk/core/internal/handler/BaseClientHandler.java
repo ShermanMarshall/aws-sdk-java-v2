@@ -16,9 +16,11 @@
 package software.amazon.awssdk.core.internal.handler;
 
 import java.net.URI;
+import java.time.Duration;
+import java.util.Optional;
 import java.util.function.BiFunction;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.core.CredentialType;
 import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.core.SdkRequest;
 import software.amazon.awssdk.core.SdkResponse;
@@ -26,15 +28,26 @@ import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.client.handler.ClientExecutionParams;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.http.ExecutionContext;
 import software.amazon.awssdk.core.http.HttpResponseHandler;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptorChain;
 import software.amazon.awssdk.core.interceptor.InterceptorContext;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
+import software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttribute;
 import software.amazon.awssdk.core.internal.InternalCoreExecutionAttribute;
+import software.amazon.awssdk.core.internal.io.SdkLengthAwareInputStream;
+import software.amazon.awssdk.core.internal.util.MetricUtils;
+import software.amazon.awssdk.core.metrics.CoreMetric;
+import software.amazon.awssdk.core.signer.Signer;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpFullResponse;
+import software.amazon.awssdk.http.SdkHttpRequest;
+import software.amazon.awssdk.metrics.MetricCollector;
+import software.amazon.awssdk.utils.Pair;
 import software.amazon.awssdk.utils.StringUtils;
 
 @SdkInternalApi
@@ -43,17 +56,6 @@ public abstract class BaseClientHandler {
 
     protected BaseClientHandler(SdkClientConfiguration clientConfiguration) {
         this.clientConfiguration = clientConfiguration;
-    }
-
-    /**
-     * Finalize {@link SdkRequest} by running beforeExecution and modifyRequest interceptors.
-     *
-     * @param executionContext the execution context
-     * @return the {@link InterceptorContext}
-     */
-    static InterceptorContext finalizeSdkRequest(ExecutionContext executionContext) {
-        runBeforeExecutionInterceptors(executionContext);
-        return runModifyRequestInterceptors(executionContext);
     }
 
     /**
@@ -66,25 +68,19 @@ public abstract class BaseClientHandler {
         SdkClientConfiguration clientConfiguration) {
 
         runBeforeMarshallingInterceptors(executionContext);
-        SdkHttpFullRequest request = executionParams.getMarshaller().marshall(inputT);
+
+        Pair<SdkHttpFullRequest, Duration> measuredMarshall = MetricUtils.measureDuration(() ->
+                executionParams.getMarshaller().marshall(inputT));
+
+        executionContext.metricCollector().reportMetric(CoreMetric.MARSHALLING_DURATION, measuredMarshall.right());
+
+        SdkHttpFullRequest request = measuredMarshall.left();
+
         request = modifyEndpointHostIfNeeded(request, clientConfiguration, executionParams);
 
         addHttpRequest(executionContext, request);
         runAfterMarshallingInterceptors(executionContext);
         return runModifyHttpRequestAndHttpContentInterceptors(executionContext);
-    }
-
-    private static void runBeforeExecutionInterceptors(ExecutionContext executionContext) {
-        executionContext.interceptorChain().beforeExecution(executionContext.interceptorContext(),
-                                                            executionContext.executionAttributes());
-    }
-
-    private static InterceptorContext runModifyRequestInterceptors(ExecutionContext executionContext) {
-        InterceptorContext interceptorContext =
-            executionContext.interceptorChain().modifyRequest(executionContext.interceptorContext(),
-                                                              executionContext.executionAttributes());
-        executionContext.interceptorContext(interceptorContext);
-        return interceptorContext;
     }
 
     private static void runBeforeMarshallingInterceptors(ExecutionContext executionContext) {
@@ -100,6 +96,7 @@ public abstract class BaseClientHandler {
                                                                  ClientExecutionParams executionParams) {
         if (executionParams.discoveredEndpoint() != null) {
             URI discoveredEndpoint = executionParams.discoveredEndpoint();
+            executionParams.putExecutionAttribute(SdkInternalExecutionAttribute.IS_DISCOVERED_ENDPOINT, true);
             return originalRequest.toBuilder().host(discoveredEndpoint.getHost()).port(discoveredEndpoint.getPort()).build();
         }
 
@@ -115,8 +112,39 @@ public abstract class BaseClientHandler {
     }
 
     private static void addHttpRequest(ExecutionContext executionContext, SdkHttpFullRequest request) {
-        InterceptorContext interceptorContext = executionContext.interceptorContext().copy(b -> b.httpRequest(request));
+        InterceptorContext interceptorContext = executionContext.interceptorContext();
+
+        Optional<ContentStreamProvider> contentStreamProvider = request.contentStreamProvider();
+        if (contentStreamProvider.isPresent()) {
+            interceptorContext = interceptorContext.copy(b -> b.httpRequest(request)
+                                                               .requestBody(getBody(request)));
+        } else {
+            interceptorContext = interceptorContext.copy(b -> b.httpRequest(request));
+        }
+
         executionContext.interceptorContext(interceptorContext);
+    }
+
+    private static RequestBody getBody(SdkHttpFullRequest request) {
+        Optional<ContentStreamProvider> contentStreamProviderOptional = request.contentStreamProvider();
+        if (contentStreamProviderOptional.isPresent()) {
+            Optional<String> contentLengthOptional = request.firstMatchingHeader("Content-Length");
+            long contentLength = Long.parseLong(contentLengthOptional.orElse("0"));
+            String contentType = request.firstMatchingHeader("Content-Type").orElse("");
+
+            // Enforce the content length specified only if it was present on the request (and not the default).
+            ContentStreamProvider streamProvider = contentStreamProviderOptional.get();
+            if (contentLengthOptional.isPresent()) {
+                ContentStreamProvider toWrap = contentStreamProviderOptional.get();
+                streamProvider = () -> new SdkLengthAwareInputStream(toWrap.newStream(), contentLength);
+            }
+
+            return RequestBody.fromContentProvider(streamProvider,
+                                                   contentLength,
+                                                   contentType);
+        }
+
+        return null;
     }
 
     private static void runAfterMarshallingInterceptors(ExecutionContext executionContext) {
@@ -157,39 +185,62 @@ public abstract class BaseClientHandler {
     private static <OutputT extends SdkResponse> BiFunction<OutputT, SdkHttpFullResponse, OutputT>
         attachHttpResponseToResult() {
 
-        return ((response, httpFullResponse) ->
-                    (OutputT) response.toBuilder().sdkHttpResponse(httpFullResponse).build());
+        return ((response, httpFullResponse) -> (OutputT) response.toBuilder().sdkHttpResponse(httpFullResponse).build());
     }
 
-    static ExecutionAttributes createInitialExecutionAttributes() {
-        return new ExecutionAttributes().putAttribute(InternalCoreExecutionAttribute.EXECUTION_ATTEMPT, 1);
-    }
-
-    protected <InputT extends SdkRequest, OutputT extends SdkResponse> ExecutionContext createExecutionContext(
-        ClientExecutionParams<InputT, OutputT> params, ExecutionAttributes executionAttributes) {
-
+    // This method is only called from tests, since the subclasses in aws-core override it.
+    protected <InputT extends SdkRequest, OutputT extends SdkResponse> ExecutionContext
+        invokeInterceptorsAndCreateExecutionContext(
+        ClientExecutionParams<InputT, OutputT> params) {
         SdkRequest originalRequest = params.getInput();
 
+        ExecutionAttributes executionAttributes = params.executionAttributes();
         executionAttributes
+            .putAttribute(InternalCoreExecutionAttribute.EXECUTION_ATTEMPT, 1)
             .putAttribute(SdkExecutionAttribute.SERVICE_CONFIG,
                           clientConfiguration.option(SdkClientOption.SERVICE_CONFIGURATION))
-            .putAttribute(SdkExecutionAttribute.SERVICE_NAME, clientConfiguration.option(SdkClientOption.SERVICE_NAME));
+            .putAttribute(SdkExecutionAttribute.SERVICE_NAME, clientConfiguration.option(SdkClientOption.SERVICE_NAME))
+            .putAttribute(SdkExecutionAttribute.PROFILE_FILE, clientConfiguration.option(SdkClientOption.PROFILE_FILE))
+            .putAttribute(SdkExecutionAttribute.PROFILE_NAME, clientConfiguration.option(SdkClientOption.PROFILE_NAME));
 
         ExecutionInterceptorChain interceptorChain =
-                new ExecutionInterceptorChain(clientConfiguration.option(SdkClientOption.EXECUTION_INTERCEPTORS));
+            new ExecutionInterceptorChain(clientConfiguration.option(SdkClientOption.EXECUTION_INTERCEPTORS));
+
+        InterceptorContext interceptorContext = InterceptorContext.builder()
+                                                                  .request(originalRequest)
+                                                                  .build();
+
+        interceptorChain.beforeExecution(interceptorContext, executionAttributes);
+        interceptorContext = interceptorChain.modifyRequest(interceptorContext, executionAttributes);
+
+        MetricCollector metricCollector = resolveMetricCollector(params);
 
         return ExecutionContext.builder()
                                .interceptorChain(interceptorChain)
-                               .interceptorContext(InterceptorContext.builder()
-                                                                     .request(originalRequest)
-                                                                     .build())
+                               .interceptorContext(interceptorContext)
                                .executionAttributes(executionAttributes)
                                .signer(clientConfiguration.option(SdkAdvancedClientOption.SIGNER))
+                               .metricCollector(metricCollector)
                                .build();
     }
 
     protected boolean isCalculateCrc32FromCompressedData() {
         return clientConfiguration.option(SdkClientOption.CRC32_FROM_COMPRESSED_DATA_ENABLED);
+    }
+
+    protected void validateSigningConfiguration(SdkHttpRequest request, Signer signer) {
+        if (signer == null) {
+            return;
+        }
+
+        if (signer.credentialType() != CredentialType.TOKEN) {
+            return;
+        }
+
+        URI endpoint = request.getUri();
+        if (!"https".equals(endpoint.getScheme())) {
+            throw SdkClientException.create("Cannot use bearer token signer with a plaintext HTTP endpoint: " + endpoint);
+        }
     }
 
     /**
@@ -234,7 +285,7 @@ public abstract class BaseClientHandler {
         };
     }
 
-    static void validateExecutionParams(ClientExecutionParams<?, ?> executionParams) {
+    static void validateCombinedResponseHandler(ClientExecutionParams<?, ?> executionParams) {
         if (executionParams.getCombinedResponseHandler() != null) {
             if (executionParams.getResponseHandler() != null) {
                 throw new IllegalArgumentException("Only one of 'combinedResponseHandler' and 'responseHandler' may "
@@ -271,5 +322,13 @@ public abstract class BaseClientHandler {
     private static <T, R> BiFunction<T, R, T> composeResponseFunctions(BiFunction<T, R, T> function1,
                                                                        BiFunction<T, R, T> function2) {
         return (x, y) -> function2.apply(function1.apply(x, y), y);
+    }
+
+    private MetricCollector resolveMetricCollector(ClientExecutionParams<?, ?> params) {
+        MetricCollector metricCollector = params.getMetricCollector();
+        if (metricCollector == null) {
+            metricCollector = MetricCollector.create("ApiCall");
+        }
+        return metricCollector;
     }
 }

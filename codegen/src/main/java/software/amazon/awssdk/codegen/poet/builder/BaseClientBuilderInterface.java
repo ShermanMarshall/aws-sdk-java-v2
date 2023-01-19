@@ -24,21 +24,31 @@ import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 import java.util.function.Consumer;
 import javax.lang.model.element.Modifier;
+import software.amazon.awssdk.auth.token.credentials.SdkTokenProvider;
+import software.amazon.awssdk.auth.token.credentials.aws.DefaultAwsTokenProvider;
+import software.amazon.awssdk.auth.token.signer.aws.BearerTokenSigner;
 import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
+import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
+import software.amazon.awssdk.codegen.model.service.ClientContextParam;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
-
+import software.amazon.awssdk.codegen.poet.rules.EndpointRulesSpecUtils;
+import software.amazon.awssdk.codegen.utils.AuthUtils;
+import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption;
+import software.amazon.awssdk.utils.internal.CodegenNamingUtils;
 
 public class BaseClientBuilderInterface implements ClassSpec {
     private final IntermediateModel model;
     private final String basePackage;
     private final ClassName builderInterfaceName;
+    private final EndpointRulesSpecUtils endpointRulesSpecUtils;
 
     public BaseClientBuilderInterface(IntermediateModel model) {
         this.model = model;
         this.basePackage = model.getMetadata().getFullClientPackageName();
         this.builderInterfaceName = ClassName.get(basePackage, model.getMetadata().getBaseBuilderInterface());
+        this.endpointRulesSpecUtils = new EndpointRulesSpecUtils(model);
     }
 
     @Override
@@ -50,12 +60,28 @@ public class BaseClientBuilderInterface implements ClassSpec {
                         .addJavadoc(getJavadoc());
 
         if (model.getEndpointOperation().isPresent()) {
-            builder.addMethod(enableEndpointDiscovery());
+            if (model.getCustomizationConfig().isEnableEndpointDiscoveryMethodRequired()) {
+                builder.addMethod(enableEndpointDiscovery());
+            }
+
+            builder.addMethod(endpointDiscovery());
         }
 
-        if (model.getCustomizationConfig().getServiceSpecificClientConfigClass() != null) {
+        if (model.getCustomizationConfig().getServiceConfig().getClassName() != null) {
             builder.addMethod(serviceConfigurationMethod());
             builder.addMethod(serviceConfigurationConsumerBuilderMethod());
+        }
+
+        builder.addMethod(endpointProviderMethod());
+
+        if (hasClientContextParams()) {
+            model.getClientContextParams().forEach((n, m) -> {
+                builder.addMethod(clientContextParamSetter(n, m));
+            });
+        }
+
+        if (generateTokenProviderMethod()) {
+            builder.addMethod(tokenProviderMethod());
         }
 
         return builder.build();
@@ -72,12 +98,22 @@ public class BaseClientBuilderInterface implements ClassSpec {
         return MethodSpec.methodBuilder("enableEndpointDiscovery")
                          .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                          .returns(TypeVariableName.get("B"))
+                         .addAnnotation(Deprecated.class)
+                         .addJavadoc("@deprecated Use {@link #endpointDiscoveryEnabled($T)} instead.", boolean.class)
+                         .build();
+    }
+
+    private MethodSpec endpointDiscovery() {
+        return MethodSpec.methodBuilder("endpointDiscoveryEnabled")
+                         .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                         .returns(TypeVariableName.get("B"))
+                         .addParameter(boolean.class, "endpointDiscovery")
                          .build();
     }
 
     private MethodSpec serviceConfigurationMethod() {
         ClassName serviceConfiguration = ClassName.get(basePackage,
-                                                        model.getCustomizationConfig().getServiceSpecificClientConfigClass());
+                                                        model.getCustomizationConfig().getServiceConfig().getClassName());
         return MethodSpec.methodBuilder("serviceConfiguration")
                          .addModifiers(Modifier.ABSTRACT, Modifier.PUBLIC)
                          .returns(TypeVariableName.get("B"))
@@ -87,7 +123,7 @@ public class BaseClientBuilderInterface implements ClassSpec {
 
     private MethodSpec serviceConfigurationConsumerBuilderMethod() {
         ClassName serviceConfiguration = ClassName.get(basePackage,
-                                                        model.getCustomizationConfig().getServiceSpecificClientConfigClass());
+                                                        model.getCustomizationConfig().getServiceConfig().getClassName());
         TypeName consumerBuilder = ParameterizedTypeName.get(ClassName.get(Consumer.class),
                                                              serviceConfiguration.nestedClass("Builder"));
         return MethodSpec.methodBuilder("serviceConfiguration")
@@ -99,8 +135,62 @@ public class BaseClientBuilderInterface implements ClassSpec {
                          .build();
     }
 
+    private MethodSpec endpointProviderMethod() {
+        return MethodSpec.methodBuilder("endpointProvider")
+                         .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                         .addParameter(endpointRulesSpecUtils.providerInterfaceName(), "endpointProvider")
+                         .addJavadoc("Set the {@link $T} implementation that will be used by the client to determine "
+                                     + "the endpoint for each request. This is optional; if none is provided a "
+                                     + "default implementation will be used the SDK.",
+                                     endpointRulesSpecUtils.providerInterfaceName())
+                         .returns(TypeVariableName.get("B"))
+                         .addStatement("throw new $T()", UnsupportedOperationException.class)
+                         .build();
+    }
+
+    private MethodSpec clientContextParamSetter(String name, ClientContextParam param) {
+        String setterName = Utils.unCapitalize(CodegenNamingUtils.pascalCase(name));
+        TypeName type = endpointRulesSpecUtils.toJavaType(param.getType());
+
+        MethodSpec.Builder b = MethodSpec.methodBuilder(setterName)
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(type, setterName)
+            .returns(TypeVariableName.get("B"));
+
+        PoetUtils.addJavadoc(b::addJavadoc, param.getDocumentation());
+
+        return b.build();
+    }
+
+    private boolean generateTokenProviderMethod() {
+        return AuthUtils.usesBearerAuth(model);
+    }
+
+    private MethodSpec tokenProviderMethod() {
+        return MethodSpec.methodBuilder("tokenProvider")
+                         .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                         .returns(TypeVariableName.get("B"))
+                         .addParameter(SdkTokenProvider.class, "tokenProvider")
+                         .addJavadoc("Set the token provider to use for bearer token authorization. This is optional, if none "
+                                     + "is provided, the SDK will use {@link $T}.\n"
+                                     + "<p>\n"
+                                     + "If the service, or any of its operations require Bearer Token Authorization, then the "
+                                     + "SDK will default to this token provider to retrieve the token to use for authorization.\n"
+                                     + "<p>\n"
+                                     + "This provider works in conjunction with the {@code $T.TOKEN_SIGNER} set on the client. "
+                                     + "By default it is {@link $T}.",
+                                     DefaultAwsTokenProvider.class,
+                                     SdkAdvancedClientOption.class,
+                                     BearerTokenSigner.class)
+                         .build();
+    }
+
     @Override
     public ClassName className() {
         return builderInterfaceName;
+    }
+
+    private boolean hasClientContextParams() {
+        return model.getClientContextParams() != null && !model.getClientContextParams().isEmpty();
     }
 }

@@ -55,9 +55,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
+import software.amazon.awssdk.http.EmptyPublisher;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
@@ -65,7 +66,6 @@ import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.http.async.AsyncExecuteRequest;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
-import software.amazon.awssdk.http.nio.netty.EmptyPublisher;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.http.nio.netty.internal.http2.GoAwayException;
@@ -78,7 +78,7 @@ public class GoAwayTest {
     private SdkAsyncHttpClient netty;
     private SimpleEndpointDriver endpointDriver;
 
-    @After
+    @AfterEach
     public void teardown() throws InterruptedException {
         if (endpointDriver != null) {
             endpointDriver.shutdown();
@@ -98,7 +98,16 @@ public class GoAwayTest {
         CountDownLatch allRequestsReceived = new CountDownLatch(2);
         Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
             @Override
+            public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            @Override
             public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            private void onHeadersReadDelegator(ChannelHandlerContext ctx, int streamId) {
                 serverChannels.add(ctx.channel().id().asShortText());
 
                 Http2Headers outboundHeaders = new DefaultHttp2Headers()
@@ -147,7 +156,16 @@ public class GoAwayTest {
         // Frame listener supplier for each connection
         Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
             @Override
+            public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            @Override
             public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            private void onHeadersReadDelegator(ChannelHandlerContext ctx, int streamId) {
                 frameWriter().writeHeaders(ctx, streamId, new DefaultHttp2Headers().add("content-length", "0").status("204"), 0, true, ctx.newPromise());
                 ctx.flush();
             }
@@ -189,7 +207,16 @@ public class GoAwayTest {
         byte[] getPayload = "go away!".getBytes(StandardCharsets.UTF_8);
         Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
             @Override
+            public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            @Override
             public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) {
+                onHeadersReadDelegator(ctx, streamId);
+            }
+
+            private void onHeadersReadDelegator(ChannelHandlerContext ctx, int streamId) {
                 channelToStreams.computeIfAbsent(ctx.channel().id().asShortText(), (k) -> Collections.newSetFromMap(new ConcurrentHashMap<>())).add(streamId);
 
                 if (streamId == 3) {

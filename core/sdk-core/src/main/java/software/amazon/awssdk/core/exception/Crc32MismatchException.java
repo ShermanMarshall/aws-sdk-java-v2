@@ -59,12 +59,16 @@ public final class Crc32MismatchException extends SdkClientException {
         Builder cause(Throwable cause);
 
         @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
+
+        @Override
         Crc32MismatchException build();
     }
 
     protected static final class BuilderImpl extends SdkClientException.BuilderImpl implements Builder {
 
-        protected BuilderImpl() {}
+        protected BuilderImpl() {
+        }
 
         protected BuilderImpl(Crc32MismatchException ex) {
             super(ex);
@@ -79,6 +83,12 @@ public final class Crc32MismatchException extends SdkClientException {
         @Override
         public Builder cause(Throwable cause) {
             this.cause = cause;
+            return this;
+        }
+
+        @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
             return this;
         }
 

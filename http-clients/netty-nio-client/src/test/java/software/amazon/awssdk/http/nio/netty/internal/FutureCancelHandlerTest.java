@@ -16,6 +16,8 @@
 package software.amazon.awssdk.http.nio.netty.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTION_ID_KEY;
@@ -23,9 +25,8 @@ import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.DefaultChannelId;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.pool.ChannelPool;
 import io.netty.util.DefaultAttributeMap;
 import java.io.IOException;
 import java.util.concurrent.CancellationException;
@@ -34,7 +35,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.http.async.AsyncExecuteRequest;
 import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
 
@@ -53,7 +54,7 @@ public class FutureCancelHandlerTest {
     private Channel channel;
 
     @Mock
-    private ChannelPool channelPool;
+    private SdkChannelPool channelPool;
 
     private RequestContext requestContext;
 
@@ -77,6 +78,7 @@ public class FutureCancelHandlerTest {
         when(ctx.channel()).thenReturn(channel);
         when(channel.attr(EXECUTION_ID_KEY)).thenReturn(attrMap.attr(EXECUTION_ID_KEY));
         when(channel.attr(REQUEST_CONTEXT_KEY)).thenReturn(attrMap.attr(REQUEST_CONTEXT_KEY));
+        when(channel.id()).thenReturn(DefaultChannelId.newInstance());
     }
 
     @Test
@@ -99,5 +101,16 @@ public class FutureCancelHandlerTest {
 
         verify(ctx).fireExceptionCaught(exceptionCaptor.capture());
         assertThat(exceptionCaptor.getValue()).isEqualTo(err);
+    }
+
+    @Test
+    public void cancelledException_executionIdNull_shouldIgnoreExceptionAndCloseChannel() {
+        when(channel.attr(EXECUTION_ID_KEY)).thenReturn(null);
+
+        FutureCancelledException cancelledException = new FutureCancelledException(1L, new CancellationException());
+        handler.exceptionCaught(ctx, cancelledException);
+
+        verify(ctx, never()).fireExceptionCaught(any(Throwable.class));
+        verify(ctx).close();
     }
 }

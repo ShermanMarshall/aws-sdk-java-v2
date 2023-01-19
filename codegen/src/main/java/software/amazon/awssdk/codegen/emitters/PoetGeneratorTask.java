@@ -22,22 +22,27 @@ import java.io.IOException;
 import java.io.Writer;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
 
-public final class PoetGeneratorTask implements GeneratorTask {
+public final class PoetGeneratorTask extends GeneratorTask {
 
     private final Writer writer;
     private final ClassSpec classSpec;
     private final String fileHeader;
 
     public PoetGeneratorTask(String outputDirectory, String fileHeader, ClassSpec classSpec) {
+        this (outputDirectory, fileHeader, classSpec, false);
+    }
+
+    public PoetGeneratorTask(String outputDirectory, String fileHeader, ClassSpec classSpec, boolean disableFormatting) {
         this.fileHeader = fileHeader;
-        this.writer = new CodeWriter(outputDirectory, classSpec.className().simpleName());
+        this.writer = new CodeWriter(outputDirectory, classSpec.className().simpleName(), disableFormatting);
         this.classSpec = classSpec;
     }
 
     @Override
-    public void execute() {
+    public void compute() {
         try {
-            writer.write(fileHeader + "\n");
+            writer.write(fileHeader);
+            writer.write("\n");
             buildJavaFile(classSpec).writeTo(writer);
             writer.flush();
         } catch (IOException e) {

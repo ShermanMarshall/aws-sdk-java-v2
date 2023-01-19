@@ -24,7 +24,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem.createUniqueFakeItem;
 import static software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithSort.createUniqueFakeItemWithSort;
@@ -104,13 +104,13 @@ public class TransactGetItemsOperationTest {
     }
 
     @Test
-    public void generateRequest_getsFromMultipleTables() {
+    public void generateRequest_getsFromMultipleTables_usingShortcutForm() {
         TransactGetItemsEnhancedRequest transactGetItemsEnhancedRequest =
             TransactGetItemsEnhancedRequest.builder()
-                                           .addGetItem(fakeItemMappedTable, r -> r.key(FAKE_ITEM_KEYS.get(0)))
-                                           .addGetItem(fakeItemWithSortMappedTable, r -> r.key(FAKESORT_ITEM_KEYS.get(0)))
-                                           .addGetItem(fakeItemWithSortMappedTable, r -> r.key(FAKESORT_ITEM_KEYS.get(1)))
-                                           .addGetItem(fakeItemMappedTable, r -> r.key(FAKE_ITEM_KEYS.get(1)))
+                                           .addGetItem(fakeItemMappedTable, FAKE_ITEM_KEYS.get(0))
+                                           .addGetItem(fakeItemWithSortMappedTable, FAKESORT_ITEM_KEYS.get(0))
+                                           .addGetItem(fakeItemWithSortMappedTable, FAKESORT_ITEM_KEYS.get(1))
+                                           .addGetItem(fakeItemMappedTable, FAKE_ITEM_KEYS.get(1))
                                            .build();
 
         TransactGetItemsOperation operation = TransactGetItemsOperation.create(transactGetItemsEnhancedRequest);
@@ -131,10 +131,10 @@ public class TransactGetItemsOperationTest {
     }
 
     @Test
-    public void getServiceCall_makesTheRightCallAndReturnsResponse() {
+    public void getServiceCall_makesTheRightCallAndReturnsResponse_usingKeyItemForm() {
         TransactGetItemsEnhancedRequest transactGetItemsEnhancedRequest =
             TransactGetItemsEnhancedRequest.builder()
-                                           .addGetItem(fakeItemMappedTable, r -> r.key(FAKE_ITEM_KEYS.get(0)))
+                                           .addGetItem(fakeItemMappedTable, FAKE_ITEMS.get(0))
                                            .build();
 
         TransactGetItemsOperation operation = TransactGetItemsOperation.create(transactGetItemsEnhancedRequest);
@@ -191,7 +191,7 @@ public class TransactGetItemsOperationTest {
 
         operation.transformResponse(response, mockExtension);
 
-        verifyZeroInteractions(mockExtension);
+        verifyNoMoreInteractions(mockExtension);
     }
 
     @Test

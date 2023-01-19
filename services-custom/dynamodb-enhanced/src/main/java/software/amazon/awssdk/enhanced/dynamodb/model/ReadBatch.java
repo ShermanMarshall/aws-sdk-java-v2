@@ -20,7 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.MappedTableResource;
@@ -37,6 +39,7 @@ import software.amazon.awssdk.services.dynamodb.model.KeysAndAttributes;
  * A valid request object should contain one or more primary keys.
  */
 @SdkPublicApi
+@ThreadSafe
 public final class ReadBatch {
     private final String tableName;
     private final KeysAndAttributes keysAndAttributes;
@@ -107,6 +110,7 @@ public final class ReadBatch {
      *
      * @param <T> the type that items in this table map to
      */
+    @NotThreadSafe
     public interface Builder<T> {
 
         /**
@@ -133,6 +137,22 @@ public final class ReadBatch {
          * @return a builder of this type
          */
         Builder<T> addGetItem(Consumer<GetItemEnhancedRequest.Builder> requestConsumer);
+
+        /**
+         * Adds a GetItem request with a primary {@link Key} to the builder.
+         *
+         * @param key A {@link Key} to match the record retrieved from the database.
+         * @return a builder of this type
+         */
+        Builder<T> addGetItem(Key key);
+
+        /**
+         * Adds a GetItem request to the builder.
+         *
+         * @param keyItem an item that will have its key fields used to match a record to retrieve from the database.
+         * @return a builder of this type
+         */
+        Builder<T> addGetItem(T keyItem);
 
         ReadBatch build();
     }
@@ -189,6 +209,7 @@ public final class ReadBatch {
         }
     }
 
+    @NotThreadSafe
     private static final class BuilderImpl<T> implements Builder<T> {
         private MappedTableResource<T> mappedTableResource;
         private List<GetItemEnhancedRequest> requests = new ArrayList<>();
@@ -196,22 +217,36 @@ public final class ReadBatch {
         private BuilderImpl() {
         }
 
+        @Override
         public Builder<T> mappedTableResource(MappedTableResource<T> mappedTableResource) {
             this.mappedTableResource = mappedTableResource;
             return this;
         }
 
+        @Override
         public Builder<T> addGetItem(GetItemEnhancedRequest request) {
             requests.add(request);
             return this;
         }
 
+        @Override
         public Builder<T> addGetItem(Consumer<GetItemEnhancedRequest.Builder> requestConsumer) {
             GetItemEnhancedRequest.Builder builder = GetItemEnhancedRequest.builder();
             requestConsumer.accept(builder);
             return addGetItem(builder.build());
         }
 
+        @Override
+        public Builder<T> addGetItem(Key key) {
+            return addGetItem(r -> r.key(key));
+        }
+
+        @Override
+        public Builder<T> addGetItem(T keyItem) {
+            return addGetItem(this.mappedTableResource.keyFrom(keyItem));
+        }
+
+        @Override
         public ReadBatch build() {
             return new ReadBatch(this);
         }

@@ -45,6 +45,7 @@ public final class EndpointDiscoveryEndpoint implements
         return new BuilderImpl();
     }
 
+    @Override
     public Builder toBuilder() {
         return builder().endpoint(endpoint).expirationTime(expirationTime);
     }
@@ -55,6 +56,7 @@ public final class EndpointDiscoveryEndpoint implements
 
         Builder expirationTime(Instant expirationTime);
 
+        @Override
         EndpointDiscoveryEndpoint build();
     }
 
@@ -63,7 +65,8 @@ public final class EndpointDiscoveryEndpoint implements
         private URI endpoint;
         private Instant expirationTime;
 
-        private BuilderImpl() {}
+        private BuilderImpl() {
+        }
 
         @Override
         public Builder endpoint(URI endpoint) {

@@ -41,11 +41,13 @@ import software.amazon.awssdk.http.HttpStatusCode;
 public class SdkServiceException extends SdkException implements SdkPojo {
 
     private final String requestId;
+    private final String extendedRequestId;
     private final int statusCode;
 
     protected SdkServiceException(Builder b) {
         super(b);
         this.requestId = b.requestId();
+        this.extendedRequestId = b.extendedRequestId();
         this.statusCode = b.statusCode();
     }
 
@@ -55,6 +57,14 @@ public class SdkServiceException extends SdkException implements SdkPojo {
      */
     public String requestId() {
         return requestId;
+    }
+
+    /**
+     * The extendedRequestId that was returned by the called service.
+     * @return String ctontaining the extendedRequestId
+     */
+    public String extendedRequestId() {
+        return extendedRequestId;
     }
 
     /**
@@ -108,9 +118,14 @@ public class SdkServiceException extends SdkException implements SdkPojo {
     }
 
     public interface Builder extends SdkException.Builder, SdkPojo {
+        @Override
         Builder message(String message);
 
+        @Override
         Builder cause(Throwable cause);
+
+        @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
 
         /**
          * Specifies the requestId returned by the called service.
@@ -126,6 +141,21 @@ public class SdkServiceException extends SdkException implements SdkPojo {
          * @return String containing the requestId
          */
         String requestId();
+
+        /**
+         * Specifies the extendedRequestId returned by the called service.
+         *
+         * @param extendedRequestId A string that identifies the request made to a service.
+         * @return This object for method chaining.
+         */
+        Builder extendedRequestId(String extendedRequestId);
+
+        /**
+         * The extendedRequestId returned by the called service.
+         *
+         * @return String containing the extendedRequestId
+         */
+        String extendedRequestId();
 
         /**
          * Specifies the status code returned by the service.
@@ -153,13 +183,16 @@ public class SdkServiceException extends SdkException implements SdkPojo {
     protected static class BuilderImpl extends SdkException.BuilderImpl implements Builder {
 
         protected String requestId;
+        protected String extendedRequestId;
         protected int statusCode;
 
-        protected BuilderImpl() {}
+        protected BuilderImpl() {
+        }
 
         protected BuilderImpl(SdkServiceException ex) {
             super(ex);
             this.requestId = ex.requestId();
+            this.extendedRequestId = ex.extendedRequestId();
             this.statusCode = ex.statusCode();
         }
 
@@ -176,8 +209,20 @@ public class SdkServiceException extends SdkException implements SdkPojo {
         }
 
         @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
+            return this;
+        }
+
+        @Override
         public Builder requestId(String requestId) {
             this.requestId = requestId;
+            return this;
+        }
+
+        @Override
+        public Builder extendedRequestId(String extendedRequestId) {
+            this.extendedRequestId = extendedRequestId;
             return this;
         }
 
@@ -192,6 +237,19 @@ public class SdkServiceException extends SdkException implements SdkPojo {
 
         public void setRequestId(String requestId) {
             this.requestId = requestId;
+        }
+
+        @Override
+        public String extendedRequestId() {
+            return extendedRequestId;
+        }
+
+        public String getExtendedRequestId() {
+            return extendedRequestId;
+        }
+
+        public void setExtendedRequestId(String extendedRequestId) {
+            this.extendedRequestId = extendedRequestId;
         }
 
         @Override

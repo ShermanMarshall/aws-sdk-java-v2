@@ -21,7 +21,6 @@ import static software.amazon.awssdk.utils.FunctionalUtils.invokeSafely;
 
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
@@ -112,7 +111,7 @@ public final class ApiCallTimeoutTrackingStage<OutputT> implements RequestToResp
         // but before we called timeoutTracker.cancel(). Note that if hasExecuted() returns true, its guaranteed that
         // the timeout tracker has set the interrupt flag, and if it returns false, it guarantees that it did not and
         // will never set the interrupt flag.
-        if (context.apiCallTimeoutTracker().hasExecuted()) {
+        if (apiCallTimerExecuted(context)) {
             // Clear the interrupt flag. Since we already have an exception from the call, which may contain information
             // that's useful to the caller, just return that instead of an ApiCallTimeoutException.
             Thread.interrupted();
@@ -134,7 +133,7 @@ public final class ApiCallTimeoutTrackingStage<OutputT> implements RequestToResp
         if (e instanceof SdkInterruptedException) {
             ((SdkInterruptedException) e).getResponseStream().ifPresent(r -> invokeSafely(r::close));
         }
-        if (context.apiCallTimeoutTracker().hasExecuted()) {
+        if (apiCallTimerExecuted(context)) {
             // Clear the interrupt status
             Thread.interrupted();
             return generateApiCallTimeoutException(context);
@@ -142,6 +141,10 @@ public final class ApiCallTimeoutTrackingStage<OutputT> implements RequestToResp
 
         Thread.currentThread().interrupt();
         return AbortedException.create("Thread was interrupted", e);
+    }
+
+    private static boolean apiCallTimerExecuted(RequestExecutionContext context) {
+        return context.apiCallTimeoutTracker() != null && context.apiCallTimeoutTracker().hasExecuted();
     }
 
     private ApiCallTimeoutException generateApiCallTimeoutException(RequestExecutionContext context) {

@@ -18,11 +18,14 @@ package software.amazon.awssdk.services.dynamodb;
 import java.time.Duration;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.awscore.retry.AwsRetryPolicy;
+import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
+import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.internal.retry.SdkDefaultRetrySetting;
 import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.core.retry.backoff.BackoffStrategy;
 import software.amazon.awssdk.core.retry.backoff.FullJitterBackoffStrategy;
+
 
 /**
  * Default retry policy for DynamoDB Client.
@@ -31,56 +34,46 @@ import software.amazon.awssdk.core.retry.backoff.FullJitterBackoffStrategy;
 final class DynamoDbRetryPolicy {
 
     /**
-     * Default max retry count for DynamoDB client, when using the LEGACY retry mode.
+     * Default max retry count for DynamoDB client, regardless of retry mode.
      **/
-    private static final int LEGACY_MAX_ERROR_RETRY = 8;
-
+    private static final int MAX_ERROR_RETRY = 8;
+    
     /**
-     * Default base sleep time for DynamoDB, when using the LEGACY retry mode.
+     * Default base sleep time for DynamoDB, regardless of retry mode.
      **/
-    private static final Duration LEGACY_BASE_DELAY = Duration.ofMillis(25);
+    private static final Duration BASE_DELAY = Duration.ofMillis(25);
 
     /**
      * The default back-off strategy for DynamoDB client, which increases
      * exponentially up to a max amount of delay. Compared to the SDK default
      * back-off strategy, it applies a smaller scale factor.
-     *
-     * This is only used when using the LEGACY retry mode.
      */
-    private static final BackoffStrategy LEGACY_BACKOFF_STRATEGY =
+    private static final BackoffStrategy BACKOFF_STRATEGY =
         FullJitterBackoffStrategy.builder()
-                                 .baseDelay(LEGACY_BASE_DELAY)
+                                 .baseDelay(BASE_DELAY)
                                  .maxBackoffTime(SdkDefaultRetrySetting.MAX_BACKOFF)
                                  .build();
 
-    /**
-     * Default retry policy for DynamoDB, when using the LEGACY retry mode.
-     */
-    private static final RetryPolicy LEGACY_RETRY_POLICY =
-        AwsRetryPolicy.defaultRetryPolicy()
-                      .toBuilder()
-                      .numRetries(LEGACY_MAX_ERROR_RETRY)
-                      .backoffStrategy(LEGACY_BACKOFF_STRATEGY)
-                      .additionalRetryConditionsAllowed(false)
-                      .build();
-
-    private DynamoDbRetryPolicy() {}
-
-    /**
-     * @return Default retry policy used by DynamoDbClient
-     */
-    public static RetryPolicy defaultRetryPolicy() {
-        if (RetryMode.defaultRetryMode() == RetryMode.LEGACY) {
-            return LEGACY_RETRY_POLICY;
-        }
-
-        return AwsRetryPolicy.defaultRetryPolicy()
-                             .toBuilder()
-                             .additionalRetryConditionsAllowed(false)
-                             .build();
+    private DynamoDbRetryPolicy() {
     }
 
-    public static RetryPolicy addRetryConditions(RetryPolicy policy) {
-        return policy;
+    public static RetryPolicy resolveRetryPolicy(SdkClientConfiguration config) {
+        RetryPolicy configuredRetryPolicy = config.option(SdkClientOption.RETRY_POLICY);
+        if (configuredRetryPolicy != null) {
+            return configuredRetryPolicy;
+        }
+
+        RetryMode retryMode = RetryMode.resolver()
+                                       .profileFile(() -> config.option(SdkClientOption.PROFILE_FILE))
+                                       .profileName(config.option(SdkClientOption.PROFILE_NAME))
+                                       .defaultRetryMode(config.option(SdkClientOption.DEFAULT_RETRY_MODE))
+                                       .resolve();
+
+        return AwsRetryPolicy.forRetryMode(retryMode)
+                             .toBuilder()
+                             .additionalRetryConditionsAllowed(false)
+                             .numRetries(MAX_ERROR_RETRY)
+                             .backoffStrategy(BACKOFF_STRATEGY)
+                             .build();
     }
 }

@@ -16,7 +16,7 @@
 package software.amazon.awssdk.protocol.tests.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,11 +24,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
@@ -108,7 +109,7 @@ public class EndpointTraitTest {
         }
     }
 
-    @Test (expected = NullPointerException.class)
+    @Test (expected = IllegalArgumentException.class)
     public void validationException_whenInputMember_inHostPrefix_isNull() {
         client.endpointTraitTwo(EndpointTraitTwoRequest.builder().build());
     }

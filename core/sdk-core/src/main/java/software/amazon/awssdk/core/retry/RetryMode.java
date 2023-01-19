@@ -16,6 +16,7 @@
 package software.amazon.awssdk.core.retry;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.SdkSystemSetting;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
@@ -69,44 +70,119 @@ public enum RetryMode {
      *     {@link TokenBucketRetryCondition}.</li>
      * </ol>
      */
-    STANDARD;
+    STANDARD,
+
+    /**
+     * Adaptive retry mode builds on {@code STANDARD} mode.
+     * <p>
+     * Adaptive retry mode dynamically limits the rate of AWS requests to maximize success rate. This may be at the
+     * expense of request latency. Adaptive retry mode is not recommended when predictable latency is important.
+     * <p>
+     * <b>Warning:</b> Adaptive retry mode assumes that the client is working against a single resource (e.g. one
+     * DynamoDB Table or one S3 Bucket). If you use a single client for multiple resources, throttling or outages
+     * associated with one resource will result in increased latency and failures when accessing all other resources via
+     * the same client. When using adaptive retry mode, we recommend using a single client per resource.
+     *
+     * @see RetryPolicy#isFastFailRateLimiting()
+     */
+    ADAPTIVE,
+
+    ;
 
     /**
      * Retrieve the default retry mode by consulting the locations described in {@link RetryMode}, or LEGACY if no value is
      * configured.
      */
     public static RetryMode defaultRetryMode() {
-        return RetryMode.fromDefaultChain(ProfileFile.defaultProfileFile());
+        return resolver().resolve();
     }
 
-    private static Optional<RetryMode> fromSystemSettings() {
-        return SdkSystemSetting.AWS_RETRY_MODE.getStringValue()
-                                              .flatMap(RetryMode::fromString);
+    /**
+     * Create a {@link Resolver} that allows customizing the variables used during determination of a {@link RetryMode}.
+     */
+    public static Resolver resolver() {
+        return new Resolver();
     }
 
-    private static Optional<RetryMode> fromProfileFile(ProfileFile profileFile) {
-        return profileFile.profile(ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow())
-                          .flatMap(p -> p.property(ProfileProperty.RETRY_MODE))
-                          .flatMap(RetryMode::fromString);
-    }
+    /**
+     * Allows customizing the variables used during determination of a {@link RetryMode}. Created via {@link #resolver()}.
+     */
+    public static class Resolver {
+        private static final RetryMode SDK_DEFAULT_RETRY_MODE = LEGACY;
+        
+        private Supplier<ProfileFile> profileFile;
+        private String profileName;
+        private RetryMode defaultRetryMode;
 
-    private static RetryMode fromDefaultChain(ProfileFile profileFile) {
-        return OptionalUtils.firstPresent(RetryMode.fromSystemSettings(), () -> fromProfileFile(profileFile))
-                            .orElse(RetryMode.LEGACY);
-    }
-
-    private static Optional<RetryMode> fromString(String string) {
-        if (string == null || string.isEmpty()) {
-            return Optional.empty();
+        private Resolver() {
         }
 
-        switch (StringUtils.lowerCase(string)) {
-            case "legacy":
-                return Optional.of(LEGACY);
-            case "standard":
-                return Optional.of(STANDARD);
-            default:
-                throw new IllegalStateException("Unsupported retry policy mode configured: " + string);
+        /**
+         * Configure the profile file that should be used when determining the {@link RetryMode}. The supplier is only consulted
+         * if a higher-priority determinant (e.g. environment variables) does not find the setting.
+         */
+        public Resolver profileFile(Supplier<ProfileFile> profileFile) {
+            this.profileFile = profileFile;
+            return this;
+        }
+
+        /**
+         * Configure the profile file name should be used when determining the {@link RetryMode}.
+         */
+        public Resolver profileName(String profileName) {
+            this.profileName = profileName;
+            return this;
+        }
+
+        /**
+         * Configure the {@link RetryMode} that should be used if the mode is not specified anywhere else.
+         */
+        public Resolver defaultRetryMode(RetryMode defaultRetryMode) {
+            this.defaultRetryMode = defaultRetryMode;
+            return this;
+        }
+
+        /**
+         * Resolve which retry mode should be used, based on the configured values.
+         */
+        public RetryMode resolve() {
+            return OptionalUtils.firstPresent(Resolver.fromSystemSettings(), () -> fromProfileFile(profileFile, profileName))
+                                .orElseGet(this::fromDefaultMode);
+        }
+
+        private static Optional<RetryMode> fromSystemSettings() {
+            return SdkSystemSetting.AWS_RETRY_MODE.getStringValue()
+                                                  .flatMap(Resolver::fromString);
+        }
+
+        private static Optional<RetryMode> fromProfileFile(Supplier<ProfileFile> profileFile, String profileName) {
+            profileFile = profileFile != null ? profileFile : ProfileFile::defaultProfileFile;
+            profileName = profileName != null ? profileName : ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow();
+            return profileFile.get()
+                              .profile(profileName)
+                              .flatMap(p -> p.property(ProfileProperty.RETRY_MODE))
+                              .flatMap(Resolver::fromString);
+        }
+
+        private static Optional<RetryMode> fromString(String string) {
+            if (string == null || string.isEmpty()) {
+                return Optional.empty();
+            }
+
+            switch (StringUtils.lowerCase(string)) {
+                case "legacy":
+                    return Optional.of(LEGACY);
+                case "standard":
+                    return Optional.of(STANDARD);
+                case "adaptive":
+                    return Optional.of(ADAPTIVE);
+                default:
+                    throw new IllegalStateException("Unsupported retry policy mode configured: " + string);
+            }
+        }
+
+        private RetryMode fromDefaultMode() {
+            return defaultRetryMode != null ? defaultRetryMode : SDK_DEFAULT_RETRY_MODE;
         }
     }
 }

@@ -16,13 +16,13 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute;
 
 import java.util.Optional;
-
 import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.TypeToken;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
+import software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -44,8 +44,8 @@ public class OptionalAttributeConverter<T> implements AttributeConverter<Optiona
     }
 
     @Override
-    public TypeToken<Optional<T>> type() {
-        return TypeToken.optionalOf(delegate.type().rawClass());
+    public EnhancedType<Optional<T>> type() {
+        return EnhancedType.optionalOf(delegate.type().rawClass());
     }
 
     @Override
@@ -56,7 +56,7 @@ public class OptionalAttributeConverter<T> implements AttributeConverter<Optiona
     @Override
     public AttributeValue transformFrom(Optional<T> input) {
         if (!input.isPresent()) {
-            return EnhancedAttributeValue.nullValue().toAttributeValue();
+            return AttributeValues.nullAttributeValue();
         }
 
         return delegate.transformFrom(input.get());
@@ -66,7 +66,7 @@ public class OptionalAttributeConverter<T> implements AttributeConverter<Optiona
     @Override
     public Optional<T> transformTo(AttributeValue input) {
         Optional<T> result;
-        if (input.nul()) {
+        if (Boolean.TRUE.equals(input.nul())) {
             // This is safe - An Optional.empty() can be used for any Optional<?> subtype.
             result = Optional.empty();
         } else {

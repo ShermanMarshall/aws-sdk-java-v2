@@ -20,26 +20,33 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.assertEquals;
 import static software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem.createUniqueFakeItem;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.stringValue;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem;
+import software.amazon.awssdk.enhanced.dynamodb.internal.client.ExtensionResolver;
+import software.amazon.awssdk.enhanced.dynamodb.internal.operations.TransactWriteItemsOperation;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 
 @RunWith(MockitoJUnitRunner.class)
 public class TransactWriteItemsEnhancedRequestTest {
@@ -79,9 +86,39 @@ public class TransactWriteItemsEnhancedRequestTest {
 
         TransactWriteItemsEnhancedRequest builtObject =
             TransactWriteItemsEnhancedRequest.builder()
-                                             .addPutItem(fakeItemMappedTable, FakeItem.class, r -> r.item(fakeItem))
-                                             .addDeleteItem(fakeItemMappedTable, r -> r.key(k -> k.partitionValue(fakeItem.getId())))
-                                             .addUpdateItem(fakeItemMappedTable, FakeItem.class, r -> r.item(fakeItem))
+                                             .addPutItem(fakeItemMappedTable, fakeItem)
+                                             .addDeleteItem(fakeItemMappedTable, fakeItem)
+                                             .addUpdateItem(fakeItemMappedTable, fakeItem)
+                                             .addConditionCheck(fakeItemMappedTable, r -> r.key(k -> k.partitionValue(fakeItem.getId()))
+                                                                                           .conditionExpression(conditionExpression))
+                                             .build();
+
+        assertThat(builtObject.transactWriteItems().size(), is(4));
+        assertThat(builtObject.transactWriteItems().get(0), is(getTransactWriteItems(fakeItem).get(0)));
+        assertThat(builtObject.transactWriteItems().get(1), is(getTransactWriteItems(fakeItem).get(1)));
+
+        assertThat(builtObject.transactWriteItems().get(2).update(), is(notNullValue()));
+        assertThat(builtObject.transactWriteItems().get(2).update().key().get("id").s(), is(fakeItem.getId()));
+
+        assertThat(builtObject.transactWriteItems().get(3).conditionCheck(), is(notNullValue()));
+        assertThat(builtObject.transactWriteItems().get(3).conditionCheck().key().get("id").s(), is(fakeItem.getId()));
+    }
+
+    @Test
+    public void builder_maximal_shortcut_style() {
+        FakeItem fakeItem = createUniqueFakeItem();
+
+        Expression conditionExpression = Expression.builder()
+                                                   .expression("#attribute = :attribute")
+                                                   .expressionValues(singletonMap(":attribute", stringValue("0")))
+                                                   .expressionNames(singletonMap("#attribute", "attribute"))
+                                                   .build();
+
+        TransactWriteItemsEnhancedRequest builtObject =
+            TransactWriteItemsEnhancedRequest.builder()
+                                             .addPutItem(fakeItemMappedTable, fakeItem)
+                                             .addDeleteItem(fakeItemMappedTable, Key.builder().partitionValue(fakeItem.getId()).build())
+                                             .addUpdateItem(fakeItemMappedTable, fakeItem)
                                              .addConditionCheck(fakeItemMappedTable, r -> r.key(k -> k.partitionValue(fakeItem.getId()))
                                                                                            .conditionExpression(conditionExpression))
                                              .build();
@@ -134,6 +171,17 @@ public class TransactWriteItemsEnhancedRequestTest {
 
         assertThat(builtObject.transactWriteItems().get(3).conditionCheck(), is(notNullValue()));
         assertThat(builtObject.transactWriteItems().get(3).conditionCheck().key().get("id").s(), is(fakeItem.getId()));
+    }
+
+    @Test
+    public void builder_passRequestToken_shouldWork() {
+        String token = UUID.randomUUID().toString();
+        TransactWriteItemsEnhancedRequest enhancedRequest = TransactWriteItemsEnhancedRequest.builder()
+                                                                                             .clientRequestToken(token)
+                                                                                             .build();
+        DynamoDbEnhancedClientExtension extension = ExtensionResolver.resolveExtensions(ExtensionResolver.defaultExtensions());
+        TransactWriteItemsRequest request = TransactWriteItemsOperation.create(enhancedRequest).generateRequest(extension);
+        assertEquals(token, request.clientRequestToken());
     }
 
     private List<TransactWriteItem> getTransactWriteItems(FakeItem fakeItem) {

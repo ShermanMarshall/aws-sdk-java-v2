@@ -15,7 +15,6 @@
 
 package software.amazon.awssdk.codegen.model.service;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import java.util.Arrays;
 import software.amazon.awssdk.utils.StringUtils;
 
@@ -27,7 +26,8 @@ public enum AuthType {
     V4("v4"),
     V4_UNSIGNED_BODY("v4-unsigned-body"),
     S3("s3"),
-    S3V4("s3v4")
+    S3V4("s3v4"),
+    BEARER("bearer")
     ;
 
     private final String value;
@@ -36,7 +36,6 @@ public enum AuthType {
         this.value = value;
     }
 
-    @JsonCreator
     public static AuthType fromValue(String value) {
         String normalizedValue = StringUtils.lowerCase(value);
         return Arrays.stream(values())

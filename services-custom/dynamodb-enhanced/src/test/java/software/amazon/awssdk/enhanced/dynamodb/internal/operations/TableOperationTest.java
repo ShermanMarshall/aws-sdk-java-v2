@@ -26,6 +26,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem;
@@ -57,7 +58,7 @@ public class TableOperationTest {
         assertThat(fakeTableOperation.lastDynamoDbEnhancedClientExtension, sameInstance(mockDynamoDbEnhancedClientExtension));
         assertThat(fakeTableOperation.lastTableSchema, sameInstance(FakeItem.getTableSchema()));
         assertThat(fakeTableOperation.lastOperationContext, is(
-            OperationContext.create(FAKE_TABLE_NAME, TableMetadata.primaryIndexName())));
+            DefaultOperationContext.create(FAKE_TABLE_NAME, TableMetadata.primaryIndexName())));
     }
 
     private static class FakeTableOperation implements TableOperation<FakeItem, String, String, String> {
@@ -65,6 +66,11 @@ public class TableOperationTest {
         private OperationContext lastOperationContext = null;
         private DynamoDbEnhancedClientExtension lastDynamoDbEnhancedClientExtension = null;
         private DynamoDbClient lastDynamoDbClient = null;
+
+        @Override
+        public OperationName operationName() {
+            return OperationName.NONE;
+        }
 
         @Override
         public String generateRequest(TableSchema<FakeItem> tableSchema, OperationContext context,

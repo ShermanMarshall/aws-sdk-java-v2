@@ -15,8 +15,6 @@
 
 package software.amazon.awssdk.codegen.model.service;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class Member {
 
     private String shape;
@@ -43,25 +41,25 @@ public class Member {
 
     private boolean deprecated;
 
-    @JsonProperty("jsonvalue")
-    private boolean jsonValue;
+    private String deprecatedMessage;
+
+    private boolean jsonvalue;
 
     private String timestampFormat;
 
-    @JsonProperty(value = "eventpayload")
-    private boolean eventPayload;
+    private boolean eventpayload;
 
-    @JsonProperty(value = "eventheader")
-    private boolean eventHeader;
+    private boolean eventheader;
 
-    @JsonProperty(value = "endpointdiscoveryid")
-    private boolean endpointDiscoveryId;
+    private boolean endpointdiscoveryid;
 
     private boolean sensitive;
 
     private boolean xmlAttribute;
 
     private String deprecatedName;
+
+    private ContextParam contextParam;
 
     public String getShape() {
         return shape;
@@ -159,12 +157,20 @@ public class Member {
         this.deprecated = deprecated;
     }
 
-    public boolean getJsonValue() {
-        return jsonValue;
+    public String getDeprecatedMessage() {
+        return deprecatedMessage;
     }
 
-    public void setJsonValue(boolean jsonValue) {
-        this.jsonValue = jsonValue;
+    public void setDeprecatedMessage(String deprecatedMessage) {
+        this.deprecatedMessage = deprecatedMessage;
+    }
+
+    public boolean getJsonvalue() {
+        return jsonvalue;
+    }
+
+    public void setJsonvalue(boolean jsonvalue) {
+        this.jsonvalue = jsonvalue;
     }
 
     public String getTimestampFormat() {
@@ -175,28 +181,28 @@ public class Member {
         this.timestampFormat = timestampFormat;
     }
 
-    public boolean isEventPayload() {
-        return eventPayload;
+    public boolean isEventpayload() {
+        return eventpayload;
     }
 
-    public void setEventPayload(boolean eventPayload) {
-        this.eventPayload = eventPayload;
+    public void setEventpayload(boolean eventpayload) {
+        this.eventpayload = eventpayload;
     }
 
-    public boolean isEventHeader() {
-        return eventHeader;
+    public boolean isEventheader() {
+        return eventheader;
     }
 
-    public void setEventHeader(boolean eventHeader) {
-        this.eventHeader = eventHeader;
+    public void setEventheader(boolean eventheader) {
+        this.eventheader = eventheader;
     }
 
-    public boolean isEndpointDiscoveryId() {
-        return endpointDiscoveryId;
+    public boolean isEndpointdiscoveryid() {
+        return endpointdiscoveryid;
     }
 
-    public void setEndpointDiscoveryId(boolean endpointDiscoveryId) {
-        this.endpointDiscoveryId = endpointDiscoveryId;
+    public void setEndpointdiscoveryid(boolean endpointdiscoveryid) {
+        this.endpointdiscoveryid = endpointdiscoveryid;
     }
 
     public boolean isSensitive() {
@@ -221,5 +227,13 @@ public class Member {
 
     public String getDeprecatedName() {
         return deprecatedName;
+    }
+
+    public ContextParam getContextParam() {
+        return contextParam;
+    }
+
+    public void setContextParam(ContextParam contextParam) {
+        this.contextParam = contextParam;
     }
 }

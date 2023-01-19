@@ -18,6 +18,7 @@ package software.amazon.awssdk.awscore.exception;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.StringJoiner;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.awscore.internal.AwsErrorCode;
 import software.amazon.awssdk.awscore.internal.AwsStatusCode;
@@ -62,10 +63,18 @@ public class AwsServiceException extends SdkServiceException {
     @Override
     public String getMessage() {
         if (awsErrorDetails != null) {
-            return awsErrorDetails().errorMessage() +
-                    " (Service: " + awsErrorDetails().serviceName() +
-                    ", Status Code: " + statusCode() +
-                    ", Request ID: " + requestId() + ")";
+            StringJoiner details = new StringJoiner(", ", "(", ")");
+            details.add("Service: " + awsErrorDetails().serviceName());
+            details.add("Status Code: " + statusCode());
+            details.add("Request ID: " + requestId());
+            if (extendedRequestId() != null) {
+                details.add("Extended Request ID: " + extendedRequestId());
+            }
+            String message = super.getMessage();
+            if (message == null) {
+                message = awsErrorDetails().errorMessage();
+            }
+            return message + " " + details;
         }
 
         return super.getMessage();
@@ -165,6 +174,9 @@ public class AwsServiceException extends SdkServiceException {
         Builder requestId(String requestId);
 
         @Override
+        Builder extendedRequestId(String extendedRequestId);
+
+        @Override
         Builder statusCode(int statusCode);
 
         @Override
@@ -227,8 +239,20 @@ public class AwsServiceException extends SdkServiceException {
         }
 
         @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
+            return this;
+        }
+
+        @Override
         public Builder requestId(String requestId) {
             this.requestId = requestId;
+            return this;
+        }
+
+        @Override
+        public Builder extendedRequestId(String extendedRequestId) {
+            this.extendedRequestId = extendedRequestId;
             return this;
         }
 

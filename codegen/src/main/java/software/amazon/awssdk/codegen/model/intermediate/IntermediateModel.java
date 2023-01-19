@@ -15,56 +15,74 @@
 
 package software.amazon.awssdk.codegen.model.intermediate;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import software.amazon.awssdk.awscore.AwsResponse;
 import software.amazon.awssdk.awscore.AwsResponseMetadata;
-import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.codegen.model.config.customization.CustomizationConfig;
+import software.amazon.awssdk.codegen.model.rules.endpoints.EndpointTestSuiteModel;
+import software.amazon.awssdk.codegen.model.service.ClientContextParam;
+import software.amazon.awssdk.codegen.model.service.EndpointRuleSetModel;
 import software.amazon.awssdk.codegen.model.service.PaginatorDefinition;
+import software.amazon.awssdk.codegen.model.service.WaiterDefinition;
 import software.amazon.awssdk.codegen.naming.NamingStrategy;
 import software.amazon.awssdk.utils.IoUtils;
 
 public final class IntermediateModel {
-    private final Metadata metadata;
+    private static final String FILE_HEADER;
 
-    private final Map<String, OperationModel> operations;
+    private Metadata metadata;
 
-    private final Map<String, ShapeModel> shapes;
+    private Map<String, OperationModel> operations;
 
-    private final CustomizationConfig customizationConfig;
+    private Map<String, ShapeModel> shapes;
 
-    private final ServiceExamples examples;
+    private CustomizationConfig customizationConfig;
 
-    private final Map<String, AuthorizerModel> customAuthorizers;
+    private Optional<OperationModel> endpointOperation;
 
-    @JsonIgnore
-    private final Optional<OperationModel> endpointOperation;
+    private Map<String, PaginatorDefinition> paginators;
 
-    @JsonIgnore
-    private final Map<String, PaginatorDefinition> paginators;
+    private Map<String, WaiterDefinition> waiters;
 
     @JsonIgnore
-    private final NamingStrategy namingStrategy;
+    private EndpointRuleSetModel endpointRuleSetModel;
 
-    @JsonCreator
-    public IntermediateModel(
-        @JsonProperty("metadata") Metadata metadata,
-        @JsonProperty("operations") Map<String, OperationModel> operations,
-        @JsonProperty("shapes") Map<String, ShapeModel> shapes,
-        @JsonProperty("customizationConfig") CustomizationConfig customizationConfig,
-        @JsonProperty("serviceExamples") ServiceExamples examples) {
+    @JsonIgnore
+    private EndpointTestSuiteModel endpointTestSuiteModel;
 
-        this(metadata, operations, shapes, customizationConfig, examples, null,
-             Collections.emptyMap(), Collections.emptyMap(), null);
+    @JsonIgnore
+    private NamingStrategy namingStrategy;
+
+    private Map<String, ClientContextParam> clientContextParams;
+
+    static {
+        FILE_HEADER = loadDefaultFileHeader();
+    }
+
+    public IntermediateModel() {
+        this.operations = new HashMap<>();
+        this.shapes = new HashMap<>();
+        this.endpointOperation = Optional.empty();
+        this.paginators = new HashMap<>();
+        this.waiters = new HashMap<>();
+        this.namingStrategy = null;
+    }
+
+    public IntermediateModel(Metadata metadata,
+                             Map<String, OperationModel> operations,
+                             Map<String, ShapeModel> shapes,
+                             CustomizationConfig customizationConfig) {
+        this(metadata, operations, shapes, customizationConfig, null,
+             Collections.emptyMap(), null, Collections.emptyMap(), null, null, null);
     }
 
     public IntermediateModel(
@@ -72,28 +90,40 @@ public final class IntermediateModel {
         Map<String, OperationModel> operations,
         Map<String, ShapeModel> shapes,
         CustomizationConfig customizationConfig,
-        ServiceExamples examples,
         OperationModel endpointOperation,
-        Map<String, AuthorizerModel> customAuthorizers,
         Map<String, PaginatorDefinition> paginators,
-        NamingStrategy namingStrategy) {
+        NamingStrategy namingStrategy,
+        Map<String, WaiterDefinition> waiters,
+        EndpointRuleSetModel endpointRuleSetModel,
+        EndpointTestSuiteModel endpointTestSuiteModel,
+        Map<String, ClientContextParam> clientContextParams) {
         this.metadata = metadata;
         this.operations = operations;
         this.shapes = shapes;
         this.customizationConfig = customizationConfig;
-        this.examples = examples;
         this.endpointOperation = Optional.ofNullable(endpointOperation);
-        this.customAuthorizers = customAuthorizers;
         this.paginators = paginators;
         this.namingStrategy = namingStrategy;
+        this.waiters = waiters;
+        this.endpointRuleSetModel = endpointRuleSetModel;
+        this.endpointTestSuiteModel = endpointTestSuiteModel;
+        this.clientContextParams = clientContextParams;
     }
 
     public Metadata getMetadata() {
         return metadata;
     }
 
+    public void setMetadata(Metadata metadata) {
+        this.metadata = metadata;
+    }
+
     public Map<String, OperationModel> getOperations() {
         return operations;
+    }
+
+    public void setOperations(Map<String, OperationModel> operations) {
+        this.operations = operations;
     }
 
     public OperationModel getOperation(String operationName) {
@@ -104,24 +134,71 @@ public final class IntermediateModel {
         return shapes;
     }
 
-    public ShapeModel getShapeByC2jName(String c2jName) {
-        return Utils.findShapeModelByC2jName(this, c2jName);
+    public void setShapes(Map<String, ShapeModel> shapes) {
+        this.shapes = shapes;
+    }
+
+    /**
+     * Looks up a shape by name and verifies that the expected C2J name matches
+     * @param shapeName the name of the shape in the intermediate model
+     * @param shapeC2jName C2J's name for the shape
+     * @return the ShapeModel
+     * @throws IllegalArgumentException if no matching shape is found
+     */
+    public ShapeModel getShapeByNameAndC2jName(String shapeName, String shapeC2jName) {
+        for (ShapeModel sm : getShapes().values()) {
+            if (shapeName.equals(sm.getShapeName()) && shapeC2jName.equals(sm.getC2jName())) {
+                return sm;
+            }
+        }
+        throw new IllegalArgumentException("C2J shape " + shapeC2jName + " with shape name " + shapeName + " does not exist in "
+                                           + "the intermediate model.");
     }
 
     public CustomizationConfig getCustomizationConfig() {
         return customizationConfig;
     }
 
-    public ServiceExamples getExamples() {
-        return examples;
+    public void setCustomizationConfig(CustomizationConfig customizationConfig) {
+        this.customizationConfig = customizationConfig;
     }
 
     public Map<String, PaginatorDefinition> getPaginators() {
         return paginators;
     }
 
+    public Map<String, WaiterDefinition> getWaiters() {
+        return waiters;
+    }
+
+    public EndpointRuleSetModel getEndpointRuleSetModel() {
+        if (endpointRuleSetModel == null) {
+            endpointRuleSetModel = EndpointRuleSetModel.defaultRules(metadata.getEndpointPrefix());
+        }
+        return endpointRuleSetModel;
+    }
+
+    public EndpointTestSuiteModel getEndpointTestSuiteModel() {
+        if (endpointTestSuiteModel == null) {
+            endpointTestSuiteModel = new EndpointTestSuiteModel();
+        }
+        return endpointTestSuiteModel;
+    }
+
+    public Map<String, ClientContextParam> getClientContextParams() {
+        return clientContextParams;
+    }
+
+    public void setPaginators(Map<String, PaginatorDefinition> paginators) {
+        this.paginators = paginators;
+    }
+
     public NamingStrategy getNamingStrategy() {
         return namingStrategy;
+    }
+
+    public void setNamingStrategy(NamingStrategy namingStrategy) {
+        this.namingStrategy = namingStrategy;
     }
 
     public String getCustomRetryPolicy() {
@@ -158,25 +235,23 @@ public final class IntermediateModel {
         }
     }
 
-    public String getFileHeader() throws IOException {
-        return loadDefaultFileHeader();
+    public String getFileHeader() {
+        return FILE_HEADER;
     }
 
-    private String loadDefaultFileHeader() throws IOException {
-        try (InputStream inputStream = getClass()
-            .getResourceAsStream("/software/amazon/awssdk/codegen/DefaultFileHeader.txt")) {
+    private static String loadDefaultFileHeader() {
+        try (InputStream inputStream =
+                 IntermediateModel.class.getResourceAsStream("/software/amazon/awssdk/codegen/DefaultFileHeader.txt")) {
             return IoUtils.toUtf8String(inputStream);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
     public String getSdkBaseResponseFqcn() {
-        if (metadata.getProtocol() == Protocol.API_GATEWAY) {
-            return "software.amazon.awssdk.opensdk.BaseResult";
-        } else {
-            return String.format("%s<%s>",
-                                 AwsResponse.class.getName(),
-                                 getResponseMetadataClassName());
-        }
+        return String.format("%s<%s>",
+                             AwsResponse.class.getName(),
+                             getResponseMetadataClassName());
     }
 
     private String getResponseMetadataClassName() {
@@ -190,16 +265,20 @@ public final class IntermediateModel {
                               .collect(Collectors.toList());
     }
 
-    public Map<String, AuthorizerModel> getCustomAuthorizers() {
-        return customAuthorizers;
-    }
-
     public Optional<OperationModel> getEndpointOperation() {
         return endpointOperation;
     }
 
+    public void setEndpointOperation(OperationModel endpointOperation) {
+        this.endpointOperation = Optional.ofNullable(endpointOperation);
+    }
+
     public boolean hasPaginators() {
         return paginators.size() > 0;
+    }
+
+    public boolean hasWaiters() {
+        return waiters.size() > 0;
     }
 
     public boolean containsRequestSigners() {

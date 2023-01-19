@@ -16,18 +16,25 @@
 package software.amazon.awssdk.auth.credentials.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
-import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.ProcessCredentialsProviderTest;
+import software.amazon.awssdk.core.checksums.Algorithm;
+import software.amazon.awssdk.core.checksums.SdkChecksum;
 import software.amazon.awssdk.profiles.ProfileFile;
 import software.amazon.awssdk.profiles.ProfileProperty;
 import software.amazon.awssdk.utils.StringInputStream;
@@ -35,12 +42,12 @@ import software.amazon.awssdk.utils.StringInputStream;
 public class ProfileCredentialsUtilsTest {
     private static String scriptLocation;
 
-    @BeforeClass
+    @BeforeAll
     public static void setup()  {
-        scriptLocation = ProcessCredentialsProviderTest.copyProcessCredentialsScript();
+        scriptLocation = ProcessCredentialsProviderTest.copyHappyCaseProcessCredentialsScript();
     }
 
-    @AfterClass
+    @AfterAll
     public static void teardown() {
         if (scriptLocation != null && !new File(scriptLocation).delete()) {
             throw new IllegalStateException("Failed to delete file: " + scriptLocation);
@@ -66,12 +73,12 @@ public class ProfileCredentialsUtilsTest {
         ProfileFile configProfile = aggregateFileProfiles(configChild, credentialsSource);
 
         Consumer<ProfileFile> profileValidator = profileFile ->
-            Assertions.assertThatThrownBy(new ProfileCredentialsUtils(profileFile.profiles().get("child"),
+            assertThatThrownBy(new ProfileCredentialsUtils(profileFile, profileFile.profiles().get("child"),
                                                                       profileFile::profile)::credentialsProvider)
                       .hasMessageContaining("the 'sts' service module must be on the class path");
 
-        Assertions.assertThat(sourceProfile).satisfies(profileValidator);
-        Assertions.assertThat(configProfile).satisfies(profileValidator);
+        assertThat(sourceProfile).satisfies(profileValidator);
+        assertThat(configProfile).satisfies(profileValidator);
     }
 
     @Test
@@ -79,7 +86,7 @@ public class ProfileCredentialsUtilsTest {
         ProfileFile profileFile = configFile("[profile test]\n" +
                                              "source_profile=source\n" +
                                              "role_arn=arn:aws:iam::123456789012:role/testRole");
-        Assertions.assertThatThrownBy(new ProfileCredentialsUtils(profileFile.profile("test")
+        assertThatThrownBy(new ProfileCredentialsUtils(profileFile, profileFile.profile("test")
                                                                              .get(), profileFile::profile)::credentialsProvider)
                   .hasMessageContaining("source profile has no credentials configured.");
     }
@@ -92,8 +99,8 @@ public class ProfileCredentialsUtilsTest {
                                           "role_arn=arn:aws:iam::123456789012:role/testRole");
 
         assertThat(profiles.profile("test")).hasValueSatisfying(profile -> {
-            ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profile, profiles::profile);
-            Assertions.assertThatThrownBy(profileCredentialsUtils::credentialsProvider)
+            ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profiles, profile, profiles::profile);
+            assertThatThrownBy(profileCredentialsUtils::credentialsProvider)
                       .hasMessageContaining("source profile has no credentials configured");
         });
     }
@@ -113,7 +120,7 @@ public class ProfileCredentialsUtilsTest {
             assertThat(profile.property(ProfileProperty.AWS_ACCESS_KEY_ID)).hasValue("defaultAccessKey");
             assertThat(profile.toString()).contains("default");
             assertThat(profile.property(ProfileProperty.REGION)).isNotPresent();
-            assertThat(new ProfileCredentialsUtils(profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
+            assertThat(new ProfileCredentialsUtils(profileFile, profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
                 assertThat(credentialsProvider.resolveCredentials()).satisfies(credentials -> {
                     assertThat(credentials.accessKeyId()).isEqualTo("defaultAccessKey");
                     assertThat(credentials.secretAccessKey()).isEqualTo("defaultSecretAccessKey");
@@ -127,12 +134,12 @@ public class ProfileCredentialsUtilsTest {
         ProfileFile profileFile = allTypesProfile();
         assertThat(profileFile.profile("profile-with-session-token")).hasValueSatisfying(profile -> {
             assertThat(profile.property(ProfileProperty.REGION)).isNotPresent();
-            assertThat(new ProfileCredentialsUtils(profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
+            assertThat(new ProfileCredentialsUtils(profileFile, profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
                 assertThat(credentialsProvider.resolveCredentials()).satisfies(credentials -> {
                     assertThat(credentials).isInstanceOf(AwsSessionCredentials.class);
                     assertThat(credentials.accessKeyId()).isEqualTo("defaultAccessKey");
                     assertThat(credentials.secretAccessKey()).isEqualTo("defaultSecretAccessKey");
-                    Assertions.assertThat(((AwsSessionCredentials) credentials).sessionToken()).isEqualTo("awsSessionToken");
+                    assertThat(((AwsSessionCredentials) credentials).sessionToken()).isEqualTo("awsSessionToken");
                 });
             });
         });
@@ -143,7 +150,7 @@ public class ProfileCredentialsUtilsTest {
         ProfileFile profileFile = allTypesProfile();
         assertThat(profileFile.profile("profile-credential-process")).hasValueSatisfying(profile -> {
             assertThat(profile.property(ProfileProperty.REGION)).isNotPresent();
-            assertThat(new ProfileCredentialsUtils(profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
+            assertThat(new ProfileCredentialsUtils(profileFile, profile, profileFile::profile).credentialsProvider()).hasValueSatisfying(credentialsProvider -> {
                 assertThat(credentialsProvider.resolveCredentials()).satisfies(credentials -> {
                     assertThat(credentials).isInstanceOf(AwsBasicCredentials.class);
                     assertThat(credentials.accessKeyId()).isEqualTo("defaultAccessKey");
@@ -159,8 +166,8 @@ public class ProfileCredentialsUtilsTest {
         assertThat(profileFile.profile("profile-with-assume-role")).hasValueSatisfying(profile -> {
             assertThat(profile.property(ProfileProperty.REGION)).isNotPresent();
 
-            ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profile, profileFile::profile);
-            Assertions.assertThatThrownBy(profileCredentialsUtils::credentialsProvider).isInstanceOf(IllegalStateException.class);
+            ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profileFile, profile, profileFile::profile);
+            assertThatThrownBy(profileCredentialsUtils::credentialsProvider).isInstanceOf(IllegalStateException.class);
         });
     }
 
@@ -176,8 +183,8 @@ public class ProfileCredentialsUtilsTest {
             assertThat(profileFile.profile(profileName)).hasValueSatisfying(profile -> {
                 assertThat(profile.property(ProfileProperty.REGION)).isNotPresent();
 
-                ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profile, profileFile::profile);
-                Assertions.assertThatThrownBy(profileCredentialsUtils::credentialsProvider).isInstanceOf(IllegalStateException.class);
+                ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profileFile, profile, profileFile::profile);
+                assertThatThrownBy(profileCredentialsUtils::credentialsProvider).isInstanceOf(IllegalStateException.class);
             });
         });
     }
@@ -199,10 +206,64 @@ public class ProfileCredentialsUtilsTest {
                                        "[profile test3]\n" +
                                        "source_profile=test2\n" +
                                        "role_arn=arn:aws:iam::123456789012:role/testRole3");
-        Assertions.assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile.profile("test").get(), configFile::profile)
+        assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile, configFile.profile("test").get(), configFile::profile)
             .credentialsProvider())
                   .isInstanceOf(IllegalStateException.class)
                   .hasMessageContaining("Invalid profile file: Circular relationship detected with profiles");
+    }
+
+    private static Stream<Arguments> roleProfileWithIncompleteSsoRoleNameSSOCredentialsProperties() {
+        return Stream.of(
+            // No sso_region
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_account_id=accountId\n" +
+                                    "sso_role_name=roleName\n" +
+                                    "sso_start_url=https//d-abc123.awsapps.com/start"),
+                         "Profile property 'sso_region' was not configured for 'test'"),
+            // No sso_account_id
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_region=region\n" +
+                                    "sso_role_name=roleName\n" +
+                                    "sso_start_url=https//d-abc123.awsapps.com/start"),
+                         "Profile property 'sso_account_id' was not configured for 'test'"),
+            // No sso_start_url
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_account_id=accountId\n" +
+                                    "sso_region=region\n" +
+                                    "sso_role_name=roleName\n" +
+                                    "sso_region=region"),
+                         "Profile property 'sso_start_url' was not configured for 'test'"),
+            // No sso_role_name
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_account_id=accountId\n" +
+                                    "sso_region=region\n" +
+                                    "sso_start_url=https//d-abc123.awsapps.com/start"),
+                         "Profile property 'sso_role_name' was not configured for 'test'"),
+            // sso_session with No sso_account_id
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_session=session\n" +
+                                    "sso_role_name=roleName"),
+                         "Profile property 'sso_account_id' was not configured for 'test'"),
+            // sso_session with No sso_role_name
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_session=session\n" +
+                                    "sso_account_id=accountId\n" +
+                                    "sso_start_url=https//d-abc123.awsapps.com/start"),
+                         "Profile property 'sso_role_name' was not configured for 'test'"),
+            Arguments.of(configFile("[profile test]\n" +
+                                    "sso_session=session"),
+                         "Profile property 'sso_account_id' was not configured for 'test'")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("roleProfileWithIncompleteSsoRoleNameSSOCredentialsProperties")
+    void validateCheckSumValues(ProfileFile profiles, String expectedValue) {
+        assertThat(profiles.profile("test")).hasValueSatisfying(profile -> {
+            ProfileCredentialsUtils profileCredentialsUtils = new ProfileCredentialsUtils(profiles, profile, profiles::profile);
+            assertThatThrownBy(profileCredentialsUtils::credentialsProvider)
+                .hasMessageContaining(expectedValue);
+        });
     }
 
     @Test
@@ -215,7 +276,7 @@ public class ProfileCredentialsUtilsTest {
                                             "[profile source]\n" +
                                             "aws_access_key_id=defaultAccessKey\n" +
                                             "aws_secret_access_key=defaultSecretAccessKey");
-        Assertions.assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile.profile("test").get(), configFile::profile)
+        assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile, configFile.profile("test").get(), configFile::profile)
             .credentialsProvider())
                   .isInstanceOf(IllegalStateException.class)
                   .hasMessageContaining("Invalid profile file: profile has both source_profile and credential_source.");
@@ -226,7 +287,7 @@ public class ProfileCredentialsUtilsTest {
         ProfileFile configFile = configFile("[profile test]\n" +
                                             "credential_source=foobar\n" +
                                             "role_arn=arn:aws:iam::123456789012:role/testRole3");
-        Assertions.assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile.profile("test").get(), configFile::profile)
+        assertThatThrownBy(() -> new ProfileCredentialsUtils(configFile, configFile.profile("test").get(), configFile::profile)
             .credentialsProvider())
                   .isInstanceOf(IllegalArgumentException.class)
                   .hasMessageContaining("foobar is not a valid credential_source");
@@ -279,7 +340,7 @@ public class ProfileCredentialsUtilsTest {
                           "role_arn=arn:aws:iam::123456789012:role/testRole\n");
     }
 
-    private ProfileFile configFile(String configFile) {
+    private static ProfileFile configFile(String configFile) {
         return ProfileFile.builder()
                           .content(new StringInputStream(configFile))
                           .type(ProfileFile.Type.CONFIGURATION)

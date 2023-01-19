@@ -19,32 +19,44 @@ import static software.amazon.awssdk.codegen.internal.Utils.closeQuietly;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.function.Supplier;
 
 /**
  * Simple generator task that writes a string to a file.
  */
-public final class SimpleGeneratorTask implements GeneratorTask {
+public final class SimpleGeneratorTask extends GeneratorTask {
 
     private final Writer writer;
     private final String fileHeader;
-    private String fileName;
-    private final String contents;
+    private final String fileName;
+    private final Supplier<String> contents;
 
     public SimpleGeneratorTask(String outputDirectory,
                                String fileName,
                                String fileHeader,
-                               String contents) {
+                               Supplier<String> contents) {
         this.fileHeader = fileHeader;
         this.writer = new CodeWriter(outputDirectory, fileName);
         this.fileName = fileName;
         this.contents = contents;
     }
 
+    public SimpleGeneratorTask(String outputDirectory,
+                               String fileName,
+                               String filenameSuffix,
+                               String fileHeader,
+                               Supplier<String> contents) {
+        this.fileHeader = fileHeader;
+        this.writer = new CodeWriter(outputDirectory, fileName, filenameSuffix, false);
+        this.fileName = fileName;
+        this.contents = contents;
+    }
+
     @Override
-    public void execute() {
+    public void compute() {
         try {
             writer.write(fileHeader + "\n");
-            writer.write(contents);
+            writer.write(contents.get());
             writer.flush();
         } catch (IOException e) {
             throw new RuntimeException(String.format("Error creating file %s", fileName), e);

@@ -57,18 +57,24 @@ public interface SdkHttpFullRequest
      */
     interface Builder extends SdkHttpRequest.Builder {
         /**
-         * Convenience method to set the {@link #protocol()}, {@link #host()}, {@link #port()}, and
-         * {@link #encodedPath()} from a {@link URI} object.
+         * Convenience method to set the {@link #protocol()}, {@link #host()}, {@link #port()},
+         * {@link #encodedPath()} and extracts query parameters from a {@link URI} object.
          *
          * @param uri URI containing protocol, host, port and path.
          * @return This builder for method chaining.
          */
         @Override
         default Builder uri(URI uri) {
-            return this.protocol(uri.getScheme())
+            Builder builder =  this.protocol(uri.getScheme())
                        .host(uri.getHost())
                        .port(uri.getPort())
                        .encodedPath(SdkHttpUtils.appendUri(uri.getRawPath(), encodedPath()));
+            if (uri.getRawQuery() != null) {
+                builder.clearQueryParameters();
+                SdkHttpUtils.uriParams(uri)
+                            .forEach(this::putRawQueryParameter);
+            }
+            return builder;
         }
 
         /**
@@ -100,6 +106,7 @@ public interface SdkHttpFullRequest
         /**
          * The port, exactly as it was configured with {@link #port(Integer)}.
          */
+        @Override
         Integer port();
 
         /**
@@ -205,23 +212,6 @@ public interface SdkHttpFullRequest
          */
         @Override
         Builder method(SdkHttpMethod httpMethod);
-
-        /**
-         * Perform a case-insensitive search for a particular header in this request, returning the first matching header, if one
-         * is found.
-         *
-         * <p>This is useful for headers like 'Content-Type' or 'Content-Length' of which there is expected to be only one value
-         * present.</p>
-         *
-         * <p>This is equivalent to invoking {@link SdkHttpUtils#firstMatchingHeader(Map, String)}</p>.
-         *
-         * @param header The header to search for (case insensitively).
-         * @return The first header that matched the requested one, or empty if one was not found.
-         */
-        @Override
-        default Optional<String> firstMatchingHeader(String header) {
-            return SdkHttpUtils.firstMatchingHeader(headers(), header);
-        }
 
         /**
          * The query parameters, exactly as they were configured with {@link #headers(Map)},

@@ -15,9 +15,10 @@
 
 package software.amazon.awssdk.core.internal.http.pipeline.stages.utils;
 
-import static software.amazon.awssdk.core.internal.retry.SdkDefaultRetrySetting.SDK_RETRY_INFO_HEADER;
-
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.OptionalDouble;
 import java.util.concurrent.CompletionException;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.Response;
@@ -26,16 +27,19 @@ import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.exception.NonRetryableException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.interceptor.ExecutionAttribute;
 import software.amazon.awssdk.core.internal.InternalCoreExecutionAttribute;
 import software.amazon.awssdk.core.internal.http.HttpClientDependencies;
 import software.amazon.awssdk.core.internal.http.RequestExecutionContext;
 import software.amazon.awssdk.core.internal.http.pipeline.stages.AsyncRetryableStage;
 import software.amazon.awssdk.core.internal.http.pipeline.stages.RetryableStage;
 import software.amazon.awssdk.core.internal.retry.ClockSkewAdjuster;
+import software.amazon.awssdk.core.internal.retry.RateLimitingTokenBucket;
+import software.amazon.awssdk.core.metrics.CoreMetric;
+import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.core.retry.RetryPolicyContext;
 import software.amazon.awssdk.core.retry.RetryUtils;
-import software.amazon.awssdk.core.retry.conditions.TokenBucketRetryCondition;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpResponse;
 
@@ -45,23 +49,38 @@ import software.amazon.awssdk.http.SdkHttpResponse;
  */
 @SdkInternalApi
 public class RetryableStageHelper {
+    public static final String SDK_RETRY_INFO_HEADER = "amz-sdk-request";
+
+    public static final ExecutionAttribute<Duration> LAST_BACKOFF_DELAY_DURATION =
+        new ExecutionAttribute<>("LastBackoffDuration");
+
     private final SdkHttpFullRequest request;
     private final RequestExecutionContext context;
     private final RetryPolicy retryPolicy;
+    private final RateLimitingTokenBucket rateLimitingTokenBucket;
     private final HttpClientDependencies dependencies;
+    private final List<String> exceptionMessageHistory = new ArrayList<>();
 
     private int attemptNumber = 0;
     private SdkHttpResponse lastResponse = null;
     private SdkException lastException = null;
-    private Duration lastBackoffDelay = null;
 
     public RetryableStageHelper(SdkHttpFullRequest request,
                                 RequestExecutionContext context,
+                                RateLimitingTokenBucket rateLimitingTokenBucket,
                                 HttpClientDependencies dependencies) {
         this.request = request;
         this.context = context;
         this.retryPolicy = dependencies.clientConfiguration().option(SdkClientOption.RETRY_POLICY);
         this.dependencies = dependencies;
+
+        if (rateLimitingTokenBucket != null) {
+            this.rateLimitingTokenBucket = rateLimitingTokenBucket;
+        } else if (isRateLimitingEnabled()) {
+            this.rateLimitingTokenBucket = new RateLimitingTokenBucket();
+        } else {
+            this.rateLimitingTokenBucket = null;
+        }
     }
 
     /**
@@ -99,6 +118,15 @@ public class RetryableStageHelper {
      * Return the exception that should be thrown, because the retry policy did not allow the request to be retried.
      */
     public SdkException retryPolicyDisallowedRetryException() {
+        context.executionContext().metricCollector().reportMetric(CoreMetric.RETRY_COUNT, retriesAttemptedSoFar(true));
+        for (int i = 0; i < exceptionMessageHistory.size() - 1; i++) {
+            SdkClientException pastException =
+                SdkClientException.builder()
+                                  .message("Request attempt " + (i + 1) + " failure: " + exceptionMessageHistory.get(i))
+                                  .writableStackTrace(false)
+                                  .build();
+            lastException.addSuppressed(pastException);
+        }
         return lastException;
     }
 
@@ -118,7 +146,7 @@ public class RetryableStageHelper {
                 result = retryPolicy.backoffStrategy().computeDelayBeforeNextRetry(context);
             }
         }
-        lastBackoffDelay = result;
+        context.executionAttributes().putAttribute(LAST_BACKOFF_DELAY_DURATION, result);
         return result;
     }
 
@@ -128,23 +156,15 @@ public class RetryableStageHelper {
     public void logBackingOff(Duration backoffDelay) {
         SdkStandardLogger.REQUEST_LOGGER.debug(() -> "Retryable error detected. Will retry in " +
                                                      backoffDelay.toMillis() + "ms. Request attempt number " +
-                                                     attemptNumber);
+                                                     attemptNumber, lastException);
     }
 
     /**
      * Retrieve the request to send to the service, including any detailed retry information headers.
      */
     public SdkHttpFullRequest requestToSend() {
-        Integer availableRetryCapacity = TokenBucketRetryCondition.getCapacityForExecution(context.executionAttributes())
-                                                                  .map(TokenBucketRetryCondition.Capacity::capacityRemaining)
-                                                                  .orElse(null);
-
         return request.toBuilder()
-                      .putHeader(SDK_RETRY_INFO_HEADER,
-                                 String.format("%s/%s/%s",
-                                               attemptNumber - 1,
-                                               lastBackoffDelay.toMillis(),
-                                               availableRetryCapacity != null ? availableRetryCapacity : ""))
+                      .putHeader(SDK_RETRY_INFO_HEADER, "attempt=" + attemptNumber + "; max=" + (retryPolicy.numRetries() + 1))
                       .build();
     }
 
@@ -171,6 +191,7 @@ public class RetryableStageHelper {
      */
     public void attemptSucceeded() {
         retryPolicy.aggregateRetryCondition().requestSucceeded(retryPolicyContext(false));
+        context.executionContext().metricCollector().reportMetric(CoreMetric.RETRY_COUNT, retriesAttemptedSoFar(false));
     }
 
     /**
@@ -197,9 +218,11 @@ public class RetryableStageHelper {
             setLastException(lastException.getCause());
         } else if (lastException instanceof SdkException) {
             this.lastException = (SdkException) lastException;
+            exceptionMessageHistory.add(this.lastException.getMessage());
         } else {
             this.lastException = SdkClientException.create("Unable to execute HTTP request: " + lastException.getMessage(),
                                                            lastException);
+            exceptionMessageHistory.add(this.lastException.getMessage());
         }
     }
 
@@ -208,6 +231,86 @@ public class RetryableStageHelper {
      */
     public void setLastResponse(SdkHttpResponse lastResponse) {
         this.lastResponse = lastResponse;
+    }
+
+    /**
+     * Whether rate limiting is enabled. Only {@link RetryMode#ADAPTIVE} enables rate limiting.
+     */
+    private boolean isRateLimitingEnabled() {
+        return retryPolicy.retryMode() == RetryMode.ADAPTIVE;
+    }
+
+    /**
+     * Whether rate limiting should fast fail.
+     */
+    public boolean isFastFailRateLimiting() {
+        return Boolean.TRUE.equals(retryPolicy.isFastFailRateLimiting());
+    }
+
+    public boolean isLastExceptionThrottlingException() {
+        if (lastException == null) {
+            return false;
+        }
+
+        return RetryUtils.isThrottlingException(lastException);
+    }
+
+    /**
+     * Acquire a send token from the rate limiter. Returns immediately if rate limiting is not enabled.
+     */
+    public void getSendToken() {
+        if (!isRateLimitingEnabled()) {
+            return;
+        }
+
+        boolean acquired = rateLimitingTokenBucket.acquire(1.0, isFastFailRateLimiting());
+
+        if (!acquired) {
+            String errorMessage = "Unable to acquire a send token immediately without waiting. This indicates that ADAPTIVE "
+                                  + "retry mode is enabled, fast fail rate limiting is enabled, and that rate limiting is "
+                                  + "engaged because of prior throttled requests. The request will not be executed.";
+            throw SdkClientException.create(errorMessage);
+        }
+    }
+
+    /**
+     * Acquire a send token from the rate limiter in a non blocking manner. See
+     * {@link RateLimitingTokenBucket#acquireNonBlocking(double, boolean)} for documentation on how to interpret the returned
+     * value.
+     */
+    public OptionalDouble getSendTokenNonBlocking() {
+        if (!isRateLimitingEnabled()) {
+            return OptionalDouble.of(0.0);
+        }
+
+        return rateLimitingTokenBucket.acquireNonBlocking(1.0, isFastFailRateLimiting());
+    }
+
+    /**
+     * Conditionally updates the sending rate of the rate limiter when an error response is received. This operation is a noop
+     * if rate limiting is not enabled.
+     */
+    public void updateClientSendingRateForErrorResponse() {
+        if (!isRateLimitingEnabled()) {
+            return;
+        }
+        // Only throttling errors affect the sending rate. For non error
+        // responses, they're handled by
+        // updateClientSendingRateForSuccessResponse()
+        if (isLastExceptionThrottlingException()) {
+            rateLimitingTokenBucket.updateClientSendingRate(true);
+        }
+    }
+
+    /**
+     * Conditionally updates the sending rate of the rate limiter when an error response is received. This operation is a noop
+     * if rate limiting is not enabled.
+     */
+    public void updateClientSendingRateForSuccessResponse() {
+        if (!isRateLimitingEnabled()) {
+            return;
+        }
+        rateLimitingTokenBucket.updateClientSendingRate(false);
     }
 
     private boolean isInitialAttempt() {

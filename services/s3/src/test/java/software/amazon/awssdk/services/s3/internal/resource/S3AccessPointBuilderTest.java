@@ -16,11 +16,10 @@
 package software.amazon.awssdk.services.s3.internal.resource;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.*;
 
 import java.net.URI;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -57,6 +56,20 @@ public class S3AccessPointBuilderTest {
 
         assertThat(result,
                    is(URI.create("protocol://access-point-account-id.s3-accesspoint.dualstack.region.domain")));
+    }
+
+    @Test
+    public void toURI_FipsEnabled() {
+        URI result = S3AccessPointBuilder.create()
+                                         .accessPointName("access-point")
+                                         .accountId("account-id")
+                                         .region("region")
+                                         .protocol("protocol")
+                                         .domain("domain")
+                                         .fipsEnabled(true)
+                                         .toUri();
+
+        assertThat(result, is(URI.create("protocol://access-point-account-id.s3-accesspoint-fips.region.domain")));
     }
 
     @Test
@@ -170,4 +183,59 @@ public class S3AccessPointBuilderTest {
             .hasMessageContaining("accountId")
             .hasMessageContaining("alphanumeric");
     }
+
+    @Test
+    public void toURI_noRegion_returnsGlobalEndpoint() {
+        URI result = S3AccessPointBuilder.create()
+                                         .accessPointName("access-point")
+                                         .accountId("account-id")
+                                         .region("")
+                                         .protocol("protocol")
+                                         .domain("domain")
+                                         .toUri();
+
+        assertThat(result, is(URI.create("protocol://access-point.accesspoint.s3-global.domain")));
+    }
+
+    @Test
+    public void toURI_noRegion_accessPointNameWithDots_returnsGlobalEndpoint() {
+        URI result = S3AccessPointBuilder.create()
+                                         .accessPointName("access-point.foobar")
+                                         .accountId("account-id")
+                                         .region("")
+                                         .protocol("protocol")
+                                         .domain("domain")
+                                         .toUri();
+
+        assertThat(result, is(URI.create("protocol://access-point.foobar.accesspoint.s3-global.domain")));
+    }
+
+    @Test
+    public void toURI_noRegion_accessPointNameWithDots_segmentHasInvalidLength() {
+        assertThatThrownBy(() -> S3AccessPointBuilder.create()
+                                                     .accessPointName("access-point." + LONG_STRING_64)
+                                                     .accountId("account-id")
+                                                     .region("")
+                                                     .protocol("protocol")
+                                                     .domain("domain")
+                                                     .toUri())
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("63")
+            .hasMessageContaining(LONG_STRING_64);
+    }
+
+    @Test
+    public void toURI_noRegion_accessPointNameWithDots_segmentHasInvalidCharacters() {
+        assertThatThrownBy(() -> S3AccessPointBuilder.create()
+                                                     .accessPointName("access-point" + "." + "%2ffoobar")
+                                                     .accountId("account-id")
+                                                     .region("")
+                                                     .protocol("protocol")
+                                                     .domain("domain")
+                                                     .toUri())
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alphanumeric")
+            .hasMessageContaining("%2ffoobar");
+    }
+
 }

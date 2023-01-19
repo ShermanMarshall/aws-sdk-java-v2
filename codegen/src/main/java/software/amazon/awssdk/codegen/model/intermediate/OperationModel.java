@@ -18,6 +18,8 @@ package software.amazon.awssdk.codegen.model.intermediate;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import software.amazon.awssdk.codegen.checksum.HttpChecksum;
 import software.amazon.awssdk.codegen.docs.ClientType;
 import software.amazon.awssdk.codegen.docs.DocConfiguration;
 import software.amazon.awssdk.codegen.docs.OperationDocs;
@@ -25,12 +27,15 @@ import software.amazon.awssdk.codegen.docs.SimpleMethodOverload;
 import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.codegen.model.service.AuthType;
 import software.amazon.awssdk.codegen.model.service.EndpointTrait;
+import software.amazon.awssdk.codegen.model.service.StaticContextParam;
 
 public class OperationModel extends DocumentationModel {
 
     private String operationName;
 
     private boolean deprecated;
+
+    private String deprecatedMessage;
 
     private VariableModel input;
 
@@ -50,6 +55,8 @@ public class OperationModel extends DocumentationModel {
 
     private boolean endpointOperation;
 
+    private boolean endpointCacheRequired;
+
     private EndpointDiscovery endpointDiscovery;
 
     @JsonIgnore
@@ -59,6 +66,13 @@ public class OperationModel extends DocumentationModel {
     private ShapeModel outputShape;
 
     private EndpointTrait endpointTrait;
+
+    private boolean httpChecksumRequired;
+
+    private HttpChecksum httpChecksum;
+
+    @JsonIgnore
+    private Map<String, StaticContextParam> staticContextParams;
 
     public String getOperationName() {
         return operationName;
@@ -78,6 +92,14 @@ public class OperationModel extends DocumentationModel {
 
     public void setDeprecated(boolean deprecated) {
         this.deprecated = deprecated;
+    }
+
+    public String getDeprecatedMessage() {
+        return deprecatedMessage;
+    }
+
+    public void setDeprecatedMessage(String deprecatedMessage) {
+        this.deprecatedMessage = deprecatedMessage;
     }
 
     public String getDocs(IntermediateModel model,
@@ -207,6 +229,14 @@ public class OperationModel extends DocumentationModel {
         this.endpointOperation = endpointOperation;
     }
 
+    public boolean isEndpointCacheRequired() {
+        return endpointCacheRequired;
+    }
+
+    public void setEndpointCacheRequired(boolean endpointCacheRequired) {
+        this.endpointCacheRequired = endpointCacheRequired;
+    }
+
     public boolean isPaginated() {
         return isPaginated;
     }
@@ -261,5 +291,29 @@ public class OperationModel extends DocumentationModel {
                && shapeModel.getMembers().stream()
                             .filter(m -> m.getShape() != null)
                             .anyMatch(m -> m.getShape().isEventStream());
+    }
+
+    public boolean isHttpChecksumRequired() {
+        return httpChecksumRequired;
+    }
+
+    public void setHttpChecksumRequired(boolean httpChecksumRequired) {
+        this.httpChecksumRequired = httpChecksumRequired;
+    }
+
+    public HttpChecksum getHttpChecksum() {
+        return httpChecksum;
+    }
+
+    public void setHttpChecksum(HttpChecksum httpChecksum) {
+        this.httpChecksum = httpChecksum;
+    }
+
+    public Map<String, StaticContextParam> getStaticContextParams() {
+        return staticContextParams;
+    }
+
+    public void setStaticContextParams(Map<String, StaticContextParam> staticContextParams) {
+        this.staticContextParams = staticContextParams;
     }
 }

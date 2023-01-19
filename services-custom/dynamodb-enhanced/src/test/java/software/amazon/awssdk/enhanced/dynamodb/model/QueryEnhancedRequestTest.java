@@ -15,21 +15,23 @@
 
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.junit.MockitoJUnitRunner;
+import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.NestedAttributeName;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+
+import java.util.*;
+
 import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.numberValue;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.stringValue;
-import static software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional.equalTo;
-
-import java.util.HashMap;
-import java.util.Map;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
-import software.amazon.awssdk.enhanced.dynamodb.Expression;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import static software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional.keyEqualTo;
 
 @RunWith(MockitoJUnitRunner.class)
 public class QueryEnhancedRequestTest {
@@ -44,6 +46,7 @@ public class QueryEnhancedRequestTest {
         assertThat(builtObject.limit(), is(nullValue()));
         assertThat(builtObject.queryConditional(), is(nullValue()));
         assertThat(builtObject.scanIndexForward(), is(nullValue()));
+        assertThat(builtObject.attributesToProject(), is(nullValue()));
     }
 
     @Test
@@ -54,20 +57,27 @@ public class QueryEnhancedRequestTest {
 
         Map<String, AttributeValue> expressionValues = singletonMap(":test-key", stringValue("test-value"));
         Expression filterExpression = Expression.builder()
-                                                .expression("test-expression")
-                                                .expressionValues(expressionValues)
-                                                .build();
+                .expression("test-expression")
+                .expressionValues(expressionValues)
+                .build();
 
-        QueryConditional queryConditional = equalTo(k -> k.partitionValue("id-value"));
+        QueryConditional queryConditional = keyEqualTo(k -> k.partitionValue("id-value"));
+
+        String[] attributesToProjectArray = {"one", "two"};
+        String additionalElement = "three";
+        List<String> attributesToProject = new ArrayList<>(Arrays.asList(attributesToProjectArray));
+        attributesToProject.add(additionalElement);
 
         QueryEnhancedRequest builtObject = QueryEnhancedRequest.builder()
-                                                               .exclusiveStartKey(exclusiveStartKey)
-                                                               .consistentRead(false)
-                                                               .filterExpression(filterExpression)
-                                                               .limit(3)
-                                                               .queryConditional(queryConditional)
-                                                               .scanIndexForward(true)
-                                                               .build();
+                .exclusiveStartKey(exclusiveStartKey)
+                .consistentRead(false)
+                .filterExpression(filterExpression)
+                .limit(3)
+                .queryConditional(queryConditional)
+                .scanIndexForward(true)
+                .attributesToProject(attributesToProjectArray)
+                .addAttributeToProject(additionalElement)
+                .build();
 
         assertThat(builtObject.exclusiveStartKey(), is(exclusiveStartKey));
         assertThat(builtObject.consistentRead(), is(false));
@@ -75,6 +85,93 @@ public class QueryEnhancedRequestTest {
         assertThat(builtObject.limit(), is(3));
         assertThat(builtObject.queryConditional(), is(queryConditional));
         assertThat(builtObject.scanIndexForward(), is(true));
+        assertThat(builtObject.attributesToProject(), is(attributesToProject));
+    }
+
+
+    @Test
+    public void test_withNestedAttributeAddedFirstAndThenAttributesToProject() {
+
+        String[] attributesToProjectArray = {"one", "two"};
+        String additionalElement = "three";
+        QueryEnhancedRequest builtObject = QueryEnhancedRequest.builder()
+                .addNestedAttributesToProject(NestedAttributeName.create("foo", "bar"))
+                .attributesToProject(attributesToProjectArray)
+                .addAttributeToProject(additionalElement)
+                .build();
+        List<String> attributesToProject = Arrays.asList("one", "two", "three");
+        assertThat(builtObject.attributesToProject(), is(attributesToProject));
+    }
+
+
+    @Test
+    public void test_nestedAttributesToProjectWithNestedAttributeAddedLast() {
+
+        String[] attributesToProjectArray = {"one", "two"};
+        String additionalElement = "three";
+
+        QueryEnhancedRequest builtObjectOne = QueryEnhancedRequest.builder()
+                .attributesToProject(attributesToProjectArray)
+                .addAttributeToProject(additionalElement)
+                .addNestedAttributesToProject(NestedAttributeName.create("foo", "bar"))
+                .build();
+        List<String> attributesToProjectNestedLast = Arrays.asList("one", "two", "three", "foo.bar");
+        assertThat(builtObjectOne.attributesToProject(), is(attributesToProjectNestedLast));
+
+    }
+
+    @Test
+    public void test_nestedAttributesToProjectWithNestedAttributeAddedInBetween() {
+
+        String[] attributesToProjectArray = {"one", "two"};
+        String additionalElement = "three";
+
+        QueryEnhancedRequest builtObjectOne = QueryEnhancedRequest.builder()
+                .attributesToProject(attributesToProjectArray)
+                .addNestedAttributesToProject(NestedAttributeName.create("foo", "bar"))
+                .addAttributeToProject(additionalElement)
+                .build();
+        List<String> attributesToProjectNestedLast = Arrays.asList("one", "two", "foo.bar", "three");
+        assertThat(builtObjectOne.attributesToProject(), is(attributesToProjectNestedLast));
+
+    }
+
+    @Test
+    public void test_nestedAttributesToProjectOverwrite() {
+
+        String[] attributesToProjectArray = {"one", "two"};
+        String additionalElement = "three";
+        String[] overwrite = { "overwrite"};
+
+        QueryEnhancedRequest builtObjectTwo = QueryEnhancedRequest.builder()
+                .attributesToProject(attributesToProjectArray)
+                .addAttributeToProject(additionalElement)
+                .addNestedAttributesToProject(NestedAttributeName.create("foo", "bar"))
+                .attributesToProject(overwrite)
+                .build();
+        assertThat(builtObjectTwo.attributesToProject(), is(Arrays.asList(overwrite)));
+    }
+
+    @Test
+    public void test_nestedAttributesNullNestedAttributeElement() {
+        List<NestedAttributeName> attributeNames = new ArrayList<>();
+        attributeNames.add(NestedAttributeName.create("foo"));
+        attributeNames.add(null);
+        assertThatThrownBy(() -> QueryEnhancedRequest.builder()
+                                                     .addNestedAttributesToProject(attributeNames)
+                                                     .build()).isInstanceOf(IllegalArgumentException.class);
+
+        assertThatThrownBy(() -> QueryEnhancedRequest.builder()
+                                                     .addNestedAttributesToProject(NestedAttributeName.create("foo", "bar"), null)
+                                                     .build()).isInstanceOf(IllegalArgumentException.class);
+
+        NestedAttributeName nestedAttributeName = null;
+        QueryEnhancedRequest.builder()
+                            .addNestedAttributeToProject(nestedAttributeName)
+                            .build();
+        assertThatThrownBy(() -> QueryEnhancedRequest.builder()
+                                                     .addNestedAttributesToProject(nestedAttributeName)
+                                                     .build()).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

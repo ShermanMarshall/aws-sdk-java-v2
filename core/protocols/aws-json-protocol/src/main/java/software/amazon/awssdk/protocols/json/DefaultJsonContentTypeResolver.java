@@ -23,7 +23,6 @@ import software.amazon.awssdk.annotations.SdkProtectedApi;
  */
 @SdkProtectedApi
 public class DefaultJsonContentTypeResolver implements JsonContentTypeResolver {
-
     private static final String REST_JSON_CONTENT_TYPE = "application/json";
 
     private final String prefix;
@@ -34,11 +33,9 @@ public class DefaultJsonContentTypeResolver implements JsonContentTypeResolver {
 
     @Override
     public String resolveContentType(AwsJsonProtocolMetadata protocolMetadata) {
-        switch (protocolMetadata.protocol()) {
-            case REST_JSON:
-                return REST_JSON_CONTENT_TYPE;
-            default:
-                return prefix + protocolMetadata.protocolVersion();
+        if (AwsJsonProtocol.REST_JSON.equals(protocolMetadata.protocol())) {
+            return REST_JSON_CONTENT_TYPE;
         }
+        return prefix + protocolMetadata.protocolVersion();
     }
 }

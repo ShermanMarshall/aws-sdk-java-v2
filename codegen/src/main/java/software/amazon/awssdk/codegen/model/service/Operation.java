@@ -15,8 +15,9 @@
 
 package software.amazon.awssdk.codegen.model.service;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import java.util.Map;
+import software.amazon.awssdk.codegen.checksum.HttpChecksum;
 import software.amazon.awssdk.codegen.model.intermediate.EndpointDiscovery;
 
 public class Operation {
@@ -24,6 +25,8 @@ public class Operation {
     private String name;
 
     private boolean deprecated;
+
+    private String deprecatedMessage;
 
     private Http http;
 
@@ -37,18 +40,19 @@ public class Operation {
 
     private List<ErrorMap> errors;
 
-    private boolean requiresApiKey;
+    private EndpointDiscovery endpointdiscovery;
 
-    @JsonProperty("endpointdiscovery")
-    private EndpointDiscovery endpointDiscovery;
-
-    @JsonProperty("endpointoperation")
-    private boolean endpointOperation;
+    private boolean endpointoperation;
 
     private EndpointTrait endpoint;
 
-    @JsonProperty("authtype")
-    private AuthType authType = AuthType.IAM;
+    private AuthType authtype;
+
+    private boolean httpChecksumRequired;
+
+    private HttpChecksum httpChecksum;
+
+    private Map<String, StaticContextParam> staticContextParams;
 
     public String getName() {
         return name;
@@ -69,6 +73,14 @@ public class Operation {
 
     public void setDeprecated(boolean deprecated) {
         this.deprecated = deprecated;
+    }
+
+    public String getDeprecatedMessage() {
+        return deprecatedMessage;
+    }
+
+    public void setDeprecatedMessage(String deprecatedMessage) {
+        this.deprecatedMessage = deprecatedMessage;
     }
 
     public Http getHttp() {
@@ -121,12 +133,12 @@ public class Operation {
         this.errors = errors;
     }
 
-    public AuthType getAuthType() {
-        return authType;
+    public AuthType getAuthtype() {
+        return authtype;
     }
 
-    public void setAuthType(AuthType authType) {
-        this.authType = authType;
+    public void setAuthtype(String authtype) {
+        this.authtype = AuthType.fromValue(authtype);
     }
 
     public String getAuthorizer() {
@@ -137,28 +149,20 @@ public class Operation {
         this.authorizer = authorizer;
     }
 
-    public boolean requiresApiKey() {
-        return requiresApiKey;
+    public EndpointDiscovery getEndpointdiscovery() {
+        return endpointdiscovery;
     }
 
-    public void setRequiresApiKey(boolean requiresApiKey) {
-        this.requiresApiKey = requiresApiKey;
+    public void setEndpointdiscovery(EndpointDiscovery endpointdiscovery) {
+        this.endpointdiscovery = endpointdiscovery;
     }
 
-    public EndpointDiscovery getEndpointDiscovery() {
-        return endpointDiscovery;
+    public boolean isEndpointoperation() {
+        return endpointoperation;
     }
 
-    public void setEndpointDiscovery(EndpointDiscovery endpointDiscovery) {
-        this.endpointDiscovery = endpointDiscovery;
-    }
-
-    public boolean isEndpointOperation() {
-        return endpointOperation;
-    }
-
-    public void setEndpointOperation(boolean endpointOperation) {
-        this.endpointOperation = endpointOperation;
+    public void setEndpointoperation(boolean endpointoperation) {
+        this.endpointoperation = endpointoperation;
     }
 
     public EndpointTrait getEndpoint() {
@@ -167,5 +171,29 @@ public class Operation {
 
     public void setEndpoint(EndpointTrait endpoint) {
         this.endpoint = endpoint;
+    }
+
+    public boolean isHttpChecksumRequired() {
+        return httpChecksumRequired;
+    }
+
+    public void setHttpChecksumRequired(boolean httpChecksumRequired) {
+        this.httpChecksumRequired = httpChecksumRequired;
+    }
+
+    public HttpChecksum getHttpChecksum() {
+        return httpChecksum;
+    }
+
+    public void setHttpChecksum(HttpChecksum httpChecksum) {
+        this.httpChecksum = httpChecksum;
+    }
+
+    public Map<String, StaticContextParam> getStaticContextParams() {
+        return staticContextParams;
+    }
+
+    public void setStaticContextParams(Map<String, StaticContextParam> staticContextParams) {
+        this.staticContextParams = staticContextParams;
     }
 }

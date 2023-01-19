@@ -19,12 +19,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.core.SdkField;
 import software.amazon.awssdk.core.SdkPojo;
+import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.protocol.MarshallLocation;
+import software.amazon.awssdk.core.traits.RequiredTrait;
 import software.amazon.awssdk.core.traits.TimestampFormatTrait;
 import software.amazon.awssdk.core.util.SdkAutoConstructList;
 import software.amazon.awssdk.core.util.SdkAutoConstructMap;
@@ -35,6 +39,12 @@ import software.amazon.awssdk.utils.DateUtils;
 public final class SimpleTypeJsonMarshaller {
 
     public static final JsonMarshaller<Void> NULL = (val, context, paramName, sdkField) -> {
+        if (Objects.nonNull(sdkField) && sdkField.containsTrait(RequiredTrait.class)) {
+            throw new IllegalArgumentException(String.format("Parameter '%s' must not be null",
+                                                             Optional.ofNullable(paramName)
+                                                                     .orElseGet(() -> "paramName null")));
+        }
+
         // If paramName is non null then we are emitting a field of an object, in that
         // we just don't write the field. If param name is null then we are either in a container
         // or the thing being marshalled is the payload itself in which case we want to preserve
@@ -61,6 +71,13 @@ public final class SimpleTypeJsonMarshaller {
     public static final JsonMarshaller<Long> LONG = new BaseJsonMarshaller<Long>() {
         @Override
         public void marshall(Long val, StructuredJsonGenerator jsonGenerator, JsonMarshallerContext context) {
+            jsonGenerator.writeValue(val);
+        }
+    };
+
+    public static final JsonMarshaller<Short> SHORT = new BaseJsonMarshaller<Short>() {
+        @Override
+        public void marshall(Short val, StructuredJsonGenerator jsonGenerator, JsonMarshallerContext context) {
             jsonGenerator.writeValue(val);
         }
     };
@@ -98,14 +115,14 @@ public final class SimpleTypeJsonMarshaller {
         if (paramName != null) {
             jsonGenerator.writeFieldName(paramName);
         }
-        TimestampFormatTrait trait = sdkField.getTrait(TimestampFormatTrait.class);
+        TimestampFormatTrait trait = sdkField != null ? sdkField.getTrait(TimestampFormatTrait.class) : null;
         if (trait != null) {
             switch (trait.format()) {
                 case UNIX_TIMESTAMP:
                     jsonGenerator.writeNumber(DateUtils.formatUnixTimestampInstant(val));
                     break;
                 case RFC_822:
-                    jsonGenerator.writeValue(DateUtils.formatRfc1123Date(val));
+                    jsonGenerator.writeValue(DateUtils.formatRfc822Date(val));
                     break;
                 case ISO_8601:
                     jsonGenerator.writeValue(DateUtils.formatIso8601Date(val));
@@ -175,6 +192,16 @@ public final class SimpleTypeJsonMarshaller {
         @Override
         protected boolean shouldEmit(Map<String, ?> map) {
             return !map.isEmpty() || !(map instanceof SdkAutoConstructMap);
+        }
+    };
+
+    /**
+     * Marshalls Document type members by visiting the document using DocumentTypeJsonMarshaller.
+     */
+    public static final JsonMarshaller<Document> DOCUMENT = new BaseJsonMarshaller<Document>() {
+        @Override
+        public void marshall(Document document, StructuredJsonGenerator jsonGenerator, JsonMarshallerContext context) {
+            document.accept(new DocumentTypeJsonMarshaller(jsonGenerator));
         }
     };
 

@@ -35,7 +35,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.http.nio.netty.internal.MockChannel;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -85,7 +85,7 @@ public class Http2StreamExceptionHandlerTest {
         when(streamChannel.parent()).thenReturn(embeddedParentChannel);
         handler.exceptionCaught(context, ReadTimeoutException.INSTANCE);
 
-        assertThat(verifyExceptionHandler.exceptionCaught).isExactlyInstanceOf(Http2StreamExceptionHandler.Http2StreamIoException.class);
+        assertThat(verifyExceptionHandler.exceptionCaught).isExactlyInstanceOf(Http2ConnectionTerminatingException.class);
         verify(context).fireExceptionCaught(ReadTimeoutException.INSTANCE);
     }
 
@@ -95,7 +95,7 @@ public class Http2StreamExceptionHandlerTest {
         when(streamChannel.parent()).thenReturn(embeddedParentChannel);
         handler.exceptionCaught(context, ioException);
 
-        assertThat(verifyExceptionHandler.exceptionCaught).isExactlyInstanceOf(Http2StreamExceptionHandler.Http2StreamIoException.class);
+        assertThat(verifyExceptionHandler.exceptionCaught).isExactlyInstanceOf(Http2ConnectionTerminatingException.class);
         verify(context).fireExceptionCaught(ioException);
     }
 

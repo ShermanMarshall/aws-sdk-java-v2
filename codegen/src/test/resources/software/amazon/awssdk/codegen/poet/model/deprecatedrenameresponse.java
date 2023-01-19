@@ -23,15 +23,16 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse implements
                                                                               ToCopyableBuilder<DeprecatedRenameResponse.Builder, DeprecatedRenameResponse> {
     private static final SdkField<String> ORIGINAL_NAME_NO_DEPRECATION_FIELD = SdkField.<String> builder(MarshallingType.STRING)
-        .getter(getter(DeprecatedRenameResponse::originalNameNoDeprecation))
-        .setter(setter(Builder::originalNameNoDeprecation))
-        .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("OriginalNameNoDeprecation").build())
-        .build();
+                                                                                       .memberName("OriginalNameNoDeprecation").getter(getter(DeprecatedRenameResponse::originalNameNoDeprecation))
+                                                                                       .setter(setter(Builder::originalNameNoDeprecation))
+                                                                                       .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("OriginalNameNoDeprecation").build())
+                                                                                       .build();
 
     private static final SdkField<String> ORIGINAL_NAME_DEPRECATED_FIELD = SdkField.<String> builder(MarshallingType.STRING)
-        .getter(getter(DeprecatedRenameResponse::originalNameDeprecated)).setter(setter(Builder::originalNameDeprecated))
-        .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("OriginalNameDeprecated").build())
-        .build();
+                                                                                   .memberName("OriginalNameDeprecated").getter(getter(DeprecatedRenameResponse::originalNameDeprecated))
+                                                                                   .setter(setter(Builder::originalNameDeprecated))
+                                                                                   .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("OriginalNameDeprecated").build())
+                                                                                   .build();
 
     private static final List<SdkField<?>> SDK_FIELDS = Collections.unmodifiableList(Arrays.asList(
         ORIGINAL_NAME_NO_DEPRECATION_FIELD, ORIGINAL_NAME_DEPRECATED_FIELD));
@@ -51,7 +52,7 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
      *
      * @return The value of the OriginalNameNoDeprecation property for this object.
      */
-    public String originalNameNoDeprecation() {
+    public final String originalNameNoDeprecation() {
         return originalNameNoDeprecation;
     }
 
@@ -60,7 +61,7 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
      *
      * @return The value of the OriginalNameDeprecated property for this object.
      */
-    public String originalNameDeprecated() {
+    public final String originalNameDeprecated() {
         return originalNameDeprecated;
     }
 
@@ -78,7 +79,7 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         int hashCode = 1;
         hashCode = 31 * hashCode + super.hashCode();
         hashCode = 31 * hashCode + Objects.hashCode(originalNameNoDeprecation());
@@ -87,12 +88,12 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         return super.equals(obj) && equalsBySdkFields(obj);
     }
 
     @Override
-    public boolean equalsBySdkFields(Object obj) {
+    public final boolean equalsBySdkFields(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -112,12 +113,12 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
      * redacted from this string using a placeholder value.
      */
     @Override
-    public String toString() {
+    public final String toString() {
         return ToString.builder("DeprecatedRenameResponse").add("OriginalNameNoDeprecation", originalNameNoDeprecation())
                        .add("OriginalNameDeprecated", originalNameDeprecated()).build();
     }
 
-    public <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
+    public final <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
         switch (fieldName) {
             case "OriginalNameNoDeprecation":
                 return Optional.ofNullable(clazz.cast(originalNameNoDeprecation()));
@@ -129,7 +130,7 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
     }
 
     @Override
-    public List<SdkField<?>> sdkFields() {
+    public final List<SdkField<?>> sdkFields() {
         return SDK_FIELDS;
     }
 
@@ -180,28 +181,28 @@ public final class DeprecatedRenameResponse extends JsonProtocolTestsResponse im
             return originalNameNoDeprecation;
         }
 
+        public final void setOriginalNameNoDeprecation(String originalNameNoDeprecation) {
+            this.originalNameNoDeprecation = originalNameNoDeprecation;
+        }
+
         @Override
         public final Builder originalNameNoDeprecation(String originalNameNoDeprecation) {
             this.originalNameNoDeprecation = originalNameNoDeprecation;
             return this;
         }
 
-        public final void setOriginalNameNoDeprecation(String originalNameNoDeprecation) {
-            this.originalNameNoDeprecation = originalNameNoDeprecation;
-        }
-
         public final String getOriginalNameDeprecated() {
             return originalNameDeprecated;
+        }
+
+        public final void setOriginalNameDeprecated(String originalNameDeprecated) {
+            this.originalNameDeprecated = originalNameDeprecated;
         }
 
         @Override
         public final Builder originalNameDeprecated(String originalNameDeprecated) {
             this.originalNameDeprecated = originalNameDeprecated;
             return this;
-        }
-
-        public final void setOriginalNameDeprecated(String originalNameDeprecated) {
-            this.originalNameDeprecated = originalNameDeprecated;
         }
 
         @Override

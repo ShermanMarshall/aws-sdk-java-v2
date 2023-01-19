@@ -15,9 +15,12 @@
 
 package software.amazon.awssdk.http.apache;
 
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.mapping;
-import static java.util.stream.Collectors.toList;
+import static software.amazon.awssdk.http.HttpMetric.AVAILABLE_CONCURRENCY;
+import static software.amazon.awssdk.http.HttpMetric.HTTP_CLIENT_NAME;
+import static software.amazon.awssdk.http.HttpMetric.LEASED_CONCURRENCY;
+import static software.amazon.awssdk.http.HttpMetric.MAX_CONCURRENCY;
+import static software.amazon.awssdk.http.HttpMetric.PENDING_CONCURRENCY_ACQUIRES;
+import static software.amazon.awssdk.http.apache.internal.conn.ClientConnectionRequestFactory.THREAD_LOCAL_REQUEST_METRIC_COLLECTOR;
 import static software.amazon.awssdk.utils.NumericUtils.saturatedCast;
 
 import java.io.IOException;
@@ -27,17 +30,15 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import org.apache.http.Header;
+import org.apache.http.HeaderIterator;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.methods.HttpRequestBase;
@@ -46,6 +47,7 @@ import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.conn.DnsResolver;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.conn.routing.HttpRoutePlanner;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
@@ -57,6 +59,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.DefaultSchemePortResolver;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.pool.PoolStats;
 import org.apache.http.protocol.HttpRequestExecutor;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
@@ -72,6 +75,7 @@ import software.amazon.awssdk.http.TlsKeyManagersProvider;
 import software.amazon.awssdk.http.TlsTrustManagersProvider;
 import software.amazon.awssdk.http.apache.internal.ApacheHttpRequestConfig;
 import software.amazon.awssdk.http.apache.internal.DefaultConfiguration;
+import software.amazon.awssdk.http.apache.internal.SdkConnectionReuseStrategy;
 import software.amazon.awssdk.http.apache.internal.SdkProxyRoutePlanner;
 import software.amazon.awssdk.http.apache.internal.conn.ClientConnectionManagerFactory;
 import software.amazon.awssdk.http.apache.internal.conn.IdleConnectionReaper;
@@ -81,6 +85,8 @@ import software.amazon.awssdk.http.apache.internal.impl.ApacheHttpRequestFactory
 import software.amazon.awssdk.http.apache.internal.impl.ApacheSdkHttpClient;
 import software.amazon.awssdk.http.apache.internal.impl.ConnectionManagerAwareHttpClient;
 import software.amazon.awssdk.http.apache.internal.utils.ApacheUtils;
+import software.amazon.awssdk.metrics.MetricCollector;
+import software.amazon.awssdk.metrics.NoOpMetricCollector;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.Logger;
 import software.amazon.awssdk.utils.Validate;
@@ -125,6 +131,15 @@ public final class ApacheHttpClient implements SdkHttpClient {
         return new DefaultBuilder();
     }
 
+    /**
+     * Create a {@link ApacheHttpClient} with the default properties
+     *
+     * @return an {@link ApacheHttpClient}
+     */
+    public static SdkHttpClient create() {
+        return new DefaultBuilder().build();
+    }
+
     private ConnectionManagerAwareHttpClient createClient(ApacheHttpClient.DefaultBuilder configuration,
                                                           AttributeMap standardOptions) {
         ApacheConnectionManagerFactory cmFactory = new ApacheConnectionManagerFactory();
@@ -142,6 +157,7 @@ public final class ApacheHttpClient implements SdkHttpClient {
                .disableRedirectHandling()
                .disableAutomaticRetries()
                .setUserAgent("") // SDK will set the user agent header in the pipeline. Don't let Apache waste time
+               .setConnectionReuseStrategy(new SdkConnectionReuseStrategy())
                .setConnectionManager(ClientConnectionManagerFactory.wrap(cm));
 
         addProxyConfig(builder, configuration);
@@ -206,11 +222,15 @@ public final class ApacheHttpClient implements SdkHttpClient {
 
     @Override
     public ExecutableHttpRequest prepareRequest(HttpExecuteRequest request) {
+        MetricCollector metricCollector = request.metricCollector().orElseGet(NoOpMetricCollector::create);
+        metricCollector.reportMetric(HTTP_CLIENT_NAME, clientName());
         HttpRequestBase apacheRequest = toApacheRequest(request);
         return new ExecutableHttpRequest() {
             @Override
             public HttpExecuteResponse call() throws IOException {
-                return execute(apacheRequest);
+                HttpExecuteResponse executeResponse = execute(apacheRequest, metricCollector);
+                collectPoolMetric(metricCollector);
+                return executeResponse;
             }
 
             @Override
@@ -227,10 +247,15 @@ public final class ApacheHttpClient implements SdkHttpClient {
         cm.shutdown();
     }
 
-    private HttpExecuteResponse execute(HttpRequestBase apacheRequest) throws IOException {
+    private HttpExecuteResponse execute(HttpRequestBase apacheRequest, MetricCollector metricCollector) throws IOException {
         HttpClientContext localRequestContext = ApacheUtils.newClientContext(requestConfig.proxyConfiguration());
-        HttpResponse httpResponse = httpClient.execute(apacheRequest, localRequestContext);
-        return createResponse(httpResponse, apacheRequest);
+        THREAD_LOCAL_REQUEST_METRIC_COLLECTOR.set(metricCollector);
+        try {
+            HttpResponse httpResponse = httpClient.execute(apacheRequest, localRequestContext);
+            return createResponse(httpResponse, apacheRequest);
+        } finally {
+            THREAD_LOCAL_REQUEST_METRIC_COLLECTOR.remove();
+        }
     }
 
     private HttpRequestBase toApacheRequest(HttpExecuteRequest request) {
@@ -247,26 +272,27 @@ public final class ApacheHttpClient implements SdkHttpClient {
      */
     private HttpExecuteResponse createResponse(org.apache.http.HttpResponse apacheHttpResponse,
                                                HttpRequestBase apacheRequest) throws IOException {
-        SdkHttpResponse response = SdkHttpResponse.builder()
-                                                  .statusCode(apacheHttpResponse.getStatusLine().getStatusCode())
-                                                  .statusText(apacheHttpResponse.getStatusLine().getReasonPhrase())
-                                                  .headers(transformHeaders(apacheHttpResponse))
-                                                  .build();
+        SdkHttpResponse.Builder responseBuilder =
+            SdkHttpResponse.builder()
+                           .statusCode(apacheHttpResponse.getStatusLine().getStatusCode())
+                           .statusText(apacheHttpResponse.getStatusLine().getReasonPhrase());
+
+        HeaderIterator headerIterator = apacheHttpResponse.headerIterator();
+        while (headerIterator.hasNext()) {
+            Header header = headerIterator.nextHeader();
+            responseBuilder.appendHeader(header.getName(), header.getValue());
+        }
+
         AbortableInputStream responseBody = apacheHttpResponse.getEntity() != null ?
                                    toAbortableInputStream(apacheHttpResponse, apacheRequest) : null;
 
-        return HttpExecuteResponse.builder().response(response).responseBody(responseBody).build();
+        return HttpExecuteResponse.builder().response(responseBuilder.build()).responseBody(responseBody).build();
 
     }
 
     private AbortableInputStream toAbortableInputStream(HttpResponse apacheHttpResponse, HttpRequestBase apacheRequest)
             throws IOException {
         return AbortableInputStream.create(apacheHttpResponse.getEntity().getContent(), apacheRequest::abort);
-    }
-
-    private Map<String, List<String>> transformHeaders(HttpResponse apacheHttpResponse) {
-        return Stream.of(apacheHttpResponse.getAllHeaders())
-                     .collect(groupingBy(Header::getName, mapping(Header::getValue, toList())));
     }
 
     private ApacheHttpRequestConfig createRequestConfig(DefaultBuilder builder,
@@ -283,6 +309,18 @@ public final class ApacheHttpClient implements SdkHttpClient {
                                       .build();
     }
 
+    private void collectPoolMetric(MetricCollector metricCollector) {
+        HttpClientConnectionManager cm = httpClient.getHttpClientConnectionManager();
+        if (cm instanceof PoolingHttpClientConnectionManager && !(metricCollector instanceof NoOpMetricCollector)) {
+            PoolingHttpClientConnectionManager poolingCm = (PoolingHttpClientConnectionManager) cm;
+            PoolStats totalStats = poolingCm.getTotalStats();
+            metricCollector.reportMetric(MAX_CONCURRENCY, totalStats.getMax());
+            metricCollector.reportMetric(AVAILABLE_CONCURRENCY, totalStats.getAvailable());
+            metricCollector.reportMetric(LEASED_CONCURRENCY, totalStats.getLeased());
+            metricCollector.reportMetric(PENDING_CONCURRENCY_ACQUIRES, totalStats.getPending());
+        }
+    }
+
     @Override
     public String clientName() {
         return CLIENT_NAME;
@@ -295,9 +333,10 @@ public final class ApacheHttpClient implements SdkHttpClient {
      * client builder for more information on configuring the HTTP layer.
      *
      * <pre class="brush: java">
-     * SdkHttpClient httpClient = SdkHttpClient.builder()
-     * .socketTimeout(Duration.ofSeconds(10))
-     * .build();
+     * SdkHttpClient httpClient =
+     *     ApacheHttpClient.builder()
+     *                     .socketTimeout(Duration.ofSeconds(10))
+     *                     .build();
      * </pre>
      */
     public interface Builder extends SdkHttpClient.Builder<ApacheHttpClient.Builder> {
@@ -322,7 +361,7 @@ public final class ApacheHttpClient implements SdkHttpClient {
         Builder connectionAcquisitionTimeout(Duration connectionAcquisitionTimeout);
 
         /**
-         * The maximum number of connections allowed in the connection pool. Each built HTTP client has it's own private
+         * The maximum number of connections allowed in the connection pool. Each built HTTP client has its own private
          * connection pool.
          */
         Builder maxConnections(Integer maxConnections);
@@ -361,6 +400,19 @@ public final class ApacheHttpClient implements SdkHttpClient {
         Builder useIdleConnectionReaper(Boolean useConnectionReaper);
 
         /**
+         * Configuration that defines a DNS resolver. If no matches are found, the default resolver is used.
+         */
+        Builder dnsResolver(DnsResolver dnsResolver);
+
+        /**
+         * Configuration that defines a custom Socket factory. If set to a null value, a default factory is used.
+         * <p>
+         * When set to a non-null value, the use of a custom factory implies the configuration options TRUST_ALL_CERTIFICATES,
+         * TLS_TRUST_MANAGERS_PROVIDER, and TLS_KEY_MANAGERS_PROVIDER are ignored.
+         */
+        Builder socketFactory(ConnectionSocketFactory socketFactory);
+
+        /**
          * Configuration that defines an HTTP route planner that computes the route an HTTP request should take.
          * May not be used in conjunction with {@link #proxyConfiguration(ProxyConfiguration)}.
          */
@@ -371,6 +423,18 @@ public final class ApacheHttpClient implements SdkHttpClient {
          * May not be used in conjunction with {@link ProxyConfiguration#username()} and {@link ProxyConfiguration#password()}.
          */
         Builder credentialsProvider(CredentialsProvider credentialsProvider);
+
+        /**
+         * Configure whether to enable or disable TCP KeepAlive.
+         * The configuration will be passed to the socket option {@link java.net.SocketOptions#SO_KEEPALIVE}.
+         * <p>
+         * By default, this is disabled.
+         * <p>
+         * When enabled, the actual KeepAlive mechanism is dependent on the Operating System and therefore additional TCP
+         * KeepAlive values (like timeout, number of packets, etc) must be configured via the Operating System (sysctl on
+         * Linux/Mac, and Registry values on Windows).
+         */
+        Builder tcpKeepAlive(Boolean keepConnectionAlive);
 
         /**
          * Configure the {@link TlsKeyManagersProvider} that will provide the {@link javax.net.ssl.KeyManager}s to use
@@ -396,6 +460,8 @@ public final class ApacheHttpClient implements SdkHttpClient {
         private Boolean expectContinueEnabled;
         private HttpRoutePlanner httpRoutePlanner;
         private CredentialsProvider credentialsProvider;
+        private DnsResolver dnsResolver;
+        private ConnectionSocketFactory socketFactory;
 
         private DefaultBuilder() {
         }
@@ -507,6 +573,26 @@ public final class ApacheHttpClient implements SdkHttpClient {
         }
 
         @Override
+        public Builder dnsResolver(DnsResolver dnsResolver) {
+            this.dnsResolver = dnsResolver;
+            return this;
+        }
+
+        public void setDnsResolver(DnsResolver dnsResolver) {
+            dnsResolver(dnsResolver);
+        }
+
+        @Override
+        public Builder socketFactory(ConnectionSocketFactory socketFactory) {
+            this.socketFactory = socketFactory;
+            return this;
+        }
+
+        public void setSocketFactory(ConnectionSocketFactory socketFactory) {
+            socketFactory(socketFactory);
+        }
+
+        @Override
         public Builder httpRoutePlanner(HttpRoutePlanner httpRoutePlanner) {
             this.httpRoutePlanner = httpRoutePlanner;
             return this;
@@ -524,6 +610,16 @@ public final class ApacheHttpClient implements SdkHttpClient {
 
         public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
             credentialsProvider(credentialsProvider);
+        }
+
+        @Override
+        public Builder tcpKeepAlive(Boolean keepConnectionAlive) {
+            standardOptions.put(SdkHttpConfigurationOption.TCP_KEEPALIVE, keepConnectionAlive);
+            return this;
+        }
+
+        public void setTcpKeepAlive(Boolean keepConnectionAlive) {
+            tcpKeepAlive(keepConnectionAlive);
         }
 
         @Override
@@ -565,7 +661,7 @@ public final class ApacheHttpClient implements SdkHttpClient {
                     createSocketFactoryRegistry(sslsf),
                     null,
                     DefaultSchemePortResolver.INSTANCE,
-                    null,
+                    configuration.dnsResolver,
                     standardOptions.get(SdkHttpConfigurationOption.CONNECTION_TIME_TO_LIVE).toMillis(),
                     TimeUnit.MILLISECONDS);
 
@@ -578,9 +674,9 @@ public final class ApacheHttpClient implements SdkHttpClient {
 
         private ConnectionSocketFactory getPreferredSocketFactory(ApacheHttpClient.DefaultBuilder configuration,
                                                                   AttributeMap standardOptions) {
-            // TODO v2 custom socket factory
-            return new SdkTlsSocketFactory(getSslContext(standardOptions),
-                                           getHostNameVerifier(standardOptions));
+            return Optional.ofNullable(configuration.socketFactory)
+                           .orElseGet(() -> new SdkTlsSocketFactory(getSslContext(standardOptions),
+                                                                    getHostNameVerifier(standardOptions)));
         }
 
         private HostnameVerifier getHostNameVerifier(AttributeMap standardOptions) {
@@ -644,8 +740,7 @@ public final class ApacheHttpClient implements SdkHttpClient {
 
         private SocketConfig buildSocketConfig(AttributeMap standardOptions) {
             return SocketConfig.custom()
-                               // TODO do we want to keep SO keep alive
-                               .setSoKeepAlive(false)
+                               .setSoKeepAlive(standardOptions.get(SdkHttpConfigurationOption.TCP_KEEPALIVE))
                                .setSoTimeout(
                                        saturatedCast(standardOptions.get(SdkHttpConfigurationOption.READ_TIMEOUT)
                                                                     .toMillis()))

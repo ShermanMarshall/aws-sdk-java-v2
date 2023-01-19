@@ -19,9 +19,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.traits.PayloadTrait;
 import software.amazon.awssdk.utils.AttributeMap;
 
+/**
+ * {@code service-2.json} models can be manually modified via defining properties in an associated {@code customization.config}
+ * file. This class defines the Java bean representation that will be used to parse the JSON customization file. The bean can
+ * then be later queried in the misc. codegen steps.
+ */
 public class CustomizationConfig {
 
     /**
@@ -31,11 +37,10 @@ public class CustomizationConfig {
     private final List<ConvenienceTypeOverload> convenienceTypeOverloads = new ArrayList<>();
 
     /**
-     * Specifies the name of the client configuration class to use if a service
-     * has a specific advanced client configuration class. Null if the service
-     * does not have advanced configuration.
+     * Configuration object for service-specific configuration options.
      */
-    private String serviceSpecificClientConfigClass;
+    private ServiceConfig serviceConfig = new ServiceConfig();
+
     /**
      * Specify shapes to be renamed.
      */
@@ -119,10 +124,6 @@ public class CustomizationConfig {
 
     private Map<String, String> modelMarshallerDefaultValueSupplier = new HashMap<>();
 
-    private boolean useAutoConstructList = true;
-
-    private boolean useAutoConstructMap = true;
-
     /**
      * Custom Retry Policy
      */
@@ -158,6 +159,71 @@ public class CustomizationConfig {
      * Config to generate a utilities() in the low-level client
      */
     private UtilitiesMethod utilitiesMethod;
+
+    /**
+     * Config to generate a additional Builder methods in the client interface.
+     */
+    private List<AdditionalBuilderMethod> additionalBuilderMethods;
+
+    /**
+     * Force generation of deprecated client builder method 'enableEndpointDiscovery'. Only services that already had
+     * this method when it was deprecated require this flag to be set.
+     */
+    private boolean enableEndpointDiscoveryMethodRequired = false;
+
+    /**
+     * Arnable fields used in s3 control
+     */
+    private Map<String, S3ArnableFieldConfig> s3ArnableFields;
+
+    /**
+     * Allow a customer to set an endpoint override AND bypass endpoint discovery on their client even when endpoint discovery
+     * enabled is true and endpoint discovery is required for an operation. This customization should almost never be "true"
+     * because it creates a confusing customer experience.
+     */
+    private boolean allowEndpointOverrideForEndpointDiscoveryRequiredOperations = false;
+
+    /**
+     * Customization to instruct the code generator to use the legacy model generation scheme for the given events.
+     * <p>
+     * <b>NOTE</b>This customization is primarily here to preserve backwards compatibility with existing code before the
+     * generation scheme for the visitor methods was changed. There should be no good reason to use this customization
+     * for any other purpose.
+     */
+    private Map<String, List<String>> useLegacyEventGenerationScheme = new HashMap<>();
+
+    /**
+     * How the code generator should behave when it encounters shapes with underscores in the name.
+     */
+    private UnderscoresInNameBehavior underscoresInNameBehavior;
+
+    private String userAgent;
+    
+    private RetryMode defaultRetryMode;
+
+    /**
+     * Whether to generate an abstract decorator class that delegates to the async service client
+     */
+    private boolean delegateAsyncClientClass;
+
+    /**
+     * Whether to skip generating endpoint tests from endpoint-tests.json
+     */
+    private boolean skipEndpointTestGeneration;
+
+    /**
+     * A mapping from the skipped test's description to the reason why it's being skipped.
+     */
+    private Map<String, String> skipEndpointTests;
+
+    private boolean useGlobalEndpoint;
+
+    private List<String> interceptors = new ArrayList<>();
+
+    /**
+     * Whether marshallers perform validations against members marked with RequiredTrait.
+     */
+    private boolean requiredTraitValidationEnabled = false;
 
     private CustomizationConfig() {
     }
@@ -196,14 +262,6 @@ public class CustomizationConfig {
 
     public void setShapeModifiers(Map<String, ShapeModifier> shapeModifiers) {
         this.shapeModifiers = shapeModifiers;
-    }
-
-    public String getServiceSpecificClientConfigClass() {
-        return serviceSpecificClientConfigClass;
-    }
-
-    public void setServiceSpecificClientConfigClass(String serviceSpecificClientConfig) {
-        this.serviceSpecificClientConfigClass = serviceSpecificClientConfig;
     }
 
     public List<ConvenienceTypeOverload> getConvenienceTypeOverloads() {
@@ -335,22 +393,6 @@ public class CustomizationConfig {
         this.modelMarshallerDefaultValueSupplier = modelMarshallerDefaultValueSupplier;
     }
 
-    public boolean isUseAutoConstructList() {
-        return useAutoConstructList;
-    }
-
-    public void setUseAutoConstructList(boolean useAutoConstructList) {
-        this.useAutoConstructList = useAutoConstructList;
-    }
-
-    public boolean isUseAutoConstructMap() {
-        return useAutoConstructMap;
-    }
-
-    public void setUseAutoConstructMap(boolean useAutoConstructMap) {
-        this.useAutoConstructMap = useAutoConstructMap;
-    }
-
     public String getCustomRetryPolicy() {
         return customRetryPolicy;
     }
@@ -405,5 +447,143 @@ public class CustomizationConfig {
 
     public void setUtilitiesMethod(UtilitiesMethod utilitiesMethod) {
         this.utilitiesMethod = utilitiesMethod;
+    }
+
+
+    public List<AdditionalBuilderMethod> getAdditionalBuilderMethods() {
+        return additionalBuilderMethods;
+    }
+
+    public void setAdditionalBuilderMethods(List<AdditionalBuilderMethod> additionalBuilderMethods) {
+        this.additionalBuilderMethods = additionalBuilderMethods;
+    }
+
+    public boolean isEnableEndpointDiscoveryMethodRequired() {
+        return enableEndpointDiscoveryMethodRequired;
+    }
+
+    public void setEnableEndpointDiscoveryMethodRequired(boolean enableEndpointDiscoveryMethodRequired) {
+        this.enableEndpointDiscoveryMethodRequired = enableEndpointDiscoveryMethodRequired;
+    }
+
+    public Map<String, S3ArnableFieldConfig> getS3ArnableFields() {
+        return s3ArnableFields;
+    }
+
+    public CustomizationConfig withS3ArnableFields(Map<String, S3ArnableFieldConfig> s3ArnableFields) {
+        this.s3ArnableFields = s3ArnableFields;
+        return this;
+    }
+
+    public void setS3ArnableFields(Map<String, S3ArnableFieldConfig> s3ArnableFields) {
+        this.s3ArnableFields = s3ArnableFields;
+    }
+
+    public boolean allowEndpointOverrideForEndpointDiscoveryRequiredOperations() {
+        return allowEndpointOverrideForEndpointDiscoveryRequiredOperations;
+    }
+
+    public void setAllowEndpointOverrideForEndpointDiscoveryRequiredOperations(
+        boolean allowEndpointOverrideForEndpointDiscoveryRequiredOperations) {
+        this.allowEndpointOverrideForEndpointDiscoveryRequiredOperations =
+            allowEndpointOverrideForEndpointDiscoveryRequiredOperations;
+    }
+
+    public Map<String, List<String>> getUseLegacyEventGenerationScheme() {
+        return useLegacyEventGenerationScheme;
+    }
+
+    public void setUseLegacyEventGenerationScheme(Map<String, List<String>> useLegacyEventGenerationScheme) {
+        this.useLegacyEventGenerationScheme = useLegacyEventGenerationScheme;
+    }
+
+    public UnderscoresInNameBehavior getUnderscoresInNameBehavior() {
+        return underscoresInNameBehavior;
+    }
+
+    public void setUnderscoresInNameBehavior(UnderscoresInNameBehavior behavior) {
+        this.underscoresInNameBehavior = behavior;
+    }
+
+    public CustomizationConfig withUnderscoresInShapeNameBehavior(UnderscoresInNameBehavior behavior) {
+        this.underscoresInNameBehavior = behavior;
+        return this;
+    }
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public CustomizationConfig withUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+        return this;
+    }
+
+    public RetryMode getDefaultRetryMode() {
+        return defaultRetryMode;
+    }
+
+    public void setDefaultRetryMode(RetryMode defaultRetryMode) {
+        this.defaultRetryMode = defaultRetryMode;
+    }
+
+    public ServiceConfig getServiceConfig() {
+        return serviceConfig;
+    }
+
+    public void setServiceConfig(ServiceConfig serviceConfig) {
+        this.serviceConfig = serviceConfig;
+    }
+
+    public boolean isDelegateAsyncClientClass() {
+        return delegateAsyncClientClass;
+    }
+
+    public void setDelegateAsyncClientClass(boolean delegateAsyncClientClass) {
+        this.delegateAsyncClientClass = delegateAsyncClientClass;
+    }
+
+    public boolean isSkipEndpointTestGeneration() {
+        return skipEndpointTestGeneration;
+    }
+
+    public void setSkipEndpointTestGeneration(boolean skipEndpointTestGeneration) {
+        this.skipEndpointTestGeneration = skipEndpointTestGeneration;
+    }
+
+    public boolean useGlobalEndpoint() {
+        return useGlobalEndpoint;
+    }
+
+    public void setUseGlobalEndpoint(boolean useGlobalEndpoint) {
+        this.useGlobalEndpoint = useGlobalEndpoint;
+    }
+
+    public Map<String, String> getSkipEndpointTests() {
+        return skipEndpointTests;
+    }
+
+    public void setSkipEndpointTests(Map<String, String> skipEndpointTests) {
+        this.skipEndpointTests = skipEndpointTests;
+    }
+
+    public List<String> getInterceptors() {
+        return interceptors;
+    }
+
+    public void setInterceptors(List<String> interceptors) {
+        this.interceptors = interceptors;
+    }
+    
+    public boolean isRequiredTraitValidationEnabled() {
+        return requiredTraitValidationEnabled;
+    }
+
+    public void setRequiredTraitValidationEnabled(boolean requiredTraitValidationEnabled) {
+        this.requiredTraitValidationEnabled = requiredTraitValidationEnabled;
     }
 }

@@ -2,17 +2,34 @@
   "version": "2.0",
   "metadata": {
     "apiVersion": "2010-05-08",
-    "endpointPrefix": "json-service",
+    "endpointPrefix": "json-service-endpoint",
     "globalEndpoint": "json-service.amazonaws.com",
-    "protocol": "rest-json",
+    "protocol": "json",
     "serviceAbbreviation": "Json Service",
-    "serviceFullName": "Some Service That Uses Json Protocol",
-    "serviceId":"Json Service",
+    "serviceFullName": "Some Service That Uses AWS Json Protocol",
+    "serviceId": "Json Service",
+    "signingName": "json-service",
     "signatureVersion": "v4",
     "uid": "json-service-2010-05-08",
     "xmlNamespace": "https://json-service.amazonaws.com/doc/2010-05-08/"
   },
   "operations": {
+    "OperationWithChecksumRequired": {
+      "name": "APostOperation",
+      "http": {
+        "method": "POST",
+        "requestUri": "/"
+      },
+      "httpChecksumRequired": true
+    },
+    "OperationWithNoneAuthType": {
+      "name": "APostOperation",
+      "http": {
+        "method": "POST",
+        "requestUri": "/"
+      },
+      "authtype": "none"
+    },
     "APostOperation": {
       "name": "APostOperation",
       "http": {
@@ -64,6 +81,9 @@
       "errors": [
         {
           "shape": "InvalidInputException"
+        },
+        {
+          "shape": "ServiceFaultException"
         }
       ],
       "documentation": "<p>Performs a post operation to the query service and has modelled output</p>"
@@ -242,12 +262,14 @@
         }
       },
       "documentation": "<p>The request was rejected because an invalid or out-of-range value was supplied for an input parameter.</p>",
-      "error": {
-        "code": "InvalidInput",
-        "httpStatusCode": 400,
-        "senderFault": true
-      },
       "exception": true
+    },
+    "ServiceFaultException": {
+      "type": "structure",
+      "members": {
+      },
+      "exception": true,
+      "fault": true
     },
     "nestedMember": {
       "type": "structure",
@@ -404,8 +426,15 @@
         "EventOne": {
           "shape": "EventOne"
         },
-        "EventTwo": {
+        "EventTheSecond": {
           "shape": "EventTwo"
+        },
+        "secondEventOne": {
+          "shape": "EventOne"
+        },
+        // Legacy generation uses shape name == event name
+        "eventThree": {
+          "shape": "LegacyEventThree"
         }
       },
       "eventstream": true
@@ -423,6 +452,15 @@
       "type": "structure",
       "members": {
         "Bar": {
+          "shape": "String"
+        }
+      },
+      "event": true
+    },
+    "LegacyEventThree": {
+      "type": "structure",
+      "members": {
+        "Baz": {
           "shape": "String"
         }
       },

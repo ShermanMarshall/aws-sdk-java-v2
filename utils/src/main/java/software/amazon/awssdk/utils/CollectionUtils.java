@@ -15,16 +15,15 @@
 
 package software.amazon.awssdk.utils;
 
-import static java.util.Collections.unmodifiableList;
-import static java.util.Collections.unmodifiableMap;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -42,6 +41,10 @@ public final class CollectionUtils {
 
     public static boolean isNullOrEmpty(Map<?, ?> map) {
         return map == null || map.isEmpty();
+    }
+
+    public static boolean isNotEmpty(Map<?, ?> map) {
+        return map != null && !map.isEmpty();
     }
 
     /**
@@ -78,7 +81,7 @@ public final class CollectionUtils {
      * desired.
      */
     public static <T, U> Map<T, List<U>> deepCopyMap(Map<T, ? extends List<U>> map) {
-        return deepCopyMap(map, () -> new HashMap<>());
+        return deepCopyMap(map, () -> new LinkedHashMap<>(map.size()));
     }
 
     /**
@@ -87,29 +90,32 @@ public final class CollectionUtils {
      * desired.
      */
     public static <T, U> Map<T, List<U>> deepCopyMap(Map<T, ? extends List<U>> map, Supplier<Map<T, List<U>>> mapConstructor) {
-        return map.entrySet().stream()
-                  .collect(Collectors.toMap(Map.Entry::getKey, e -> new ArrayList<>(e.getValue()),
-                                 CollectionUtils::throwIllegalStateException, mapConstructor));
+        Map<T, List<U>> result = mapConstructor.get();
+        map.forEach((k, v) -> result.put(k, new ArrayList<>(v)));
+        return result;
+    }
+
+    public static <T, U> Map<T, List<U>> unmodifiableMapOfLists(Map<T, List<U>> map) {
+        return new UnmodifiableMapOfLists<>(map);
     }
 
     /**
      * Perform a deep copy of the provided map of lists, and make the result unmodifiable.
+     *
+     * This is equivalent to calling {@link #deepCopyMap} followed by {@link #unmodifiableMapOfLists}.
      */
     public static <T, U> Map<T, List<U>> deepUnmodifiableMap(Map<T, ? extends List<U>> map) {
-        return deepUnmodifiableMap(map, () -> new HashMap<>());
+        return unmodifiableMapOfLists(deepCopyMap(map));
     }
 
     /**
      * Perform a deep copy of the provided map of lists, and make the result unmodifiable.
+     *
+     * This is equivalent to calling {@link #deepCopyMap} followed by {@link #unmodifiableMapOfLists}.
      */
     public static <T, U> Map<T, List<U>> deepUnmodifiableMap(Map<T, ? extends List<U>> map,
                                                              Supplier<Map<T, List<U>>> mapConstructor) {
-        return unmodifiableMap(map.entrySet().stream()
-                                  .collect(Collectors.toMap(
-                                      Map.Entry::getKey,
-                                      e -> unmodifiableList(new ArrayList<>(e.getValue())),
-                                      CollectionUtils::throwIllegalStateException,
-                                      mapConstructor)));
+        return unmodifiableMapOfLists(deepCopyMap(map, mapConstructor));
     }
 
 
@@ -123,14 +129,68 @@ public final class CollectionUtils {
         return Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue);
     }
 
+    /**
+     * Transforms the values of a map to another map with the same keys, using the supplied function.
+     *
+     * @param inputMap the input map
+     * @param mapper the function used to transform the map values
+     * @param <K> the key type
+     * @param <VInT> the value type for the input map
+     * @param <VOutT> the value type for the output map
+     * @return a map
+     */
     public static <K, VInT, VOutT> Map<K, VOutT> mapValues(Map<K, VInT> inputMap, Function<VInT, VOutT> mapper) {
         return inputMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> mapper.apply(e.getValue())));
     }
 
     /**
-     * Dummy merger since there can't be a conflict when collecting from a map.
+     * Filters a map based on a condition
+     *
+     * @param map the input map
+     * @param condition the predicate to filter on
+     * @param <K> the key type
+     * @param <V> the value type
+     * @return the filtered map
      */
-    private static <T> T throwIllegalStateException(T left, T right) {
-        throw new IllegalStateException("Duplicate keys are impossible when collecting from a map");
+    public static <K, V> Map<K, V> filterMap(Map<K, V> map, Predicate<Map.Entry<K, V>> condition) {
+        return map.entrySet()
+                  .stream()
+                  .filter(condition)
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /**
+     * Return a new map that is the inverse of the supplied map, with the values becoming the keys
+     * and vice versa. Requires the values to be unique.
+     *
+     * @param inputMap a map where both the keys and values are unique
+     * @param <K> the key type
+     * @param <V> the value type
+     * @return a map
+     */
+    public static <K, V> Map<K, V> inverseMap(Map<V, K> inputMap) {
+        return inputMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+    }
+
+    /**
+     * For a collection of values of type {@code V} that can all be converted to type {@code K}, create a map that
+     * indexes all of the values by {@code K}. This requires that no two values map to the same index.
+     * 
+     * @param values the collection of values to index
+     * @param indexFunction the function used to convert a value to its index
+     * @param <K> the index (or key) type
+     * @param <V> the value type
+     * @return a (modifiable) map that indexes K to its unique value V
+     * @throws IllegalArgumentException if any of the values map to the same index
+     */
+    public static <K, V> Map<K, V> uniqueIndex(Iterable<V> values, Function<? super V, K> indexFunction) {
+        Map<K, V> map = new HashMap<>();
+        for (V value : values) {
+            K index = indexFunction.apply(value);
+            V prev = map.put(index, value);
+            Validate.isNull(prev, "No duplicate indices allowed but both %s and %s have the same index: %s",
+                            prev, value, index);
+        }
+        return map;
     }
 }

@@ -20,7 +20,9 @@ import static software.amazon.awssdk.auth.signer.internal.SignerConstant.X_AMZ_C
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -28,9 +30,11 @@ import java.util.function.Function;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.SdkPublisher;
+import software.amazon.awssdk.core.checksums.SdkChecksum;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.utils.BinaryUtils;
@@ -48,6 +52,8 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
     private static final Logger LOG = Logger.loggerFor(BaseEventStreamAsyncAws4Signer.class);
     private static final String HTTP_CONTENT_SHA_256 = "STREAMING-AWS4-HMAC-SHA256-EVENTS";
     private static final String EVENT_STREAM_PAYLOAD = "AWS4-HMAC-SHA256-PAYLOAD";
+
+    private static final int PAYLOAD_TRUNCATE_LENGTH = 32;
 
 
     protected BaseEventStreamAsyncAws4Signer() {
@@ -67,7 +73,6 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
 
     @Override
     protected AsyncRequestBody transformRequestProvider(String headerSignature,
-                                                        byte[] signingKey,
                                                         Aws4SignerRequestParams signerRequestParams,
                                                         Aws4SignerParams signerParams,
                                                         AsyncRequestBody asyncRequestBody) {
@@ -80,7 +85,8 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
          * Map publisher with signing function
          */
         Publisher<ByteBuffer> publisherWithSignedFrame =
-            transformRequestBodyPublisher(publisherWithTrailingEmptyFrame, headerSignature, signingKey, signerRequestParams);
+            transformRequestBodyPublisher(publisherWithTrailingEmptyFrame, headerSignature,
+                                          signerParams.awsCredentials(), signerRequestParams);
 
         AsyncRequestBody transformedRequestBody = AsyncRequestBody.fromPublisher(publisherWithSignedFrame);
 
@@ -93,7 +99,8 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
      * method which calculates the hash of the whole content for signing.
      */
     @Override
-    protected String calculateContentHash(SdkHttpFullRequest.Builder mutableRequest, Aws4SignerParams signerParams) {
+    protected String calculateContentHash(SdkHttpFullRequest.Builder mutableRequest, Aws4SignerParams signerParams,
+                                          SdkChecksum contentFlexibleChecksum) {
         return HTTP_CONTENT_SHA_256;
     }
 
@@ -105,16 +112,16 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
     }
 
     private Publisher<ByteBuffer> transformRequestBodyPublisher(Publisher<ByteBuffer> publisher, String headerSignature,
-                                                                byte[] signingKey, Aws4SignerRequestParams signerRequestParams) {
+                                                                AwsCredentials credentials,
+                                                                Aws4SignerRequestParams signerRequestParams) {
         return SdkPublisher.adapt(publisher)
-                           .map(getDataFrameSigner(headerSignature, signingKey, signerRequestParams));
+                           .map(getDataFrameSigner(headerSignature, credentials, signerRequestParams));
     }
 
-    private Function<ByteBuffer, ByteBuffer> getDataFrameSigner(String headerSignature, byte[] signingKey,
+    private Function<ByteBuffer, ByteBuffer> getDataFrameSigner(String headerSignature,
+                                                                AwsCredentials credentials,
                                                                 Aws4SignerRequestParams signerRequestParams) {
         return new Function<ByteBuffer, ByteBuffer>() {
-
-            final byte[] key = signingKey;
             final Aws4SignerRequestParams requestParams = signerRequestParams;
 
             /**
@@ -132,10 +139,18 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
                 nonSignatureHeaders.put(EVENT_STREAM_DATE, HeaderValue.fromTimestamp(signingInstant));
 
                 /**
+                 * Derive Signing Key
+                 */
+                AwsCredentials sanitizedCredentials = sanitizeCredentials(credentials);
+                byte[] signingKey = deriveSigningKey(sanitizedCredentials,
+                                                     signingInstant,
+                                                     requestParams.getRegionName(),
+                                                     requestParams.getServiceSigningName());
+                /**
                  * Calculate rolling signature
                  */
                 byte[] payload = byteBuffer.array();
-                byte[] signatureBytes = signEventStream(priorSignature, key, signingInstant, requestParams,
+                byte[] signatureBytes = signEventStream(priorSignature, signingKey, signingInstant, requestParams,
                                                         nonSignatureHeaders, payload);
                 priorSignature = BinaryUtils.toHex(signatureBytes);
 
@@ -150,6 +165,13 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
                  * Encode signed event to byte
                  */
                 Message signedMessage = new Message(sortHeaders(headers), payload);
+
+                if (LOG.isLoggingLevelEnabled("trace")) {
+                    LOG.trace(() -> "Signed message: " + toDebugString(signedMessage, false));
+                } else {
+                    LOG.debug(() -> "Signed message: " + toDebugString(signedMessage, true));
+                }
+
                 return signedMessage.toByteBuffer();
             }
         };
@@ -248,6 +270,52 @@ public abstract class BaseEventStreamAsyncAws4Signer extends BaseAsyncAws4Signer
         public Optional<Long> contentLength() {
             return transformedRequestBody.contentLength();
         }
+
+        @Override
+        public String contentType() {
+            return transformedRequestBody.contentType();
+        }
     }
 
+    static String toDebugString(Message m, boolean truncatePayload) {
+        StringBuilder sb = new StringBuilder("Message = {headers={");
+        Map<String, HeaderValue> headers = m.getHeaders();
+
+        Iterator<Map.Entry<String, HeaderValue>> headersIter = headers.entrySet().iterator();
+
+        while (headersIter.hasNext()) {
+            Map.Entry<String, HeaderValue> h = headersIter.next();
+
+            sb.append(h.getKey()).append("={").append(h.getValue().toString()).append("}");
+
+            if (headersIter.hasNext()) {
+                sb.append(", ");
+            }
+        }
+
+        sb.append("}, payload=");
+
+        byte[] payload = m.getPayload();
+        byte[] payloadToLog;
+
+        // We don't actually need to truncate if the payload length is already within the truncate limit
+        truncatePayload = truncatePayload && payload.length > PAYLOAD_TRUNCATE_LENGTH;
+
+        if (truncatePayload) {
+            // Would be nice if BinaryUtils.toHex() could take an array index range instead so we don't need to copy
+            payloadToLog = Arrays.copyOf(payload, PAYLOAD_TRUNCATE_LENGTH);
+        } else {
+            payloadToLog = payload;
+        }
+
+        sb.append(BinaryUtils.toHex(payloadToLog));
+
+        if (truncatePayload) {
+            sb.append("...");
+        }
+
+        sb.append("}");
+
+        return sb.toString();
+    }
 }

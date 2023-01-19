@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.core.internal.http.pipeline.stages;
 
+import static software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttribute.SDK_HTTP_EXECUTION_ATTRIBUTES;
 import static software.amazon.awssdk.core.internal.http.timers.TimerUtils.resolveTimeoutInMillis;
 import static software.amazon.awssdk.http.Header.CONTENT_LENGTH;
 
@@ -25,10 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
-
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
@@ -45,12 +43,15 @@ import software.amazon.awssdk.core.internal.http.async.SimpleHttpContentPublishe
 import software.amazon.awssdk.core.internal.http.pipeline.RequestPipeline;
 import software.amazon.awssdk.core.internal.http.timers.TimeoutTracker;
 import software.amazon.awssdk.core.internal.http.timers.TimerUtils;
+import software.amazon.awssdk.core.internal.util.MetricUtils;
+import software.amazon.awssdk.core.metrics.CoreMetric;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
-import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.http.async.AsyncExecuteRequest;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.http.async.SdkHttpContentPublisher;
+import software.amazon.awssdk.metrics.MetricCollector;
+import software.amazon.awssdk.utils.CompletableFutureUtils;
 import software.amazon.awssdk.utils.Logger;
 
 /**
@@ -58,7 +59,7 @@ import software.amazon.awssdk.utils.Logger;
  */
 @SdkInternalApi
 public final class MakeAsyncHttpRequestStage<OutputT>
-    implements RequestPipeline<SdkHttpFullRequest, CompletableFuture<Response<OutputT>>> {
+        implements RequestPipeline<CompletableFuture<SdkHttpFullRequest>, CompletableFuture<Response<OutputT>>> {
 
     private static final Logger log = Logger.loggerFor(MakeAsyncHttpRequestStage.class);
 
@@ -72,70 +73,56 @@ public final class MakeAsyncHttpRequestStage<OutputT>
                                      HttpClientDependencies dependencies) {
         this.responseHandler = responseHandler;
         this.futureCompletionExecutor =
-            dependencies.clientConfiguration().option(SdkAdvancedAsyncClientOption.FUTURE_COMPLETION_EXECUTOR);
+                dependencies.clientConfiguration().option(SdkAdvancedAsyncClientOption.FUTURE_COMPLETION_EXECUTOR);
         this.sdkAsyncHttpClient = dependencies.clientConfiguration().option(SdkClientOption.ASYNC_HTTP_CLIENT);
         this.apiCallAttemptTimeout = dependencies.clientConfiguration().option(SdkClientOption.API_CALL_ATTEMPT_TIMEOUT);
         this.timeoutExecutor = dependencies.clientConfiguration().option(SdkClientOption.SCHEDULED_EXECUTOR_SERVICE);
     }
 
     @Override
-    public CompletableFuture<Response<OutputT>> execute(SdkHttpFullRequest request,
-                                                        RequestExecutionContext context) throws Exception {
-        return executeHttpRequest(request, context);
-    }
+    public CompletableFuture<Response<OutputT>> execute(CompletableFuture<SdkHttpFullRequest> requestFuture,
+                                                        RequestExecutionContext context) {
+        CompletableFuture<Response<OutputT>> toReturn = new CompletableFuture<>();
 
-    private static final class WrappedErrorForwardingResponseHandler<T>
-            implements TransformingAsyncResponseHandler<T> {
+        // Setup the cancellations. If the caller fails to provide a request, forward the exception to the future we
+        // return
+        CompletableFutureUtils.forwardExceptionTo(requestFuture, toReturn);
 
-        private final TransformingAsyncResponseHandler<T> wrappedHandler;
-        private final CompletableFuture<T> responseFuture;
+        // On the other hand, if the future we return is completed exceptionally, throw the exception back up to the
+        // request future
+        CompletableFutureUtils.forwardExceptionTo(toReturn, requestFuture);
 
-        private WrappedErrorForwardingResponseHandler(TransformingAsyncResponseHandler<T> wrappedHandler,
-                                                      CompletableFuture<T> responseFuture) {
-            this.wrappedHandler = wrappedHandler;
-            this.responseFuture = responseFuture;
+        requestFuture.thenAccept(request -> {
+            // At this point, we have a request that we're ready to execute; we do everything in a try-catch in case the
+            // method call to executeHttpRequest throws directly
+            try {
+                CompletableFuture<Response<OutputT>> executeFuture = executeHttpRequest(request, context);
 
-        }
+                executeFuture.whenComplete((r, t) -> {
+                    if (t != null) {
+                        toReturn.completeExceptionally(t);
+                    } else {
+                        toReturn.complete(r);
+                    }
+                });
 
-        private static <T> WrappedErrorForwardingResponseHandler<T> of(
-                TransformingAsyncResponseHandler<T> wrappedHandler,
-                CompletableFuture<T> responseFuture) {
+                // Similar to cancelling the request future, but we've now started the request execution, so if our
+                // returned future gets an exception, forward to the HTTP execution future
+                CompletableFutureUtils.forwardExceptionTo(toReturn, executeFuture);
+            } catch (Throwable t) {
+                toReturn.completeExceptionally(t);
+            }
+        });
 
-            return new WrappedErrorForwardingResponseHandler<>(wrappedHandler, responseFuture);
-        }
-
-        @Override
-        public CompletableFuture<T> prepare() {
-            return wrappedHandler.prepare();
-        }
-
-        @Override
-        public void onHeaders(SdkHttpResponse headers) {
-            wrappedHandler.onHeaders(headers);
-        }
-
-        @Override
-        public void onStream(Publisher<ByteBuffer> stream) {
-            wrappedHandler.onStream(stream);
-        }
-
-        @Override
-        public void onError(Throwable error) {
-            responseFuture.completeExceptionally(error);
-            wrappedHandler.onError(error);
-        }
+        return toReturn;
     }
 
     private CompletableFuture<Response<OutputT>> executeHttpRequest(SdkHttpFullRequest request,
                                                                     RequestExecutionContext context) {
+
         CompletableFuture<Response<OutputT>> responseFuture = new CompletableFuture<>();
 
-        // Wrap the response handler in a layer that will notify the newly created responseFuture when the onError event
-        // is triggered
-        TransformingAsyncResponseHandler<Response<OutputT>> wrappedResponseHandler =
-            WrappedErrorForwardingResponseHandler.of(responseHandler, responseFuture);
-
-        CompletableFuture<Response<OutputT>> responseHandlerFuture = wrappedResponseHandler.prepare();
+        CompletableFuture<Response<OutputT>> responseHandlerFuture = responseHandler.prepare();
 
         SdkHttpContentPublisher requestProvider = context.requestProvider() == null
                                                   ? new SimpleHttpContentPublisher(request)
@@ -143,14 +130,21 @@ public final class MakeAsyncHttpRequestStage<OutputT>
         // Set content length if it hasn't been set already.
         SdkHttpFullRequest requestWithContentLength = getRequestWithContentLength(request, requestProvider);
 
-        AsyncExecuteRequest executeRequest = AsyncExecuteRequest.builder()
+        MetricCollector httpMetricCollector = MetricUtils.createHttpMetricsCollector(context);
+
+        AsyncExecuteRequest.Builder executeRequestBuilder = AsyncExecuteRequest.builder()
                                                                 .request(requestWithContentLength)
                                                                 .requestContentPublisher(requestProvider)
-                                                                .responseHandler(wrappedResponseHandler)
+                                                                .responseHandler(responseHandler)
                                                                 .fullDuplex(isFullDuplex(context.executionAttributes()))
-                                                                .build();
+                                                                .metricCollector(httpMetricCollector);
+        if (context.executionAttributes().getAttribute(SDK_HTTP_EXECUTION_ATTRIBUTES) != null) {
+            executeRequestBuilder.httpExecutionAttributes(
+                context.executionAttributes()
+                       .getAttribute(SDK_HTTP_EXECUTION_ATTRIBUTES));
+        }
 
-        CompletableFuture<Void> httpClientFuture = sdkAsyncHttpClient.execute(executeRequest);
+        CompletableFuture<Void> httpClientFuture = doExecuteHttpRequest(context, executeRequestBuilder.build());
 
         TimeoutTracker timeoutTracker = setupAttemptTimer(responseFuture, context);
         context.apiCallAttemptTimeoutTracker(timeoutTracker);
@@ -173,6 +167,22 @@ public final class MakeAsyncHttpRequestStage<OutputT>
         }, futureCompletionExecutor);
 
         return responseFuture;
+    }
+
+    private CompletableFuture<Void> doExecuteHttpRequest(RequestExecutionContext context, AsyncExecuteRequest executeRequest) {
+        MetricCollector metricCollector = context.attemptMetricCollector();
+        long callStart = System.nanoTime();
+        CompletableFuture<Void> httpClientFuture = sdkAsyncHttpClient.execute(executeRequest);
+
+        CompletableFuture<Void> result = httpClientFuture.whenComplete((r, t) -> {
+            long duration = System.nanoTime() - callStart;
+            metricCollector.reportMetric(CoreMetric.SERVICE_CALL_DURATION, Duration.ofNanos(duration));
+        });
+
+        // Make sure failures on the result future are forwarded to the http client future.
+        CompletableFutureUtils.forwardExceptionTo(result, httpClientFuture);
+
+        return result;
     }
 
     private boolean isFullDuplex(ExecutionAttributes executionAttributes) {

@@ -25,9 +25,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.CreateTableEnhancedRequest;
@@ -51,6 +51,11 @@ public class CreateTableOperation<T> implements TableOperation<T, CreateTableReq
 
     public static <T> CreateTableOperation<T> create(CreateTableEnhancedRequest request) {
         return new CreateTableOperation<>(request);
+    }
+
+    @Override
+    public OperationName operationName() {
+        return OperationName.CREATE_TABLE;
     }
 
     @Override
@@ -114,13 +119,14 @@ public class CreateTableOperation<T> implements TableOperation<T, CreateTableReq
                             .map(attribute ->
                                      AttributeDefinition.builder()
                                                         .attributeName(attribute)
-                                                        .attributeType(tableSchema.tableMetadata()
-                                                                                  .scalarAttributeType(attribute)
-                                                                                  .orElseThrow(() ->
-                                        new IllegalArgumentException("Could not map the key attribute '" + attribute +
-                                                                     "' to a valid scalar type.")))
-                                                        .build())
-                            .collect(Collectors.toList());
+                                                        .attributeType(tableSchema
+                                                                .tableMetadata().scalarAttributeType(attribute)
+                                                                .orElseThrow(() ->
+                                                                        new IllegalArgumentException(
+                                                                                "Could not map the key attribute '" + attribute +
+                                                                                        "' to a valid scalar type.")))
+                                             .build())
+                    .collect(Collectors.toList());
 
         BillingMode billingMode = this.request.provisionedThroughput() == null ?
                                   BillingMode.PAY_PER_REQUEST :

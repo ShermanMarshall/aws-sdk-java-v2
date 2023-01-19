@@ -31,6 +31,7 @@ public final class OperationInfo {
     private final String apiVersion;
     private final boolean hasExplicitPayloadMember;
     private final boolean hasPayloadMembers;
+    private final boolean hasImplicitPayloadMembers;
     private final boolean hasStreamingInput;
     private final boolean hasEventStreamingInput;
     private final boolean hasEvent;
@@ -42,6 +43,7 @@ public final class OperationInfo {
         this.operationIdentifier = builder.operationIdentifier;
         this.apiVersion = builder.apiVersion;
         this.hasExplicitPayloadMember = builder.hasExplicitPayloadMember;
+        this.hasImplicitPayloadMembers = builder.hasImplicitPayloadMembers;
         this.hasPayloadMembers = builder.hasPayloadMembers;
         this.hasStreamingInput = builder.hasStreamingInput;
         this.additionalMetadata = builder.additionalMetadata.build();
@@ -64,7 +66,7 @@ public final class OperationInfo {
     }
 
     /**
-     * @return Identifer for the operation/API being invoked. This is used for RPC based protocols that
+     * @return Identifier for the operation/API being invoked. This is used for RPC based protocols that
      *     need to identify which action is being taken. For Query/EC2 protocol this is sent as the 'Action' query
      *     parameter, for JSON RPC this is sent as the 'X-Amz-Target' header.
      */
@@ -93,6 +95,14 @@ public final class OperationInfo {
      */
     public boolean hasPayloadMembers() {
         return hasPayloadMembers;
+    }
+
+    /**
+     * @return True if the operation has members that are not explicitly bound to a marshalling location, and thus are
+     * implicitly bound to the body.
+     */
+    public boolean hasImplicitPayloadMembers() {
+        return hasImplicitPayloadMembers;
     }
 
     /**
@@ -144,6 +154,7 @@ public final class OperationInfo {
         private String operationIdentifier;
         private String apiVersion;
         private boolean hasExplicitPayloadMember;
+        private boolean hasImplicitPayloadMembers;
         private boolean hasPayloadMembers;
         private boolean hasStreamingInput;
         private boolean hasEventStreamingInput;
@@ -180,6 +191,11 @@ public final class OperationInfo {
 
         public Builder hasPayloadMembers(boolean hasPayloadMembers) {
             this.hasPayloadMembers = hasPayloadMembers;
+            return this;
+        }
+
+        public Builder hasImplicitPayloadMembers(boolean hasImplicitPayloadMembers) {
+            this.hasImplicitPayloadMembers = hasImplicitPayloadMembers;
             return this;
         }
 

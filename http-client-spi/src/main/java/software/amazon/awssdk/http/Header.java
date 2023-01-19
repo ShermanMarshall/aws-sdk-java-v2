@@ -33,6 +33,14 @@ public final class Header {
 
     public static final String CHUNKED = "chunked";
 
+    public static final String HOST = "Host";
+
+    public static final String CONNECTION = "Connection";
+
+    public static final String KEEP_ALIVE_VALUE = "keep-alive";
+
+    public static final String ACCEPT = "Accept";
+
     private Header() {
     }
 

@@ -23,6 +23,7 @@ import static software.amazon.awssdk.codegen.internal.Utils.isScalar;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import software.amazon.awssdk.codegen.internal.TypeUtils;
 import software.amazon.awssdk.codegen.model.config.customization.CustomizationConfig;
 import software.amazon.awssdk.codegen.model.intermediate.EnumModel;
@@ -79,10 +80,13 @@ abstract class AddShapes {
         // contains the list of c2j member names that are required for this shape.
         shapeModel.setRequired(shape.getRequired());
         shapeModel.setDeprecated(shape.isDeprecated());
+        shapeModel.setDeprecatedMessage(shape.getDeprecatedMessage());
         shapeModel.setWrapper(shape.isWrapper());
-        shapeModel.withIsEventStream(shape.isEventStream());
+        shapeModel.withIsEventStream(shape.isEventstream());
         shapeModel.withIsEvent(shape.isEvent());
         shapeModel.withXmlNamespace(shape.getXmlNamespace());
+        shapeModel.withIsUnion(shape.isUnion());
+        shapeModel.withIsFault(shape.isFault());
 
         boolean hasHeaderMember = false;
         boolean hasStatusCodeMember = false;
@@ -159,7 +163,6 @@ abstract class AddShapes {
                                                variableType + " type.");
         }
 
-
         MemberModel memberModel = new MemberModel();
 
         memberModel.withC2jName(c2jMemberName)
@@ -170,9 +173,10 @@ abstract class AddShapes {
                    .withSetterModel(new VariableModel(variableName, variableType, variableDeclarationType))
                    .withGetterModel(new ReturnTypeModel(variableType))
                    .withTimestampFormat(resolveTimestampFormat(c2jMemberDefinition, shape))
-                   .withJsonValue(c2jMemberDefinition.getJsonValue());
+                   .withJsonValue(c2jMemberDefinition.getJsonvalue());
         memberModel.setDocumentation(c2jMemberDefinition.getDocumentation());
         memberModel.setDeprecated(c2jMemberDefinition.isDeprecated());
+        memberModel.setDeprecatedMessage(c2jMemberDefinition.getDeprecatedMessage());
         memberModel.setSensitive(isSensitiveShapeOrContainer(c2jMemberDefinition, allC2jShapes));
         memberModel
                 .withFluentGetterMethodName(namingStrategy.getFluentGetterMethodName(c2jMemberName, parentShape, shape))
@@ -183,10 +187,14 @@ abstract class AddShapes {
                 .withBeanStyleGetterMethodName(namingStrategy.getBeanStyleGetterMethodName(c2jMemberName, parentShape, shape))
                 .withBeanStyleSetterMethodName(namingStrategy.getBeanStyleSetterMethodName(c2jMemberName, parentShape, shape));
         memberModel.setIdempotencyToken(c2jMemberDefinition.isIdempotencyToken());
-        memberModel.setEventPayload(c2jMemberDefinition.isEventPayload());
-        memberModel.setEventHeader(c2jMemberDefinition.isEventHeader());
-        memberModel.setEndpointDiscoveryId(c2jMemberDefinition.isEndpointDiscoveryId());
+        memberModel.setEventPayload(c2jMemberDefinition.isEventpayload());
+        memberModel.setEventHeader(c2jMemberDefinition.isEventheader());
+        memberModel.setEndpointDiscoveryId(c2jMemberDefinition.isEndpointdiscoveryid());
         memberModel.setXmlAttribute(c2jMemberDefinition.isXmlAttribute());
+        memberModel.setUnionEnumTypeName(namingStrategy.getUnionEnumTypeName(memberModel));
+        memberModel.setContextParam(c2jMemberDefinition.getContextParam());
+        memberModel.setRequired(isRequiredMember(c2jMemberName, parentShape));
+
 
         // Pass the xmlNameSpace from the member reference
         if (c2jMemberDefinition.getXmlNamespace() != null) {
@@ -301,6 +309,12 @@ abstract class AddShapes {
     private boolean isFlattened(Member member, Shape memberShape) {
         return member.isFlattened()
                || memberShape.isFlattened();
+    }
+
+    private boolean isRequiredMember(String memberName, Shape memberShape) {
+        return Optional.ofNullable(memberShape.getRequired())
+                       .map(l -> l.contains(memberName))
+                       .orElse(false);
     }
 
     /**
@@ -443,7 +457,7 @@ abstract class AddShapes {
                                                  mapValueModel));
 
         } else if (memberC2jShape.getEnumValues() != null) { // enum values
-            memberModel.withEnumType(getNamingStrategy().getJavaClassName(memberC2jShapeName));
+            memberModel.withEnumType(getNamingStrategy().getShapeClassName(memberC2jShapeName));
         }
     }
 

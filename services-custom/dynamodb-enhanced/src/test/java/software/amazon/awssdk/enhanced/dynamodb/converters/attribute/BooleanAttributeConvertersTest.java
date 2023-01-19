@@ -21,9 +21,8 @@ import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.Conv
 import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformFrom;
 import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformTo;
 
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.AtomicBooleanAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.BooleanAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue;
@@ -41,6 +40,8 @@ public class BooleanAttributeConvertersTest {
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("0").toAttributeValue()));
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("1").toAttributeValue()));
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("").toAttributeValue()));
+        assertThat(transformTo(converter, EnhancedAttributeValue.fromNumber("1").toAttributeValue())).isTrue();
+        assertThat(transformTo(converter, EnhancedAttributeValue.fromNumber("0").toAttributeValue())).isFalse();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromString("true").toAttributeValue())).isTrue();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromString("false").toAttributeValue())).isFalse();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromBoolean(true).toAttributeValue())).isTrue();
@@ -59,6 +60,8 @@ public class BooleanAttributeConvertersTest {
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("0").toAttributeValue()));
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("1").toAttributeValue()));
         assertFails(() -> transformTo(converter, EnhancedAttributeValue.fromString("").toAttributeValue()));
+        assertThat(transformTo(converter, EnhancedAttributeValue.fromNumber("1").toAttributeValue())).isTrue();
+        assertThat(transformTo(converter, EnhancedAttributeValue.fromNumber("0").toAttributeValue())).isFalse();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromString("true").toAttributeValue())).isTrue();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromString("false").toAttributeValue())).isFalse();
         assertThat(transformTo(converter, EnhancedAttributeValue.fromBoolean(true).toAttributeValue())).isTrue();

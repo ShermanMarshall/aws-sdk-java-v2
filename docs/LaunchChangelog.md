@@ -261,7 +261,7 @@ DynamoDbAsyncClient client =
 | Cache Response Metadata | `clientConfig.setCacheResponseMetadata(...)`<br />`clientConfig.withCacheResponseMetadata(...)` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
 | Response Metadata Cache Size | `clientConfig.setResponseMetadataCacheSize(...)`<br />`clientConfig.withResponseMetadataCacheSize(...)` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
 | DNS Resolver | `clientConfig.setDnsResolver(...)`<br />`clientConfig.withDnsResolver(...)` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
-| TCP Keepalive | `clientConfig.setUseTcpKeepAlive(...)`<br />`clientConfig.withTcpKeepAlive(...)` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
+| TCP Keepalive | `clientConfig.setUseTcpKeepAlive(...)`<br />`clientConfig.withTcpKeepAlive(...)` | ~~Not Supported~~ <br />This option is now in the HTTP Client configuration: <br />`- ApacheHttpClient.builder().tcpKeepAlive(true)`<br /> `- NettyNioAsyncHttpClient.builder().tcpKeepAlive(true)`  |
 | Secure Random | `clientConfig.setSecureRandom(...)`<br />`clientConfig.withSecureRandom(...)` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
 | | `AmazonDynamoDBClientBuilder.standard()`<br />`.withClientConfiguration(clientConfiguration)`<br />`.build()` | `DynamoDbClient.builder()`<br />`.httpClientBuilder(httpClientBuilder)`<br />`.build()` |
 
@@ -378,7 +378,7 @@ The S3 client in 2.0 is drastically different from the client in 1.11, because i
 | `doesBucketExistV2` | `headBucket` |
 | `doesObjectExist` | `headObject` |
 | `enableRequesterPays` | `putBucketRequestPayment` |
-| `generatePresignedUrl` | [Not Supported](https://github.com/aws/aws-sdk-java-v2/issues/849) |
+| `generatePresignedUrl` | ~~Not Supported~~ [S3Presigner](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/examples-s3-presign.html) |
 | `getBucketAccelerateConfiguration` | `getBucketAccelerateConfiguration` |
 | `getBucketAcl` | `getBucketAcl` |
 | `getBucketAnalyticsConfiguration` | `getBucketAnalyticsConfiguration` |
@@ -420,7 +420,7 @@ The S3 client in 2.0 is drastically different from the client in 1.11, because i
 | `putObject` | `putObject` |
 | `restoreObject` | `restoreObject` |
 | `restoreObjectV2` | `restoreObject` |
-| `selectObjectContent` | [Not Supported](https://github.com/aws/aws-sdk-java-v2/issues/859) |
+| `selectObjectContent` | `selectObjectContent` |
 | `setBucketAccelerateConfiguration` | `putBucketAccelerateConfiguration` |
 | `setBucketAcl` | `putBucketAcl` |
 | `setBucketAnalyticsConfiguration` | `putBucketAnalyticsConfiguration` |
@@ -448,6 +448,10 @@ The S3 client in 2.0 is drastically different from the client in 1.11, because i
 ## 4.3. SQS Changes
 
 1. An SQS client may no longer access SQS queues in regions different than the one with which the client was configured.
+
+## 4.4. RDS Changes
+
+1. The class`RdsIamAuthTokenGenerator` has been replaced with `RdsUtilities#generateAuthenticationToken`.
 
 # 5. Profile File Changes
 
@@ -726,8 +730,8 @@ The parsing of the `~/.aws/config` and `~/.aws/credentials` has changed to more 
 | `amazonaws.services.mq.AmazonMQClient` | `software.amazon.awssdk.services.mq.MqClient` |
 | `amazonaws.services.mturk.AmazonMTurkAsyncClient` | `software.amazon.awssdk.services.mturk.MTurkAsyncClient` |
 | `amazonaws.services.mturk.AmazonMTurkClient` | `software.amazon.awssdk.services.mturk.MTurkClient` |
-| `amazonaws.services.neptune.AmazonNeptuneAsyncClient` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
-| `amazonaws.services.neptune.AmazonNeptuneClient` | Not Supported ([Request Feature](https://github.com/aws/aws-sdk-java-v2/issues/new)) |
+| `amazonaws.services.neptune.AmazonNeptuneAsyncClient` | `software.amazon.awssdk.services.neptune.NeptuneAsyncClient` |
+| `amazonaws.services.neptune.AmazonNeptuneClient` | `software.amazon.awssdk.services.neptune.NeptuneClient` |
 | `amazonaws.services.opsworks.AWSOpsWorksAsyncClient` | `software.amazon.awssdk.services.opsworks.OpsWorksAsyncClient` |
 | `amazonaws.services.opsworks.AWSOpsWorksClient` | `software.amazon.awssdk.services.opsworks.OpsWorksClient` |
 | `amazonaws.services.opsworkscm.AWSOpsWorksCMAsyncClient` | `software.amazon.awssdk.services.opsworkscm.OpsWorksCmAsyncClient` |
@@ -814,5 +818,12 @@ The parsing of the `~/.aws/config` and `~/.aws/credentials` has changed to more 
 
 # 7. High-Level Libraries
 
-1. All high-level libraries have been removed.
-2. High-level libraries will be re-designed to match the 2.0 programming model and re-introduced over time.
+All high-level libraries will be re-designed to match the 2.0 programming model and re-introduced over time.
+The following libraries are available in 2.0:
+
+| 1.11.x | 2.0 | Since version |
+|---|---|---|
+| DynamoDBMapper | [DynamoDbEnhancedClient](https://github.com/aws/aws-sdk-java-v2/blob/464be97535cc82a4adb2e5b9fdadd9d4ac739ef8/services-custom/dynamodb-enhanced/README.md) | 2.12.0 |
+| Waiters | [Waiters](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/waiters.html) | 2.15.0 |
+| CloudFrontUrlSigner, CloudFrontCookieSigner | [CloudFrontUtilities](https://aws.amazon.com/blogs/developer/amazon-cloudfront-signed-urls-and-cookies-are-now-supported-in-aws-sdk-for-java-2-x/) | 2.18.33 |
+| TransferManager | [S3TransferManager](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/transfer-manager.html) | 2.19.0 |

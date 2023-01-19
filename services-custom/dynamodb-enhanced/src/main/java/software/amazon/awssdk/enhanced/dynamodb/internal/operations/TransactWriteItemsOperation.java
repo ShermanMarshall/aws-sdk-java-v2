@@ -17,7 +17,6 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.operations;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
@@ -41,9 +40,15 @@ public class TransactWriteItemsOperation
     }
 
     @Override
+    public OperationName operationName() {
+        return OperationName.TRANSACT_WRITE_ITEMS;
+    }
+
+    @Override
     public TransactWriteItemsRequest generateRequest(DynamoDbEnhancedClientExtension extension) {
         return TransactWriteItemsRequest.builder()
                                         .transactItems(this.request.transactWriteItems())
+                                        .clientRequestToken(this.request.clientRequestToken())
                                         .build();
     }
 

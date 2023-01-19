@@ -18,20 +18,27 @@ package software.amazon.awssdk.http.nio.netty;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static software.amazon.awssdk.http.SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES;
+
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import java.io.IOException;
+import java.util.concurrent.CompletionException;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import software.amazon.awssdk.http.EmptyPublisher;
 import software.amazon.awssdk.http.FileStoreTlsKeyManagersProvider;
+import software.amazon.awssdk.http.HttpTestUtils;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.TlsKeyManagersProvider;
@@ -165,6 +172,17 @@ public class NettyClientTlsAuthTest extends ClientTlsAuthTestBase {
             System.clearProperty("javax.net.ssl.keyStoreType");
             System.clearProperty("javax.net.ssl.keyStorePassword");
         }
+    }
+
+    @Test
+    public void nonProxy_noKeyManagerGiven_shouldThrowException() {
+        netty = NettyNioAsyncHttpClient.builder()
+                                       .buildWithDefaults(DEFAULTS);
+
+        assertThatThrownBy(() -> HttpTestUtils.sendGetRequest(mockProxy.httpsPort(), netty).join())
+            .isInstanceOf(CompletionException.class)
+            .hasMessageContaining("SSL")
+            .hasRootCauseInstanceOf(SSLException.class);
     }
 
     private void sendRequest(SdkAsyncHttpClient client, SdkAsyncHttpResponseHandler responseHandler) {

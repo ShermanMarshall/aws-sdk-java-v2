@@ -19,8 +19,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.Document;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
@@ -30,13 +30,12 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.operations.BatchWriteIt
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.TransactGetItemsOperation;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.TransactWriteItemsOperation;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetItemEnhancedRequest;
-import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetResultPage;
+import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetResultPageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactGetItemsEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.utils.Validate;
 
 @SdkInternalApi
 public final class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {
@@ -44,9 +43,7 @@ public final class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClie
     private final DynamoDbEnhancedClientExtension extension;
 
     private DefaultDynamoDbEnhancedClient(Builder builder) {
-        this.dynamoDbClient = Validate.paramNotNull(builder.dynamoDbClient, "You must provide a DynamoDbClient to build " +
-            "a DefaultDynamoDbEnhancedClient.");
-
+        this.dynamoDbClient = builder.dynamoDbClient == null ? DynamoDbClient.create() : builder.dynamoDbClient;
         this.extension = ExtensionResolver.resolveExtensions(builder.dynamoDbEnhancedClientExtensions);
     }
 
@@ -60,13 +57,13 @@ public final class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClie
     }
 
     @Override
-    public SdkIterable<BatchGetResultPage> batchGetItem(BatchGetItemEnhancedRequest request) {
+    public BatchGetResultPageIterable batchGetItem(BatchGetItemEnhancedRequest request) {
         BatchGetItemOperation operation = BatchGetItemOperation.create(request);
-        return operation.execute(dynamoDbClient, extension);
+        return BatchGetResultPageIterable.create(operation.execute(dynamoDbClient, extension));
     }
 
     @Override
-    public SdkIterable<BatchGetResultPage> batchGetItem(Consumer<BatchGetItemEnhancedRequest.Builder> requestConsumer) {
+    public BatchGetResultPageIterable batchGetItem(Consumer<BatchGetItemEnhancedRequest.Builder> requestConsumer) {
         BatchGetItemEnhancedRequest.Builder builder = BatchGetItemEnhancedRequest.builder();
         requestConsumer.accept(builder);
         return batchGetItem(builder.build());
@@ -152,6 +149,7 @@ public final class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClie
         return result;
     }
 
+    @NotThreadSafe
     public static final class Builder implements DynamoDbEnhancedClient.Builder {
         private DynamoDbClient dynamoDbClient;
         private List<DynamoDbEnhancedClientExtension> dynamoDbEnhancedClientExtensions =

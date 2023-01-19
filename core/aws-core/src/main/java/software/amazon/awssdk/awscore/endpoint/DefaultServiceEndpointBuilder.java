@@ -17,10 +17,22 @@ package software.amazon.awssdk.awscore.endpoint;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkProtectedApi;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.profiles.ProfileFileSystemSetting;
+import software.amazon.awssdk.regions.EndpointTag;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.regions.ServiceEndpointKey;
 import software.amazon.awssdk.regions.ServiceMetadata;
+import software.amazon.awssdk.regions.ServiceMetadataAdvancedOption;
+import software.amazon.awssdk.utils.Lazy;
 import software.amazon.awssdk.utils.Validate;
 
 /**
@@ -31,10 +43,15 @@ import software.amazon.awssdk.utils.Validate;
 // TODO We may not need this anymore, we should default to AWS partition when resolving
 // a region we don't know about yet.
 public final class DefaultServiceEndpointBuilder {
-
     private final String serviceName;
     private final String protocol;
+
     private Region region;
+    private Supplier<ProfileFile> profileFile;
+    private String profileName;
+    private final Map<ServiceMetadataAdvancedOption<?>, Object> advancedOptions = new HashMap<>();
+    private Boolean dualstackEnabled;
+    private Boolean fipsEnabled;
 
     public DefaultServiceEndpointBuilder(String serviceName, String protocol) {
         this.serviceName = Validate.paramNotNull(serviceName, "serviceName");
@@ -49,12 +66,98 @@ public final class DefaultServiceEndpointBuilder {
         return this;
     }
 
-    public URI getServiceEndpoint() {
-        ServiceMetadata serviceMetadata = ServiceMetadata.of(serviceName);
-        return withProtocol(serviceMetadata.endpointFor(region));
+    public DefaultServiceEndpointBuilder withProfileFile(Supplier<ProfileFile> profileFile) {
+        this.profileFile = profileFile;
+        return this;
     }
 
-    private URI withProtocol(URI endpointWithoutProtocol) throws IllegalArgumentException {
+    public DefaultServiceEndpointBuilder withProfileFile(ProfileFile profileFile) {
+        this.profileFile = () -> profileFile;
+        return this;
+    }
+
+    public DefaultServiceEndpointBuilder withProfileName(String profileName) {
+        this.profileName = profileName;
+        return this;
+    }
+
+    public <T> DefaultServiceEndpointBuilder putAdvancedOption(ServiceMetadataAdvancedOption<T> option, T value) {
+        advancedOptions.put(option, value);
+        return this;
+    }
+
+    public DefaultServiceEndpointBuilder withDualstackEnabled(Boolean dualstackEnabled) {
+        this.dualstackEnabled = dualstackEnabled;
+        return this;
+    }
+
+    public DefaultServiceEndpointBuilder withFipsEnabled(Boolean fipsEnabled) {
+        this.fipsEnabled = fipsEnabled;
+        return this;
+    }
+
+    public URI getServiceEndpoint() {
+        if (profileFile == null) {
+            profileFile = new Lazy<>(ProfileFile::defaultProfileFile)::getValue;
+        }
+
+        if (profileName == null) {
+            profileName = ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow();
+        }
+
+        if (dualstackEnabled == null) {
+            dualstackEnabled = DualstackEnabledProvider.builder()
+                                                       .profileFile(profileFile)
+                                                       .profileName(profileName)
+                                                       .build()
+                                                       .isDualstackEnabled()
+                                                       .orElse(false);
+        }
+
+        if (fipsEnabled == null) {
+            fipsEnabled = FipsEnabledProvider.builder()
+                                             .profileFile(profileFile)
+                                             .profileName(profileName)
+                                             .build()
+                                             .isFipsEnabled()
+                                             .orElse(false);
+        }
+
+
+
+        List<EndpointTag> endpointTags = new ArrayList<>();
+        if (dualstackEnabled) {
+            endpointTags.add(EndpointTag.DUALSTACK);
+        }
+        if (fipsEnabled) {
+            endpointTags.add(EndpointTag.FIPS);
+        }
+
+        ServiceMetadata serviceMetadata = ServiceMetadata.of(serviceName)
+                                                         .reconfigure(c -> c.profileFile(profileFile)
+                                                                            .profileName(profileName)
+                                                                            .advancedOptions(advancedOptions));
+        URI endpoint = addProtocolToServiceEndpoint(serviceMetadata.endpointFor(ServiceEndpointKey.builder()
+                                                                                                  .region(region)
+                                                                                                  .tags(endpointTags)
+                                                                                                  .build()));
+
+        if (endpoint.getHost() == null) {
+            String error = "Configured region (" + region + ") and tags (" + endpointTags + ") resulted in an invalid URI: "
+                           + endpoint + ". This is usually caused by an invalid region configuration.";
+
+            List<Region> exampleRegions = serviceMetadata.regions();
+            if (!exampleRegions.isEmpty()) {
+                error += " Valid regions: " + exampleRegions;
+            }
+
+            throw SdkClientException.create(error);
+        }
+
+        return endpoint;
+    }
+
+    private URI addProtocolToServiceEndpoint(URI endpointWithoutProtocol) throws IllegalArgumentException {
         try {
             return new URI(protocol + "://" + endpointWithoutProtocol);
         } catch (URISyntaxException e) {

@@ -16,14 +16,15 @@
 package software.amazon.awssdk.codegen.emitters;
 
 import static software.amazon.awssdk.codegen.internal.Constant.JAVA_FILE_NAME_SUFFIX;
-import static software.amazon.awssdk.codegen.internal.Utils.closeQuietly;
 
-import java.io.File;
+import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.utils.StringUtils;
 
@@ -37,8 +38,7 @@ public class CodeWriter extends StringWriter {
     /**
      * The code transformation that should be applied before code is written.
      */
-    private final CodeTransformer codeWriteTransformer =
-            CodeTransformer.chain(new UnusedImportRemover(), new JavaCodeFormatter());
+    private final CodeTransformer codeWriteTransformer;
 
     /**
      * The code transformation that should be applied before source code is "compared" for equality. This is only used when
@@ -58,7 +58,11 @@ public class CodeWriter extends StringWriter {
      *             name of the file without .java suffix.
      */
     public CodeWriter(String dir, String file) {
-        this(dir, file, JAVA_FILE_NAME_SUFFIX);
+        this(dir, file, JAVA_FILE_NAME_SUFFIX, false);
+    }
+
+    public CodeWriter(String dir, String file, boolean disableFormatter) {
+        this(dir, file, JAVA_FILE_NAME_SUFFIX, disableFormatter);
     }
 
     /**
@@ -71,7 +75,7 @@ public class CodeWriter extends StringWriter {
      * @param fileNameSuffix
      *             suffix to be appended at the end of file name.
      */
-    public CodeWriter(String dir, String file, String fileNameSuffix) {
+    public CodeWriter(String dir, String file, String fileNameSuffix, boolean disableFormatter) {
         if (dir == null) {
             throw new IllegalArgumentException(
                     "Output Directory cannot be null.");
@@ -92,6 +96,13 @@ public class CodeWriter extends StringWriter {
         this.dir = dir;
         this.file = file;
         Utils.createDirectory(dir);
+
+        if (disableFormatter) {
+            codeWriteTransformer = CodeTransformer.chain(new UnusedImportRemover());
+        } else {
+            codeWriteTransformer = CodeTransformer.chain(new UnusedImportRemover(),
+                                                         new JavaCodeFormatter());
+        }
     }
 
     /**
@@ -100,27 +111,33 @@ public class CodeWriter extends StringWriter {
      */
     @Override
     public void flush() {
-        PrintWriter out = null;
         try {
-            File outputFile = Utils.createFile(dir, this.file);
+            Path outputFile = Paths.get(dir, this.file);
             String contents = getBuffer().toString();
             String formattedContents = codeWriteTransformer.apply(contents);
 
-            if (outputFile.length() == 0) {
-                out = new PrintWriter(outputFile, "UTF-8");
-                out.write(formattedContents);
+            if (fileSize(outputFile) == 0) {
+                try (BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
+                    writer.write(formattedContents);
+                }
             } else {
                 validateFileContentMatches(outputFile, formattedContents);
             }
         } catch (IOException e) {
             throw new IllegalStateException(e);
-        } finally {
-            closeQuietly(out);
         }
     }
 
-    private void validateFileContentMatches(File outputFile, String newFileContents) throws IOException {
-        byte[] currentFileBytes = Files.readAllBytes(outputFile.toPath());
+    private long fileSize(Path outputFile) throws IOException {
+        try {
+            return Files.size(outputFile);
+        } catch (NoSuchFileException e) {
+            return 0;
+        }
+    }
+
+    private void validateFileContentMatches(Path outputFile, String newFileContents) throws IOException {
+        byte[] currentFileBytes = Files.readAllBytes(outputFile);
         String currentFileContents = new String(currentFileBytes, StandardCharsets.UTF_8);
 
         String currentContentForComparison = codeComparisonTransformer.apply(currentFileContents);

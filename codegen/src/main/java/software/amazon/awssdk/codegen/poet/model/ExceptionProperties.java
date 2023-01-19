@@ -17,16 +17,15 @@ package software.amazon.awssdk.codegen.poet.model;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
-
 import java.util.Arrays;
 import java.util.List;
 import javax.lang.model.element.Modifier;
-
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 
 public class ExceptionProperties {
 
-    private ExceptionProperties() {}
+    private ExceptionProperties() {
+    }
 
     public static List<MethodSpec> builderInterfaceMethods(ClassName className) {
         return Arrays.asList(
@@ -34,7 +33,8 @@ public class ExceptionProperties {
                 builderMethod(className, "message", String.class),
                 builderMethod(className, "requestId", String.class),
                 builderMethod(className, "statusCode", int.class),
-                builderMethod(className, "cause", Throwable.class));
+                builderMethod(className, "cause", Throwable.class),
+                builderMethod(className, "writableStackTrace", Boolean.class));
     }
 
     public static List<MethodSpec> builderImplMethods(ClassName className) {
@@ -43,7 +43,8 @@ public class ExceptionProperties {
                 builderImplMethods(className, "message", String.class),
                 builderImplMethods(className, "requestId", String.class),
                 builderImplMethods(className, "statusCode", int.class),
-                builderImplMethods(className, "cause", Throwable.class));
+                builderImplMethods(className, "cause", Throwable.class),
+                builderImplMethods(className, "writableStackTrace", Boolean.class));
     }
 
     private static MethodSpec builderMethod(ClassName className, String name, Class clazz) {

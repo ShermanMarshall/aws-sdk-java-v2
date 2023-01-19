@@ -16,6 +16,7 @@
 package software.amazon.awssdk.codegen.lite.regions.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
 import java.util.List;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 
@@ -24,7 +25,6 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
  */
 @SdkInternalApi
 public final class Endpoint implements Cloneable {
-
     private static final String HTTP = "http";
 
     private static final String HTTPS = "https";
@@ -54,7 +54,12 @@ public final class Endpoint implements Cloneable {
      */
     private String sslCommonName;
 
-    public Endpoint() {}
+    private List<EndpointVariant> variants = new ArrayList<>();
+
+    private Boolean deprecated;
+
+    public Endpoint() {
+    }
 
     /**
      * Merges the given endpoints and returns the merged one.
@@ -191,5 +196,21 @@ public final class Endpoint implements Cloneable {
             throw new IllegalStateException(
                     "Got a CloneNotSupportedException from Object.clone() even though we're Cloneable!", e);
         }
+    }
+
+    public List<EndpointVariant> getVariants() {
+        return variants;
+    }
+
+    public void setVariants(List<EndpointVariant> variants) {
+        this.variants = variants;
+    }
+
+    public Boolean getDeprecated() {
+        return deprecated;
+    }
+
+    public void setDeprecated(Boolean deprecated) {
+        this.deprecated = deprecated;
     }
 }

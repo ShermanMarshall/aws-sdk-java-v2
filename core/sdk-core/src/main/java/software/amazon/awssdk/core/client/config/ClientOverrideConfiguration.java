@@ -25,10 +25,16 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ToBuilderIgnoreField;
+import software.amazon.awssdk.core.interceptor.ExecutionAttribute;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.metrics.MetricPublisher;
+import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.profiles.ProfileFileSystemSetting;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.ToString;
@@ -44,13 +50,17 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
  */
 @SdkPublicApi
 public final class ClientOverrideConfiguration
-    implements ToCopyableBuilder<ClientOverrideConfiguration.Builder, ClientOverrideConfiguration> {
+        implements ToCopyableBuilder<ClientOverrideConfiguration.Builder, ClientOverrideConfiguration> {
     private final Map<String, List<String>> headers;
     private final RetryPolicy retryPolicy;
     private final List<ExecutionInterceptor> executionInterceptors;
     private final AttributeMap advancedOptions;
     private final Duration apiCallAttemptTimeout;
     private final Duration apiCallTimeout;
+    private final ProfileFile defaultProfileFile;
+    private final String defaultProfileName;
+    private final List<MetricPublisher> metricPublishers;
+    private final ExecutionAttributes executionAttributes;
 
     /**
      * Initialize this configuration. Private to require use of {@link #builder()}.
@@ -62,16 +72,26 @@ public final class ClientOverrideConfiguration
         this.advancedOptions = builder.advancedOptions();
         this.apiCallTimeout = Validate.isPositiveOrNull(builder.apiCallTimeout(), "apiCallTimeout");
         this.apiCallAttemptTimeout = Validate.isPositiveOrNull(builder.apiCallAttemptTimeout(), "apiCallAttemptTimeout");
+        this.defaultProfileFile = builder.defaultProfileFile();
+        this.defaultProfileName = builder.defaultProfileName();
+        this.metricPublishers = Collections.unmodifiableList(new ArrayList<>(builder.metricPublishers()));
+        this.executionAttributes = ExecutionAttributes.unmodifiableExecutionAttributes(builder.executionAttributes());
     }
 
     @Override
+    @ToBuilderIgnoreField("advancedOptions")
     public Builder toBuilder() {
-        return new DefaultClientOverrideConfigurationBuilder().advancedOptions(advancedOptions.toBuilder())
-                                                              .headers(headers)
-                                                              .retryPolicy(retryPolicy)
-                                                              .apiCallTimeout(apiCallTimeout)
-                                                              .apiCallAttemptTimeout(apiCallAttemptTimeout)
-                                                              .executionInterceptors(executionInterceptors);
+        return new DefaultClientOverrideConfigurationBuilder()
+            .advancedOptions(advancedOptions.toBuilder())
+            .headers(headers)
+            .retryPolicy(retryPolicy)
+            .apiCallTimeout(apiCallTimeout)
+            .apiCallAttemptTimeout(apiCallAttemptTimeout)
+            .executionInterceptors(executionInterceptors)
+            .defaultProfileFile(defaultProfileFile)
+            .defaultProfileName(defaultProfileName)
+            .executionAttributes(executionAttributes)
+            .metricPublishers(metricPublishers);
     }
 
     /**
@@ -158,16 +178,54 @@ public final class ClientOverrideConfiguration
         return Optional.ofNullable(apiCallAttemptTimeout);
     }
 
+    /**
+     * The profile file that should be used by default for all profile-based configuration in the SDK client.
+     *
+     * @see Builder#defaultProfileFile(ProfileFile)
+     */
+    public Optional<ProfileFile> defaultProfileFile() {
+        return Optional.ofNullable(defaultProfileFile);
+    }
+
+    /**
+     * The profile name that should be used by default for all profile-based configuration in the SDK client.
+     *
+     * @see Builder#defaultProfileName(String)
+     */
+    public Optional<String> defaultProfileName() {
+        return Optional.ofNullable(defaultProfileName);
+    }
+
+    /**
+     * The metric publishers to use to publisher metrics collected for this client.
+     *
+     * @return The metric publisher.
+     */
+    public List<MetricPublisher> metricPublishers() {
+        return metricPublishers;
+    }
+
+    /**
+     *  Returns the additional execution attributes to be added for this client.
+     *
+     * @Return Map of execution attributes.
+     */
+    public ExecutionAttributes executionAttributes() {
+        return executionAttributes;
+    }
+
     @Override
     public String toString() {
         return ToString.builder("ClientOverrideConfiguration")
-                       .add("headers", headers)
-                       .add("retryPolicy", retryPolicy)
-                       .add("apiCallTimeout", apiCallTimeout)
-                       .add("apiCallAttemptTimeout", apiCallAttemptTimeout)
-                       .add("executionInterceptors", executionInterceptors)
-                       .add("advancedOptions", advancedOptions)
-                       .build();
+                .add("headers", headers)
+                .add("retryPolicy", retryPolicy)
+                .add("apiCallTimeout", apiCallTimeout)
+                .add("apiCallAttemptTimeout", apiCallAttemptTimeout)
+                .add("executionInterceptors", executionInterceptors)
+                .add("advancedOptions", advancedOptions)
+                .add("profileFile", defaultProfileFile)
+                .add("profileName", defaultProfileName)
+                .build();
     }
 
     /**
@@ -179,6 +237,8 @@ public final class ClientOverrideConfiguration
 
         /**
          * Add a single header to be set on the HTTP request.
+         * <p>
+         * This overrides any values for the given header set on the request by default by the SDK.
          *
          * <p>
          * This overrides any values already configured with this header name in the builder.
@@ -194,6 +254,8 @@ public final class ClientOverrideConfiguration
 
         /**
          * Add a single header with multiple values to be set on the HTTP request.
+         * <p>
+         * This overrides any values for the given header set on the request by default by the SDK.
          *
          * <p>
          * This overrides any values already configured with this header name in the builder.
@@ -206,6 +268,8 @@ public final class ClientOverrideConfiguration
 
         /**
          * Configure headers to be set on the HTTP request.
+         * <p>
+         * This overrides any values for the given headers set on the request by default by the SDK.
          *
          * <p>
          * This overrides any values currently configured in the builder.
@@ -335,6 +399,80 @@ public final class ClientOverrideConfiguration
         Builder apiCallAttemptTimeout(Duration apiCallAttemptTimeout);
 
         Duration apiCallAttemptTimeout();
+
+        /**
+         * Configure the profile file that should be used by default for all profile-based configuration in the SDK client.
+         *
+         * <p>This is equivalent to setting the {@link ProfileFileSystemSetting#AWS_CONFIG_FILE} and
+         * {@link ProfileFileSystemSetting#AWS_SHARED_CREDENTIALS_FILE} environment variables or system properties.
+         *
+         * <p>Like the system settings, this value is only used when determining default values. For example, directly configuring
+         * the retry policy, credentials provider or region will mean that the configured values will be used instead of those
+         * from the profile file.
+         *
+         * <p>Like the {@code --profile} setting in the CLI, profile-based configuration loaded from this profile file has lower
+         * priority than more specific environment variables, like the {@code AWS_REGION} environment variable.
+         *
+         * <p>If this is not set, the {@link ProfileFile#defaultProfileFile()} is used.
+         *
+         * @see #defaultProfileName(String)
+         */
+        Builder defaultProfileFile(ProfileFile defaultProfileFile);
+
+        ProfileFile defaultProfileFile();
+
+        /**
+         * Configure the profile name that should be used by default for all profile-based configuration in the SDK client.
+         *
+         * <p>This is equivalent to setting the {@link ProfileFileSystemSetting#AWS_PROFILE} environment variable or system
+         * property.
+         *
+         * <p>Like the system setting, this value is only used when determining default values. For example, directly configuring
+         * the retry policy, credentials provider or region will mean that the configured values will be used instead of those
+         * from this profile.
+         *
+         * <p>If this is not set, the {@link ProfileFileSystemSetting#AWS_PROFILE} (or {@code "default"}) is used.
+         *
+         * @see #defaultProfileFile(ProfileFile)
+         */
+        Builder defaultProfileName(String defaultProfileName);
+
+        String defaultProfileName();
+
+        /**
+         * Set the Metric publishers to be use to publish metrics for this client. This overwrites the current list of
+         * metric publishers set on the builder.
+         *
+         * @param metricPublishers The metric publishers.
+         */
+        Builder metricPublishers(List<MetricPublisher> metricPublishers);
+
+
+        /**
+         * Add a metric publisher to the existing list of previously set publishers to be used for publishing metrics
+         * for this client.
+         *
+         * @param metricPublisher The metric publisher to add.
+         */
+        Builder addMetricPublisher(MetricPublisher metricPublisher);
+
+        List<MetricPublisher> metricPublishers();
+
+        /**
+         * Sets the additional execution attributes collection for this client.
+         * @param executionAttributes Execution attributes map for this client.
+         * @return This object for method chaining.
+         */
+        Builder executionAttributes(ExecutionAttributes executionAttributes);
+
+        /**
+         * Put an execution attribute into to the existing collection of execution attributes.
+         * @param attribute The execution attribute object
+         * @param value The value of the execution attribute.
+         */
+        <T> Builder putExecutionAttribute(ExecutionAttribute<T> attribute, T value);
+
+        ExecutionAttributes executionAttributes();
     }
 
     /**
@@ -347,6 +485,10 @@ public final class ClientOverrideConfiguration
         private AttributeMap.Builder advancedOptions = AttributeMap.builder();
         private Duration apiCallTimeout;
         private Duration apiCallAttemptTimeout;
+        private ProfileFile defaultProfileFile;
+        private String defaultProfileName;
+        private List<MetricPublisher> metricPublishers = new ArrayList<>();
+        private ExecutionAttributes.Builder executionAttributes = ExecutionAttributes.builder();
 
         @Override
         public Builder headers(Map<String, List<String>> headers) {
@@ -361,7 +503,7 @@ public final class ClientOverrideConfiguration
 
         @Override
         public Map<String, List<String>> headers() {
-            return CollectionUtils.deepUnmodifiableMap(headers);
+            return CollectionUtils.unmodifiableMapOfLists(headers);
         }
 
         @Override
@@ -464,6 +606,69 @@ public final class ClientOverrideConfiguration
         @Override
         public Duration apiCallAttemptTimeout() {
             return apiCallAttemptTimeout;
+        }
+
+        @Override
+        public ProfileFile defaultProfileFile() {
+            return this.defaultProfileFile;
+        }
+
+        @Override
+        public Builder defaultProfileFile(ProfileFile defaultProfileFile) {
+            this.defaultProfileFile = defaultProfileFile;
+            return this;
+        }
+
+        @Override
+        public String defaultProfileName() {
+            return this.defaultProfileName;
+        }
+
+        @Override
+        public Builder defaultProfileName(String defaultProfileName) {
+            this.defaultProfileName = defaultProfileName;
+            return this;
+        }
+
+        @Override
+        public Builder metricPublishers(List<MetricPublisher> metricPublishers) {
+            Validate.paramNotNull(metricPublishers, "metricPublishers");
+            this.metricPublishers = new ArrayList<>(metricPublishers);
+            return this;
+        }
+
+        public void setMetricPublishers(List<MetricPublisher> metricPublishers) {
+            metricPublishers(metricPublishers);
+        }
+
+        @Override
+        public Builder addMetricPublisher(MetricPublisher metricPublisher) {
+            Validate.paramNotNull(metricPublisher, "metricPublisher");
+            this.metricPublishers.add(metricPublisher);
+            return this;
+        }
+
+        @Override
+        public List<MetricPublisher> metricPublishers() {
+            return Collections.unmodifiableList(metricPublishers);
+        }
+
+        @Override
+        public Builder executionAttributes(ExecutionAttributes executionAttributes) {
+            Validate.paramNotNull(executionAttributes, "executionAttributes");
+            this.executionAttributes = executionAttributes.toBuilder();
+            return this;
+        }
+
+        @Override
+        public <T> Builder putExecutionAttribute(ExecutionAttribute<T> executionAttribute, T value) {
+            this.executionAttributes.put(executionAttribute, value);
+            return this;
+        }
+
+        @Override
+        public ExecutionAttributes executionAttributes() {
+            return executionAttributes.build();
         }
 
         @Override

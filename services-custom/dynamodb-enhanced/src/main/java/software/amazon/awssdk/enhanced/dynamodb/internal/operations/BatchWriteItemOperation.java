@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteItemEnhancedRequest;
@@ -47,6 +46,11 @@ public class BatchWriteItemOperation
 
     public static BatchWriteItemOperation create(BatchWriteItemEnhancedRequest request) {
         return new BatchWriteItemOperation(request);
+    }
+
+    @Override
+    public OperationName operationName() {
+        return OperationName.BATCH_WRITE_ITEM;
     }
 
     @Override

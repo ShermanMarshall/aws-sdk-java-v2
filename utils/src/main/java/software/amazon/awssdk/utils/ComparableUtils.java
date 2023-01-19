@@ -20,7 +20,8 @@ import software.amazon.awssdk.annotations.SdkProtectedApi;
 
 @SdkProtectedApi
 public final class ComparableUtils {
-    private ComparableUtils() {}
+    private ComparableUtils() {
+    }
 
     /**
      * Does a safe comparison of two {@link Comparable} objects accounting for nulls
@@ -54,6 +55,17 @@ public final class ComparableUtils {
     @SafeVarargs
     public static <T extends Comparable<T>> T minimum(T... values) {
         return values == null ? null : Stream.of(values).min(Comparable::compareTo).orElse(null);
+    }
+
+    /**
+     * Get the maximum value from a list of comparable vales.
+     *
+     * @param values The values from which the maximum should be extracted.
+     * @return The maximum value in the list.
+     */
+    @SafeVarargs
+    public static <T extends Comparable<T>> T maximum(T... values) {
+        return values == null ? null : Stream.of(values).max(Comparable::compareTo).orElse(null);
     }
 
 }

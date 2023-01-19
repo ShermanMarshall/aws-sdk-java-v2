@@ -18,9 +18,9 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.client;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertNotNull;
 
 import java.util.Arrays;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -72,7 +72,7 @@ public class DefaultDynamoDbEnhancedAsyncClientTest {
                                               .build();
 
         assertThat(builtObject.dynamoDbAsyncClient(), is(mockDynamoDbAsyncClient));
-        assertThat(builtObject.mapperExtension(), instanceOf(VersionedRecordExtension.class));
+        assertThat(builtObject.mapperExtension(), instanceOf(ChainExtension.class));
     }
 
     @Test
@@ -109,11 +109,6 @@ public class DefaultDynamoDbEnhancedAsyncClientTest {
 
         assertThat(builtObject.dynamoDbAsyncClient(), is(mockDynamoDbAsyncClient));
         assertThat(builtObject.mapperExtension(), instanceOf(ChainExtension.class));
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void builder_missingDynamoDbClient() {
-        DefaultDynamoDbEnhancedAsyncClient.builder().extensions(mockDynamoDbEnhancedClientExtension).build();
     }
 
     @Test

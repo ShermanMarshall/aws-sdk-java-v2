@@ -17,16 +17,17 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.operations;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbAsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+
 
 /**
  * Common interface for a single operation that can be executed in a synchronous or non-blocking asynchronous fashion
@@ -139,4 +140,9 @@ public interface CommonOperation<ItemT, RequestT, ResponseT, ResultT> {
         CompletableFuture<ResponseT> response = asyncServiceCall(dynamoDbAsyncClient).apply(request);
         return response.thenApply(r -> transformResponse(r, tableSchema, context, extension));
     }
+
+    /**
+     * The type, or name, of the operation.
+     */
+    OperationName operationName();
 }

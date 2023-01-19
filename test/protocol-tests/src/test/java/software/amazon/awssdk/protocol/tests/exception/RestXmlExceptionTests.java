@@ -155,6 +155,35 @@ public class RestXmlExceptionTests {
             assertThat(awsErrorDetails.serviceName()).isEqualTo("ProtocolRestXml");
             assertThat(awsErrorDetails.sdkHttpResponse()).isNotNull();
             assertThat(e.requestId()).isEqualTo("1234");
+            assertThat(e.extendedRequestId()).isNull();
+            assertThat(e.statusCode()).isEqualTo(404);
+        }
+    }
+
+    @Test
+    public void modeledException_HasExceptionMetadataIncludingExtendedRequestIdSet() {
+        String xml = "<ErrorResponse>"
+                     + "   <Error>"
+                     + "      <Code>EmptyModeledException</Code>"
+                     + "      <Message>This is the service message</Message>"
+                     + "   </Error>"
+                     + "   <RequestId>1234</RequestId>"
+                     + "</ErrorResponse>";
+        stubFor(post(urlEqualTo(ALL_TYPES_PATH)).willReturn(
+            aResponse()
+                .withStatus(404)
+                .withHeader("x-amz-id-2", "5678")
+                .withBody(xml)));
+        try {
+            client.allTypes();
+        } catch (EmptyModeledException e) {
+            AwsErrorDetails awsErrorDetails = e.awsErrorDetails();
+            assertThat(awsErrorDetails.errorCode()).isEqualTo("EmptyModeledException");
+            assertThat(awsErrorDetails.errorMessage()).isEqualTo("This is the service message");
+            assertThat(awsErrorDetails.serviceName()).isEqualTo("ProtocolRestXml");
+            assertThat(awsErrorDetails.sdkHttpResponse()).isNotNull();
+            assertThat(e.requestId()).isEqualTo("1234");
+            assertThat(e.extendedRequestId()).isEqualTo("5678");
             assertThat(e.statusCode()).isEqualTo(404);
         }
     }
@@ -185,6 +214,19 @@ public class RestXmlExceptionTests {
                                                                                                       .build()),
                                      SdkClientException.class,
                                      IllegalArgumentException.class);
+    }
+
+    @Test
+    public void alternateRequestIdInHeader_IsSetOnException() {
+        stubFor(post(urlEqualTo(ALL_TYPES_PATH)).willReturn(
+            aResponse()
+                .withStatus(404)
+                .withHeader("x-amz-request-id", "1234")));
+        try {
+            client.allTypes();
+        } catch (ProtocolRestXmlException e) {
+            assertThat(e.requestId()).isEqualTo("1234");
+        }
     }
 
     private void callAllTypes() {

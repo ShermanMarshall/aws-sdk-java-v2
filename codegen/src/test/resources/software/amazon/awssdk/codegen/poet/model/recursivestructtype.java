@@ -25,7 +25,6 @@ import software.amazon.awssdk.core.util.DefaultSdkAutoConstructList;
 import software.amazon.awssdk.core.util.DefaultSdkAutoConstructMap;
 import software.amazon.awssdk.core.util.SdkAutoConstructList;
 import software.amazon.awssdk.core.util.SdkAutoConstructMap;
-import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.ToString;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
@@ -36,16 +35,18 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 public final class RecursiveStructType implements SdkPojo, Serializable,
                                                   ToCopyableBuilder<RecursiveStructType.Builder, RecursiveStructType> {
     private static final SdkField<String> NO_RECURSE_FIELD = SdkField.<String> builder(MarshallingType.STRING)
-        .getter(getter(RecursiveStructType::noRecurse)).setter(setter(Builder::noRecurse))
-        .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("NoRecurse").build()).build();
+                                                                     .memberName("NoRecurse").getter(getter(RecursiveStructType::noRecurse)).setter(setter(Builder::noRecurse))
+                                                                     .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("NoRecurse").build()).build();
 
     private static final SdkField<RecursiveStructType> RECURSIVE_STRUCT_FIELD = SdkField
-        .<RecursiveStructType> builder(MarshallingType.SDK_POJO).getter(getter(RecursiveStructType::recursiveStruct))
-                                                                .setter(setter(Builder::recursiveStruct)).constructor(RecursiveStructType::builder)
-                                                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("RecursiveStruct").build()).build();
+        .<RecursiveStructType> builder(MarshallingType.SDK_POJO).memberName("RecursiveStruct")
+        .getter(getter(RecursiveStructType::recursiveStruct)).setter(setter(Builder::recursiveStruct))
+        .constructor(RecursiveStructType::builder)
+        .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("RecursiveStruct").build()).build();
 
     private static final SdkField<List<RecursiveStructType>> RECURSIVE_LIST_FIELD = SdkField
         .<List<RecursiveStructType>> builder(MarshallingType.LIST)
+        .memberName("RecursiveList")
         .getter(getter(RecursiveStructType::recursiveList))
         .setter(setter(Builder::recursiveList))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("RecursiveList").build(),
@@ -54,12 +55,13 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
                     .memberLocationName(null)
                     .memberFieldInfo(
                         SdkField.<RecursiveStructType> builder(MarshallingType.SDK_POJO)
-                            .constructor(RecursiveStructType::builder)
-                            .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
-                                                 .locationName("member").build()).build()).build()).build();
+                                .constructor(RecursiveStructType::builder)
+                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
+                                                     .locationName("member").build()).build()).build()).build();
 
     private static final SdkField<Map<String, RecursiveStructType>> RECURSIVE_MAP_FIELD = SdkField
         .<Map<String, RecursiveStructType>> builder(MarshallingType.MAP)
+        .memberName("RecursiveMap")
         .getter(getter(RecursiveStructType::recursiveMap))
         .setter(setter(Builder::recursiveMap))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("RecursiveMap").build(),
@@ -68,9 +70,9 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
                         .valueLocationName("value")
                         .valueFieldInfo(
                             SdkField.<RecursiveStructType> builder(MarshallingType.SDK_POJO)
-                                .constructor(RecursiveStructType::builder)
-                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
-                                                     .locationName("value").build()).build()).build()).build();
+                                    .constructor(RecursiveStructType::builder)
+                                    .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
+                                                         .locationName("value").build()).build()).build()).build();
 
     private static final List<SdkField<?>> SDK_FIELDS = Collections.unmodifiableList(Arrays.asList(NO_RECURSE_FIELD,
                                                                                                    RECURSIVE_STRUCT_FIELD, RECURSIVE_LIST_FIELD, RECURSIVE_MAP_FIELD));
@@ -97,7 +99,7 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
      *
      * @return The value of the NoRecurse property for this object.
      */
-    public String noRecurse() {
+    public final String noRecurse() {
         return noRecurse;
     }
 
@@ -106,15 +108,19 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
      *
      * @return The value of the RecursiveStruct property for this object.
      */
-    public RecursiveStructType recursiveStruct() {
+    public final RecursiveStructType recursiveStruct() {
         return recursiveStruct;
     }
 
     /**
-     * Returns true if the RecursiveList property was specified by the sender (it may be empty), or false if the sender
-     * did not specify the value (it will be empty). For responses returned by the SDK, the sender is the AWS service.
+     * For responses, this returns true if the service returned a value for the RecursiveList property. This DOES NOT
+     * check that the value is non-empty (for which, you should check the {@code isEmpty()} method on the property).
+     * This is useful because the SDK will never return a null collection or map, but you may need to differentiate
+     * between the service returning nothing (or null) and the service returning an empty collection or map. For
+     * requests, this returns true if a value for the property was specified in the request builder, and false if a
+     * value was not specified.
      */
-    public boolean hasRecursiveList() {
+    public final boolean hasRecursiveList() {
         return recursiveList != null && !(recursiveList instanceof SdkAutoConstructList);
     }
 
@@ -124,20 +130,25 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
      * Attempts to modify the collection returned by this method will result in an UnsupportedOperationException.
      * </p>
      * <p>
-     * You can use {@link #hasRecursiveList()} to see if a value was sent in this field.
+     * This method will never return null. If you would like to know whether the service returned this field (so that
+     * you can differentiate between null and empty), you can use the {@link #hasRecursiveList} method.
      * </p>
      *
      * @return The value of the RecursiveList property for this object.
      */
-    public List<RecursiveStructType> recursiveList() {
+    public final List<RecursiveStructType> recursiveList() {
         return recursiveList;
     }
 
     /**
-     * Returns true if the RecursiveMap property was specified by the sender (it may be empty), or false if the sender
-     * did not specify the value (it will be empty). For responses returned by the SDK, the sender is the AWS service.
+     * For responses, this returns true if the service returned a value for the RecursiveMap property. This DOES NOT
+     * check that the value is non-empty (for which, you should check the {@code isEmpty()} method on the property).
+     * This is useful because the SDK will never return a null collection or map, but you may need to differentiate
+     * between the service returning nothing (or null) and the service returning an empty collection or map. For
+     * requests, this returns true if a value for the property was specified in the request builder, and false if a
+     * value was not specified.
      */
-    public boolean hasRecursiveMap() {
+    public final boolean hasRecursiveMap() {
         return recursiveMap != null && !(recursiveMap instanceof SdkAutoConstructMap);
     }
 
@@ -147,12 +158,13 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
      * Attempts to modify the collection returned by this method will result in an UnsupportedOperationException.
      * </p>
      * <p>
-     * You can use {@link #hasRecursiveMap()} to see if a value was sent in this field.
+     * This method will never return null. If you would like to know whether the service returned this field (so that
+     * you can differentiate between null and empty), you can use the {@link #hasRecursiveMap} method.
      * </p>
      *
      * @return The value of the RecursiveMap property for this object.
      */
-    public Map<String, RecursiveStructType> recursiveMap() {
+    public final Map<String, RecursiveStructType> recursiveMap() {
         return recursiveMap;
     }
 
@@ -170,22 +182,22 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         int hashCode = 1;
         hashCode = 31 * hashCode + Objects.hashCode(noRecurse());
         hashCode = 31 * hashCode + Objects.hashCode(recursiveStruct());
-        hashCode = 31 * hashCode + Objects.hashCode(recursiveList());
-        hashCode = 31 * hashCode + Objects.hashCode(recursiveMap());
+        hashCode = 31 * hashCode + Objects.hashCode(hasRecursiveList() ? recursiveList() : null);
+        hashCode = 31 * hashCode + Objects.hashCode(hasRecursiveMap() ? recursiveMap() : null);
         return hashCode;
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         return equalsBySdkFields(obj);
     }
 
     @Override
-    public boolean equalsBySdkFields(Object obj) {
+    public final boolean equalsBySdkFields(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -197,7 +209,8 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
         }
         RecursiveStructType other = (RecursiveStructType) obj;
         return Objects.equals(noRecurse(), other.noRecurse()) && Objects.equals(recursiveStruct(), other.recursiveStruct())
-               && Objects.equals(recursiveList(), other.recursiveList()) && Objects.equals(recursiveMap(), other.recursiveMap());
+               && hasRecursiveList() == other.hasRecursiveList() && Objects.equals(recursiveList(), other.recursiveList())
+               && hasRecursiveMap() == other.hasRecursiveMap() && Objects.equals(recursiveMap(), other.recursiveMap());
     }
 
     /**
@@ -205,12 +218,13 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
      * redacted from this string using a placeholder value.
      */
     @Override
-    public String toString() {
+    public final String toString() {
         return ToString.builder("RecursiveStructType").add("NoRecurse", noRecurse()).add("RecursiveStruct", recursiveStruct())
-                       .add("RecursiveList", recursiveList()).add("RecursiveMap", recursiveMap()).build();
+                       .add("RecursiveList", hasRecursiveList() ? recursiveList() : null)
+                       .add("RecursiveMap", hasRecursiveMap() ? recursiveMap() : null).build();
     }
 
-    public <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
+    public final <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
         switch (fieldName) {
             case "NoRecurse":
                 return Optional.ofNullable(clazz.cast(noRecurse()));
@@ -226,7 +240,7 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
     }
 
     @Override
-    public List<SdkField<?>> sdkFields() {
+    public final List<SdkField<?>> sdkFields() {
         return SDK_FIELDS;
     }
 
@@ -260,9 +274,10 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
         /**
          * Sets the value of the RecursiveStruct property for this object.
          *
-         * This is a convenience that creates an instance of the {@link RecursiveStructType.Builder} avoiding the need
-         * to create one manually via {@link RecursiveStructType#builder()}.
+         * This is a convenience method that creates an instance of the {@link RecursiveStructType.Builder} avoiding the
+         * need to create one manually via {@link RecursiveStructType#builder()}.
          *
+         * <p>
          * When the {@link Consumer} completes, {@link RecursiveStructType.Builder#build()} is called immediately and
          * its result is passed to {@link #recursiveStruct(RecursiveStructType)}.
          *
@@ -296,16 +311,21 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
         /**
          * Sets the value of the RecursiveList property for this object.
          *
-         * This is a convenience that creates an instance of the {@link List<RecursiveStructType>.Builder} avoiding the
-         * need to create one manually via {@link List<RecursiveStructType>#builder()}.
+         * This is a convenience method that creates an instance of the
+         * {@link software.amazon.awssdk.services.jsonprotocoltests.model.RecursiveStructType.Builder} avoiding the need
+         * to create one manually via
+         * {@link software.amazon.awssdk.services.jsonprotocoltests.model.RecursiveStructType#builder()}.
          *
-         * When the {@link Consumer} completes, {@link List<RecursiveStructType>.Builder#build()} is called immediately
-         * and its result is passed to {@link #recursiveList(List<RecursiveStructType>)}.
+         * <p>
+         * When the {@link Consumer} completes,
+         * {@link software.amazon.awssdk.services.jsonprotocoltests.model.RecursiveStructType.Builder#build()} is called
+         * immediately and its result is passed to {@link #recursiveList(List<RecursiveStructType>)}.
          *
          * @param recursiveList
-         *        a consumer that will call methods on {@link List<RecursiveStructType>.Builder}
+         *        a consumer that will call methods on
+         *        {@link software.amazon.awssdk.services.jsonprotocoltests.model.RecursiveStructType.Builder}
          * @return Returns a reference to this object so that method calls can be chained together.
-         * @see #recursiveList(List<RecursiveStructType>)
+         * @see #recursiveList(java.util.Collection<RecursiveStructType>)
          */
         Builder recursiveList(Consumer<Builder>... recursiveList);
 
@@ -342,18 +362,22 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
             return noRecurse;
         }
 
+        public final void setNoRecurse(String noRecurse) {
+            this.noRecurse = noRecurse;
+        }
+
         @Override
         public final Builder noRecurse(String noRecurse) {
             this.noRecurse = noRecurse;
             return this;
         }
 
-        public final void setNoRecurse(String noRecurse) {
-            this.noRecurse = noRecurse;
-        }
-
         public final Builder getRecursiveStruct() {
             return recursiveStruct != null ? recursiveStruct.toBuilder() : null;
+        }
+
+        public final void setRecursiveStruct(BuilderImpl recursiveStruct) {
+            this.recursiveStruct = recursiveStruct != null ? recursiveStruct.build() : null;
         }
 
         @Override
@@ -362,13 +386,16 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
             return this;
         }
 
-        public final void setRecursiveStruct(BuilderImpl recursiveStruct) {
-            this.recursiveStruct = recursiveStruct != null ? recursiveStruct.build() : null;
+        public final List<Builder> getRecursiveList() {
+            List<Builder> result = RecursiveListTypeCopier.copyToBuilder(this.recursiveList);
+            if (result instanceof SdkAutoConstructList) {
+                return null;
+            }
+            return result;
         }
 
-        public final Collection<Builder> getRecursiveList() {
-            return recursiveList != null ? recursiveList.stream().map(RecursiveStructType::toBuilder)
-                                                        .collect(Collectors.toList()) : null;
+        public final void setRecursiveList(Collection<BuilderImpl> recursiveList) {
+            this.recursiveList = RecursiveListTypeCopier.copyFromBuilder(recursiveList);
         }
 
         @Override
@@ -392,22 +419,22 @@ public final class RecursiveStructType implements SdkPojo, Serializable,
             return this;
         }
 
-        public final void setRecursiveList(Collection<BuilderImpl> recursiveList) {
-            this.recursiveList = RecursiveListTypeCopier.copyFromBuilder(recursiveList);
+        public final Map<String, Builder> getRecursiveMap() {
+            Map<String, Builder> result = RecursiveMapTypeCopier.copyToBuilder(this.recursiveMap);
+            if (result instanceof SdkAutoConstructMap) {
+                return null;
+            }
+            return result;
         }
 
-        public final Map<String, Builder> getRecursiveMap() {
-            return recursiveMap != null ? CollectionUtils.mapValues(recursiveMap, RecursiveStructType::toBuilder) : null;
+        public final void setRecursiveMap(Map<String, BuilderImpl> recursiveMap) {
+            this.recursiveMap = RecursiveMapTypeCopier.copyFromBuilder(recursiveMap);
         }
 
         @Override
         public final Builder recursiveMap(Map<String, RecursiveStructType> recursiveMap) {
             this.recursiveMap = RecursiveMapTypeCopier.copy(recursiveMap);
             return this;
-        }
-
-        public final void setRecursiveMap(Map<String, BuilderImpl> recursiveMap) {
-            this.recursiveMap = RecursiveMapTypeCopier.copyFromBuilder(recursiveMap);
         }
 
         @Override

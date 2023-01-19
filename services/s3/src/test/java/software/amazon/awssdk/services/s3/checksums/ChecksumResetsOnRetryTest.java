@@ -24,6 +24,7 @@ import static software.amazon.awssdk.core.async.AsyncResponseTransformer.toBytes
 
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import java.net.URI;
@@ -50,7 +51,7 @@ import software.amazon.awssdk.utils.BinaryUtils;
  */
 public class ChecksumResetsOnRetryTest {
     @Rule
-    public WireMockRule mockServer = new WireMockRule(0);
+    public WireMockRule mockServer = new WireMockRule(new WireMockConfiguration().port(0));
 
     private S3Client s3Client;
 
@@ -69,12 +70,14 @@ public class ChecksumResetsOnRetryTest {
                            .credentialsProvider(credentials)
                            .region(Region.US_WEST_2)
                            .endpointOverride(URI.create("http://localhost:" + mockServer.port()))
+                           .serviceConfiguration(c -> c.pathStyleAccessEnabled(true))
                            .build();
 
         s3AsyncClient = S3AsyncClient.builder()
                                      .credentialsProvider(credentials)
                                      .region(Region.US_WEST_2)
                                      .endpointOverride(URI.create("http://localhost:" + mockServer.port()))
+                                     .serviceConfiguration(c -> c.pathStyleAccessEnabled(true))
                                      .build();
 
         body = "foo".getBytes(StandardCharsets.UTF_8);

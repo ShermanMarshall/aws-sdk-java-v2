@@ -17,8 +17,7 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.mapper;
 
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeType;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @SdkInternalApi
@@ -37,14 +36,17 @@ public final class StaticAttributeType<T> implements AttributeType<T> {
         return new StaticAttributeType<>(attributeConverter);
     }
 
+    @Override
     public AttributeValue objectToAttributeValue(T object) {
         return this.attributeConverter.transformFrom(object);
     }
 
+    @Override
     public T attributeValueToObject(AttributeValue attributeValue) {
         return this.attributeConverter.transformTo(attributeValue);
     }
 
+    @Override
     public AttributeValueType attributeValueType() {
         return attributeValueType;
     }

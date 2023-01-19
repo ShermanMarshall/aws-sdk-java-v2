@@ -28,6 +28,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
                                                                           ToCopyableBuilder<TestXmlNamespaceRequest.Builder, TestXmlNamespaceRequest> {
     private static final SdkField<String> STRING_MEMBER_FIELD = SdkField
         .<String> builder(MarshallingType.STRING)
+        .memberName("stringMember")
         .getter(getter(TestXmlNamespaceRequest::stringMember))
         .setter(setter(Builder::stringMember))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("stringMember")
@@ -35,6 +36,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
 
     private static final SdkField<Integer> INTEGER_MEMBER_FIELD = SdkField
         .<Integer> builder(MarshallingType.INTEGER)
+        .memberName("integerMember")
         .getter(getter(TestXmlNamespaceRequest::integerMember))
         .setter(setter(Builder::integerMember))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("integerMember")
@@ -42,6 +44,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
 
     private static final SdkField<XmlNamespaceMember> XML_NAMESPACE_MEMBER_FIELD = SdkField
         .<XmlNamespaceMember> builder(MarshallingType.SDK_POJO)
+        .memberName("xmlNamespaceMember")
         .getter(getter(TestXmlNamespaceRequest::xmlNamespaceMember))
         .setter(setter(Builder::xmlNamespaceMember))
         .constructor(XmlNamespaceMember::builder)
@@ -76,7 +79,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
      *
      * @return The value of the StringMember property for this object.
      */
-    public String stringMember() {
+    public final String stringMember() {
         return stringMember;
     }
 
@@ -85,7 +88,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
      *
      * @return The value of the IntegerMember property for this object.
      */
-    public Integer integerMember() {
+    public final Integer integerMember() {
         return integerMember;
     }
 
@@ -94,7 +97,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
      *
      * @return The value of the XmlNamespaceMember property for this object.
      */
-    public XmlNamespaceMember xmlNamespaceMember() {
+    public final XmlNamespaceMember xmlNamespaceMember() {
         return xmlNamespaceMember;
     }
 
@@ -112,7 +115,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         int hashCode = 1;
         hashCode = 31 * hashCode + super.hashCode();
         hashCode = 31 * hashCode + Objects.hashCode(stringMember());
@@ -122,12 +125,12 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         return super.equals(obj) && equalsBySdkFields(obj);
     }
 
     @Override
-    public boolean equalsBySdkFields(Object obj) {
+    public final boolean equalsBySdkFields(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -147,12 +150,12 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
      * redacted from this string using a placeholder value.
      */
     @Override
-    public String toString() {
+    public final String toString() {
         return ToString.builder("TestXmlNamespaceRequest").add("StringMember", stringMember())
                        .add("IntegerMember", integerMember()).add("XmlNamespaceMember", xmlNamespaceMember()).build();
     }
 
-    public <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
+    public final <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
         switch (fieldName) {
             case "stringMember":
                 return Optional.ofNullable(clazz.cast(stringMember()));
@@ -166,7 +169,7 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
     }
 
     @Override
-    public List<SdkField<?>> sdkFields() {
+    public final List<SdkField<?>> sdkFields() {
         return SDK_FIELDS;
     }
 
@@ -209,9 +212,10 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
         /**
          * Sets the value of the XmlNamespaceMember property for this object.
          *
-         * This is a convenience that creates an instance of the {@link XmlNamespaceMember.Builder} avoiding the need to
-         * create one manually via {@link XmlNamespaceMember#builder()}.
+         * This is a convenience method that creates an instance of the {@link XmlNamespaceMember.Builder} avoiding the
+         * need to create one manually via {@link XmlNamespaceMember#builder()}.
          *
+         * <p>
          * When the {@link Consumer} completes, {@link XmlNamespaceMember.Builder#build()} is called immediately and its
          * result is passed to {@link #xmlNamespaceMember(XmlNamespaceMember)}.
          *
@@ -252,18 +256,22 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
             return stringMember;
         }
 
+        public final void setStringMember(String stringMember) {
+            this.stringMember = stringMember;
+        }
+
         @Override
         public final Builder stringMember(String stringMember) {
             this.stringMember = stringMember;
             return this;
         }
 
-        public final void setStringMember(String stringMember) {
-            this.stringMember = stringMember;
-        }
-
         public final Integer getIntegerMember() {
             return integerMember;
+        }
+
+        public final void setIntegerMember(Integer integerMember) {
+            this.integerMember = integerMember;
         }
 
         @Override
@@ -272,22 +280,18 @@ public final class TestXmlNamespaceRequest extends ProtocolRestXmlRequest implem
             return this;
         }
 
-        public final void setIntegerMember(Integer integerMember) {
-            this.integerMember = integerMember;
-        }
-
         public final XmlNamespaceMember.Builder getXmlNamespaceMember() {
             return xmlNamespaceMember != null ? xmlNamespaceMember.toBuilder() : null;
+        }
+
+        public final void setXmlNamespaceMember(XmlNamespaceMember.BuilderImpl xmlNamespaceMember) {
+            this.xmlNamespaceMember = xmlNamespaceMember != null ? xmlNamespaceMember.build() : null;
         }
 
         @Override
         public final Builder xmlNamespaceMember(XmlNamespaceMember xmlNamespaceMember) {
             this.xmlNamespaceMember = xmlNamespaceMember;
             return this;
-        }
-
-        public final void setXmlNamespaceMember(XmlNamespaceMember.BuilderImpl xmlNamespaceMember) {
-            this.xmlNamespaceMember = xmlNamespaceMember != null ? xmlNamespaceMember.build() : null;
         }
 
         @Override

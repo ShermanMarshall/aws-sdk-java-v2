@@ -15,16 +15,21 @@
 
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import static software.amazon.awssdk.enhanced.dynamodb.internal.EnhancedClientUtils.createKeyFromMap;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.EnhancedClientUtils.readAndTransformSingleItem;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.internal.operations.OperationContext;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.MappedTableResource;
+import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
+import software.amazon.awssdk.enhanced.dynamodb.internal.operations.DefaultOperationContext;
 import software.amazon.awssdk.services.dynamodb.model.DeleteRequest;
 import software.amazon.awssdk.services.dynamodb.model.PutRequest;
 import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
@@ -34,14 +39,15 @@ import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
  * {@link DynamoDbEnhancedClient#batchWriteItem(BatchWriteItemEnhancedRequest)}. The result describes any unprocessed items
  * after the operation completes.
  * <ul>
- *     <li>Use the {@link #unprocessedPutItemsForTable(DynamoDbTable)} method once for each table present in the request
+ *     <li>Use the {@link #unprocessedPutItemsForTable(MappedTableResource)} method once for each table present in the request
  *  to get any unprocessed items from a put action on that table.</li>
- *     <li>Use the {@link #unprocessedDeleteItemsForTable(DynamoDbTable)} method once for each table present in the request
+ *     <li>Use the {@link #unprocessedDeleteItemsForTable(MappedTableResource)} method once for each table present in the request
  *  to get any unprocessed items from a delete action on that table.</li>
  * </ul>
  *
  */
 @SdkPublicApi
+@ThreadSafe
 public final class BatchWriteResult {
     private final Map<String, List<WriteRequest>> unprocessedRequests;
 
@@ -64,7 +70,7 @@ public final class BatchWriteResult {
      * @param <T> the type of the table items
      * @return a list of items
      */
-    public <T> List<T> unprocessedPutItemsForTable(DynamoDbTable<T> mappedTable) {
+    public <T> List<T> unprocessedPutItemsForTable(MappedTableResource<T> mappedTable) {
         List<WriteRequest> writeRequests =
             unprocessedRequests.getOrDefault(mappedTable.tableName(),
                                              Collections.emptyList());
@@ -75,20 +81,19 @@ public final class BatchWriteResult {
                             .map(PutRequest::item)
                             .map(item -> readAndTransformSingleItem(item,
                                                                     mappedTable.tableSchema(),
-                                                                    OperationContext.create(mappedTable.tableName()),
+                                                                    DefaultOperationContext.create(mappedTable.tableName()),
                                                                     mappedTable.mapperExtension()))
                             .collect(Collectors.toList());
     }
 
     /**
-     * Retrieve any unprocessed delete action items belonging to the supplied table from the result .
+     * Retrieve any unprocessed delete action keys belonging to the supplied table from the result.
      * Call this method once for each table present in the batch request.
      *
-     * @param mappedTable the table to retrieve unprocessed items for
-     * @param <T> the type of the table items
-     * @return a list of items
+     * @param mappedTable the table to retrieve unprocessed items for.
+     * @return a list of keys that were not processed as part of the batch request.
      */
-    public <T> List<T> unprocessedDeleteItemsForTable(DynamoDbTable<T> mappedTable) {
+    public List<Key> unprocessedDeleteItemsForTable(MappedTableResource<?> mappedTable) {
         List<WriteRequest> writeRequests =
             unprocessedRequests.getOrDefault(mappedTable.tableName(),
                                              Collections.emptyList());
@@ -97,13 +102,16 @@ public final class BatchWriteResult {
                             .filter(writeRequest -> writeRequest.deleteRequest() != null)
                             .map(WriteRequest::deleteRequest)
                             .map(DeleteRequest::key)
-                            .map(itemMap -> mappedTable.tableSchema().mapToItem(itemMap))
+                            .map(itemMap -> createKeyFromMap(itemMap,
+                                                             mappedTable.tableSchema(),
+                                                             TableMetadata.primaryIndexName()))
                             .collect(Collectors.toList());
     }
 
     /**
      * A builder that is used to create a result with the desired parameters.
      */
+    @NotThreadSafe
     public static final class Builder {
         private Map<String, List<WriteRequest>> unprocessedRequests;
 

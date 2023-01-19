@@ -19,9 +19,9 @@ import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.TypeToken;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.string.CharacterArrayStringConverter;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -52,8 +52,8 @@ public final class CharacterArrayAttributeConverter implements AttributeConverte
     }
 
     @Override
-    public TypeToken<char[]> type() {
-        return TypeToken.of(char[].class);
+    public EnhancedType<char[]> type() {
+        return EnhancedType.of(char[].class);
     }
 
     @Override
@@ -63,7 +63,7 @@ public final class CharacterArrayAttributeConverter implements AttributeConverte
 
     @Override
     public AttributeValue transformFrom(char[] input) {
-        return EnhancedAttributeValue.fromString(CHAR_ARRAY_STRING_CONVERTER.toString(input)).toAttributeValue();
+        return AttributeValue.builder().s(CHAR_ARRAY_STRING_CONVERTER.toString(input)).build();
     }
 
     @Override

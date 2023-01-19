@@ -18,6 +18,7 @@ package software.amazon.awssdk.core.internal.retry;
 import static java.util.Collections.unmodifiableSet;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,9 +33,10 @@ import software.amazon.awssdk.utils.Validate;
 
 @SdkInternalApi
 public final class SdkDefaultRetrySetting {
-    public static final String SDK_RETRY_INFO_HEADER = "amz-sdk-retry";
-
     public static final class Legacy {
+        private static final int MAX_ATTEMPTS = 4;
+        private static final Duration BASE_DELAY = Duration.ofMillis(100);
+        private static final Duration THROTTLED_BASE_DELAY = Duration.ofMillis(500);
         private static final int THROTTLE_EXCEPTION_TOKEN_COST = 0;
         private static final int DEFAULT_EXCEPTION_TOKEN_COST = 5;
 
@@ -46,6 +48,9 @@ public final class SdkDefaultRetrySetting {
     }
 
     public static final class Standard {
+        private static final int MAX_ATTEMPTS = 3;
+        private static final Duration BASE_DELAY = Duration.ofMillis(100);
+        private static final Duration THROTTLED_BASE_DELAY = Duration.ofSeconds(1);
         private static final int THROTTLE_EXCEPTION_TOKEN_COST = 5;
         private static final int DEFAULT_EXCEPTION_TOKEN_COST = 5;
 
@@ -58,13 +63,7 @@ public final class SdkDefaultRetrySetting {
 
     public static final int TOKEN_BUCKET_SIZE = 500;
 
-    public static final Duration BASE_DELAY = Duration.ofMillis(100);
-
-    public static final Duration THROTTLED_BASE_DELAY = Duration.ofMillis(500);
-
-    public static final Duration MAX_BACKOFF = Duration.ofMillis(20_000);
-
-    public static final Integer DEFAULT_MAX_RETRIES = 3;
+    public static final Duration MAX_BACKOFF = Duration.ofSeconds(20);
 
     public static final Set<Integer> RETRYABLE_STATUS_CODES;
     public static final Set<Class<? extends Exception>> RETRYABLE_EXCEPTIONS;
@@ -80,11 +79,13 @@ public final class SdkDefaultRetrySetting {
         Set<Class<? extends Exception>> retryableExceptions = new HashSet<>();
         retryableExceptions.add(RetryableException.class);
         retryableExceptions.add(IOException.class);
+        retryableExceptions.add(UncheckedIOException.class);
         retryableExceptions.add(ApiCallAttemptTimeoutException.class);
         RETRYABLE_EXCEPTIONS = unmodifiableSet(retryableExceptions);
     }
 
-    private SdkDefaultRetrySetting() {}
+    private SdkDefaultRetrySetting() {
+    }
 
     public static Integer maxAttempts(RetryMode retryMode) {
         Integer maxAttempts = SdkSystemSetting.AWS_MAX_ATTEMPTS.getIntegerValue().orElse(null);
@@ -92,13 +93,14 @@ public final class SdkDefaultRetrySetting {
         if (maxAttempts == null) {
             switch (retryMode) {
                 case LEGACY:
-                    maxAttempts = 4;
+                    maxAttempts = Legacy.MAX_ATTEMPTS;
                     break;
+                case ADAPTIVE:
                 case STANDARD:
-                    maxAttempts = 3;
+                    maxAttempts = Standard.MAX_ATTEMPTS;
                     break;
                 default:
-                    throw new IllegalArgumentException("Unknown retry mode: " + retryMode);
+                    throw new IllegalStateException("Unsupported RetryMode: " + retryMode);
             }
         }
 
@@ -109,13 +111,41 @@ public final class SdkDefaultRetrySetting {
 
     public static TokenBucketExceptionCostFunction tokenCostFunction(RetryMode retryMode) {
         switch (retryMode) {
-            case LEGACY: return Legacy.COST_FUNCTION;
-            case STANDARD: return Standard.COST_FUNCTION;
-            default: throw new IllegalStateException("Unsupported RetryMode: " + retryMode);
+            case LEGACY:
+                return Legacy.COST_FUNCTION;
+            case ADAPTIVE:
+            case STANDARD:
+                return Standard.COST_FUNCTION;
+            default:
+                throw new IllegalStateException("Unsupported RetryMode: " + retryMode);
         }
     }
 
     public static Integer defaultMaxAttempts() {
         return maxAttempts(RetryMode.defaultRetryMode());
+    }
+
+    public static Duration baseDelay(RetryMode retryMode) {
+        switch (retryMode) {
+            case LEGACY:
+                return Legacy.BASE_DELAY;
+            case ADAPTIVE:
+            case STANDARD:
+                return Standard.BASE_DELAY;
+            default:
+                throw new IllegalStateException("Unsupported RetryMode: " + retryMode);
+        }
+    }
+
+    public static Duration throttledBaseDelay(RetryMode retryMode) {
+        switch (retryMode) {
+            case LEGACY:
+                return Legacy.THROTTLED_BASE_DELAY;
+            case ADAPTIVE:
+            case STANDARD:
+                return Standard.THROTTLED_BASE_DELAY;
+            default:
+                throw new IllegalStateException("Unsupported RetryMode: " + retryMode);
+        }
     }
 }

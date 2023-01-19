@@ -18,11 +18,13 @@ package software.amazon.awssdk.protocols.xml.internal.marshall;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.SdkField;
 import software.amazon.awssdk.core.protocol.MarshallLocation;
 import software.amazon.awssdk.core.traits.ListTrait;
 import software.amazon.awssdk.core.traits.MapTrait;
+import software.amazon.awssdk.core.traits.RequiredTrait;
 import software.amazon.awssdk.protocols.core.ValueToStringConverter;
 
 @SdkInternalApi
@@ -33,6 +35,8 @@ public final class QueryParamMarshaller {
     public static final XmlMarshaller<Integer> INTEGER = new SimpleQueryParamMarshaller<>(ValueToStringConverter.FROM_INTEGER);
 
     public static final XmlMarshaller<Long> LONG = new SimpleQueryParamMarshaller<>(ValueToStringConverter.FROM_LONG);
+
+    public static final XmlMarshaller<Short> SHORT = new SimpleQueryParamMarshaller<>(ValueToStringConverter.FROM_SHORT);
 
     public static final XmlMarshaller<Double> DOUBLE = new SimpleQueryParamMarshaller<>(ValueToStringConverter.FROM_DOUBLE);
 
@@ -58,8 +62,7 @@ public final class QueryParamMarshaller {
             return;
         }
 
-        MapTrait mapTrait = sdkField.getOptionalTrait(MapTrait.class)
-                                    .orElseThrow(() -> new IllegalStateException("SdkField of list type is missing List trait"));
+        MapTrait mapTrait = sdkField.getRequiredTrait(MapTrait.class);
         SdkField valueField = mapTrait.valueFieldInfo();
 
         for (Map.Entry<String, ?> entry : map.entrySet()) {
@@ -74,6 +77,12 @@ public final class QueryParamMarshaller {
 
                 context.request().putRawQueryParameter(entry.getKey(), valueMarshaller.convert(entry.getValue(), null));
             }
+        }
+    };
+
+    public static final XmlMarshaller<Void> NULL = (val, context, paramName, sdkField) -> {
+        if (Objects.nonNull(sdkField) && sdkField.containsTrait(RequiredTrait.class)) {
+            throw new IllegalArgumentException(String.format("Parameter '%s' must not be null", paramName));
         }
     };
 

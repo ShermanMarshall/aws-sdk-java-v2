@@ -16,7 +16,7 @@ To generate a new changelog entry::
 
 This will open up a file in your editor (via the ``EDITOR`` env  var).
 You'll see this template::
-    # Type should be one of: feature, bugfix, deprecation, removal
+    # Type should be one of: feature, bugfix, deprecation, removal, documentation
     type: {change_type}
 
     # The marketing name of the service this change applies to
@@ -53,13 +53,19 @@ CHANGES_DIR = os.path.join(
 )
 CHANGE_PARTS = ['type', 'category', 'description']
 TEMPLATE = """\
-# Type should be one of: feature, bugfix, deprecation, removal
+# Type should be one of: feature, bugfix, deprecation, removal, documentation
 type: {change_type}
 
 # The marketing name of the service this change applies to
 # e.g: AWS CodeCommit, Amazon DynamoDB
 # or "AWS SDK for Java v2" if it's an SDK change to the core, runtime etc
 category: {category}
+
+# Your GitHub username (without '@') to be included in the CHANGELOG.
+# Every contribution counts and we would like to recognize
+# your contribution!
+# Leave it empty if you would prefer not to be mentioned.
+contributor: {contributor}
 
 The description of the change. Feel free to use Markdown here.
 description: {description}
@@ -76,6 +82,7 @@ def new_changelog_entry(args):
             'type': args.change_type,
             'category': args.category,
             'description': args.description,
+            'contributor': args.contributor
         }
     else:
         parsed_values = get_values_from_editor(args)
@@ -94,7 +101,7 @@ def get_missing_parts(parsed_values):
 
 
 def all_values_provided(args):
-    return args.change_type and args.category and args.description
+    return args.change_type and args.category and args.description and args.contributor
 
 
 def get_values_from_editor(args):
@@ -103,6 +110,7 @@ def get_values_from_editor(args):
             change_type=args.change_type,
             category=args.category,
             description=args.description,
+            contributor=args.contributor
         )
         f.write(contents)
         f.flush()
@@ -137,6 +145,12 @@ def write_new_change(parsed_values):
         os.makedirs(dirname)
     # Need to generate a unique filename for this change.
     category = parsed_values['category']
+
+    contributor = parsed_values['contributor']
+    if contributor and contributor.strip:
+        contributor = remove_prefix(contributor, '@')
+        parsed_values['contributor'] = contributor
+
     short_summary = ''.join(filter(lambda x: x in VALID_CHARS, category))
     contents = json.dumps(parsed_values, indent=4) + "\n"
     contents_digest = hashlib.sha1(contents.encode('utf-8')).hexdigest()
@@ -149,6 +163,10 @@ def write_new_change(parsed_values):
         f.write(contents)
     return filename
 
+def remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
 
 def parse_filled_in_contents(contents):
     """Parse filled in file contents and returns parsed dict.
@@ -171,11 +189,14 @@ def parse_filled_in_contents(contents):
             continue
         if 'type' not in parsed and line.startswith('type:'):
             t = line[len('type:'):].strip()
-            if t not in ['feature', 'bugfix', 'deprecation', 'removal']:
+            if t not in ['feature', 'bugfix', 'deprecation', 'removal',
+                         'documentation']:
                 raise Exception("Unsupported category %s" % t)
             parsed['type'] = t
         elif 'category' not in parsed and line.startswith('category:'):
             parsed['category'] = line[len('category:'):].strip()
+        elif 'contributor' not in parsed and line.startswith('contributor:'):
+            parsed['contributor'] = line[len('contributor:'):].strip()
         elif 'description' not in parsed and line.startswith('description:'):
             # Assume that everything until the end of the file is part
             # of the description, so we can break once we pull in the
@@ -190,8 +211,11 @@ def parse_filled_in_contents(contents):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--type', dest='change_type',
-                        default='', choices=('bugfix', 'feature', 'deprecation'))
+                        default='', choices=('bugfix', 'feature',
+                                             'deprecation', 'documentation'))
     parser.add_argument('-c', '--category', dest='category',
+                        default='')
+    parser.add_argument('-u', '--contributor', dest='contributor',
                         default='')
     parser.add_argument('-d', '--description', dest='description',
                         default='')

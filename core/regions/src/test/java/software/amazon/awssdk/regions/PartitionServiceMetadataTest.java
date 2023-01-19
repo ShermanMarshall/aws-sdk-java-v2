@@ -18,14 +18,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class PartitionServiceMetadataTest {
 
     private static final List<String> AWS_PARTITION_GLOBAL_SERVICES = Arrays.asList(
-            "budgets", "cloudfront", "iam", "route53", "waf");
+            "budgets", "cloudfront", "iam", "route53", "shield", "waf");
 
     private static final List<String> AWS_PARTITION_REGIONALIZED_SERVICES = Arrays.asList(
             "acm", "apigateway", "application-autoscaling", "appstream2", "autoscaling", "batch",
@@ -33,11 +32,11 @@ public class PartitionServiceMetadataTest {
             "codepipeline", "cognito-identity", "cognito-idp", "cognito-sync", "config", "cur", "data.iot",
             "datapipeline", "directconnect", "dms", "ds", "dynamodb", "ec2", "ecs", "elasticache",
             "elasticbeanstalk", "elasticfilesystem", "elasticloadbalancing", "elasticmapreduce", "elastictranscoder",
-            "email", "es", "events", "firehose", "gamelift", "glacier", "health", "inspector",
+            "email", "es", "events", "firehose", "gamelift", "glacier", "inspector",
             "iot", "kinesis", "kinesisanalytics", "kms", "lambda", "lightsail", "logs", "machinelearning",
             "marketplacecommerceanalytics", "metering.marketplace", "mobileanalytics", "monitoring", "opsworks",
             "opsworks-cm", "pinpoint", "polly", "rds", "redshift", "rekognition", "route53domains", "s3",
-            "sdb", "servicecatalog", "shield", "sms", "snowball", "sns", "sqs", "ssm", "states", "storagegateway",
+            "sdb", "servicecatalog", "sms", "snowball", "sns", "sqs", "ssm", "states", "storagegateway",
             "streams.dynamodb", "sts", "support", "swf", "waf-regional", "workspaces", "xray");
 
     private static final List<String> AWS_CN_PARTITION_GLOBAL_SERVICES = Arrays.asList("iam");
@@ -58,32 +57,38 @@ public class PartitionServiceMetadataTest {
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllRegionalizedServices_When_AwsPartition() {
-        AWS_PARTITION_REGIONALIZED_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.US_EAST_1));
+        AWS_PARTITION_REGIONALIZED_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.US_EAST_1)).isNotNull());
     }
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllGlobalServices_When_AwsGlobalRegion() {
-        AWS_PARTITION_GLOBAL_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.AWS_GLOBAL));
+        AWS_PARTITION_GLOBAL_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.AWS_GLOBAL)).isNotNull());
     }
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllRegionalizedServices_When_AwsCnPartition() {
-        AWS_CN_PARTITION_REGIONALIZED_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.CN_NORTH_1));
+        AWS_CN_PARTITION_REGIONALIZED_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.CN_NORTH_1)).isNotNull());
     }
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllGlobalServices_When_AwsCnGlobalRegion() {
-        AWS_CN_PARTITION_GLOBAL_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.AWS_CN_GLOBAL));
+        AWS_CN_PARTITION_GLOBAL_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.AWS_CN_GLOBAL)).isNotNull());
     }
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllRegionalizedServices_When_AwsUsGovPartition() {
-        AWS_US_GOV_PARTITION_REGIONALIZED_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.US_GOV_WEST_1));
+        AWS_US_GOV_PARTITION_REGIONALIZED_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.US_GOV_WEST_1)).isNotNull());
     }
 
     @Test
     public void endpointFor_ReturnsEndpoint_ForAllGlobalServices_When_AwsUsGovGlobalRegion() {
-        AWS_US_GOV_PARTITION_GLOBAL_SERVICES.forEach(s -> ServiceMetadata.of(s).endpointFor(Region.AWS_US_GOV_GLOBAL));
+        AWS_US_GOV_PARTITION_GLOBAL_SERVICES.forEach(
+            s -> assertThat(ServiceMetadata.of(s).endpointFor(Region.AWS_US_GOV_GLOBAL)).isNotNull());
     }
 
     @Test

@@ -15,12 +15,22 @@
 
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.NestedAttributeName;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.utils.Validate;
 
 /**
  * Defines parameters used to when scanning a DynamoDb table or index using the scan() operation (such as
@@ -29,18 +39,27 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * All parameters are optional.
  */
 @SdkPublicApi
+@ThreadSafe
 public final class ScanEnhancedRequest {
 
     private final Map<String, AttributeValue> exclusiveStartKey;
     private final Integer limit;
     private final Boolean consistentRead;
     private final Expression filterExpression;
+    private final List<NestedAttributeName> attributesToProject;
+    private final Integer segment;
+    private final Integer totalSegments;
 
     private ScanEnhancedRequest(Builder builder) {
         this.exclusiveStartKey = builder.exclusiveStartKey;
         this.limit = builder.limit;
+        this.segment = builder.segment;
+        this.totalSegments = builder.totalSegments;
         this.consistentRead = builder.consistentRead;
         this.filterExpression = builder.filterExpression;
+        this.attributesToProject = builder.attributesToProject != null
+                ? Collections.unmodifiableList(builder.attributesToProject)
+                : null;
     }
 
     /**
@@ -55,9 +74,10 @@ public final class ScanEnhancedRequest {
      */
     public Builder toBuilder() {
         return builder().exclusiveStartKey(exclusiveStartKey)
-                        .limit(limit)
-                        .consistentRead(consistentRead)
-                        .filterExpression(filterExpression);
+                .limit(limit)
+                .consistentRead(consistentRead)
+                .filterExpression(filterExpression)
+                .addNestedAttributesToProject(attributesToProject);
     }
 
     /**
@@ -75,6 +95,20 @@ public final class ScanEnhancedRequest {
     }
 
     /**
+     * Returns the value of segment set on this request object, or null if it doesn't exist.
+     */
+    public Integer segment() {
+        return segment;
+    }
+
+    /**
+     * Returns the value of totalSegments set on this request object, or null if it doesn't exist.
+     */
+    public Integer totalSegments() {
+        return totalSegments;
+    }
+
+    /**
      * Returns the value of consistent read, or false if it has not been set.
      */
     public Boolean consistentRead() {
@@ -87,6 +121,28 @@ public final class ScanEnhancedRequest {
     public Expression filterExpression() {
         return filterExpression;
     }
+
+    /**
+     * Returns the list of projected attributes on this request object, or an null if no projection is specified.
+     * Nested attributes are represented using the '.' separator. Example : foo.bar is represented as "foo.bar" which is
+     * indistinguishable from a non-nested attribute with the name "foo.bar".
+     * Use {@link #nestedAttributesToProject} if you have a use-case that requires discrimination between these two cases.
+     */
+    public List<String> attributesToProject() {
+        return attributesToProject != null ?
+                attributesToProject.stream().map(item -> String.join(".", item.elements()))
+                        .collect(Collectors.toList()) : null;
+    }
+
+    /**
+     * Returns the list of projected attribute names, in the form of {@link NestedAttributeName} objects,
+     * for this request object, or null if no projection is specified.
+     * Refer  {@link NestedAttributeName}
+     */
+    public List<NestedAttributeName> nestedAttributesToProject() {
+        return attributesToProject;
+    }
+
 
     @Override
     public boolean equals(Object o) {
@@ -106,7 +162,17 @@ public final class ScanEnhancedRequest {
         if (limit != null ? ! limit.equals(scan.limit) : scan.limit != null) {
             return false;
         }
+        if (segment != null ? ! segment.equals(scan.segment) : scan.segment != null) {
+            return false;
+        }
+        if (totalSegments != null ? ! totalSegments.equals(scan.totalSegments) : scan.totalSegments != null) {
+            return false;
+        }
         if (consistentRead != null ? ! consistentRead.equals(scan.consistentRead) : scan.consistentRead != null) {
+            return false;
+        }
+        if (attributesToProject != null
+                ? !attributesToProject.equals(scan.attributesToProject) : scan.attributesToProject != null) {
             return false;
         }
         return filterExpression != null ? filterExpression.equals(scan.filterExpression) : scan.filterExpression == null;
@@ -116,19 +182,26 @@ public final class ScanEnhancedRequest {
     public int hashCode() {
         int result = exclusiveStartKey != null ? exclusiveStartKey.hashCode() : 0;
         result = 31 * result + (limit != null ? limit.hashCode() : 0);
+        result = 31 * result + (segment != null ? segment.hashCode() : 0);
+        result = 31 * result + (totalSegments != null ? totalSegments.hashCode() : 0);
         result = 31 * result + (consistentRead != null ? consistentRead.hashCode() : 0);
         result = 31 * result + (filterExpression != null ? filterExpression.hashCode() : 0);
+        result = 31 * result + (attributesToProject != null ? attributesToProject.hashCode() : 0);
         return result;
     }
 
     /**
      * A builder that is used to create a request with the desired parameters.
      */
+    @NotThreadSafe
     public static final class Builder {
         private Map<String, AttributeValue> exclusiveStartKey;
         private Integer limit;
         private Boolean consistentRead;
         private Expression filterExpression;
+        private List<NestedAttributeName> attributesToProject;
+        private Integer segment;
+        private Integer totalSegments;
 
         private Builder() {
         }
@@ -163,6 +236,45 @@ public final class ScanEnhancedRequest {
         }
 
         /**
+         * For a parallel Scan request, Segment identifies an individual segment to be scanned by an application worker.
+         * <p>
+         * <b>Note:</b>Segment IDs are zero-based, so the first segment is always 0. For example, if you want to use four
+         * application threads to scan a table or an index, then the first thread specifies a Segment value of 0, the second
+         * thread specifies 1, and so on.
+         *
+         * The value for Segment must be greater than or equal to 0, and less than the value provided for TotalSegments.
+         *
+         * If you provide Segment, you must also provide <em>TotalSegments</em>.
+         *
+         * @param segment  identifies an individual segment to be scanned
+         * @return a builder of this type
+         */
+        public Builder segment(Integer segment) {
+            this.segment = segment;
+            return this;
+        }
+
+        /**
+         * For a parallel Scan request, TotalSegments represents the total number of segments into
+         * which the Scan operation will be divided.
+         * <p>
+         * <b>Note:</b>If you do not specify this value, the TotalSegements is effectively 1 and Scan operation
+         * will be sequential rather than parallel.
+         *
+         * If you specify TotalSegments, you must also specify Segment.
+         *
+         * If you specify TotalSegments of 2 and above, you can create separate thread for each segment and scan items
+         * in parallel across segments from multiple threads.
+         *
+         * @param totalSegments the total number of segments to divide the table.
+         * @return a builder of this type
+         */
+        public Builder totalSegments(Integer totalSegments) {
+            this.totalSegments = totalSegments;
+            return this;
+        }
+
+        /**
          * Determines the read consistency model: If set to true, the operation uses strongly consistent reads; otherwise,
          * the operation uses eventually consistent reads.
          * <p>
@@ -189,6 +301,130 @@ public final class ScanEnhancedRequest {
          */
         public Builder filterExpression(Expression filterExpression) {
             this.filterExpression = filterExpression;
+            return this;
+        }
+
+        /**
+         * <p>
+         * Sets a collection of the attribute names to be retrieved from the database. These attributes can include
+         * scalars, sets, or elements of a JSON document.
+         * <p>
+         * If no attribute names are specified, then all attributes will be returned. If any of the requested attributes
+         * are not found, they will not appear in the result.
+         * <p>
+         * If there are nested attributes, use any of the addNestedAttributesToProject methods, such as
+         * {@link #addNestedAttributesToProject(NestedAttributeName...)}.
+         * <p>
+         * For more information, see <a href=
+         * "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.AccessingItemAttributes.html"
+         * >Accessing Item Attributes</a> in the <i>Amazon DynamoDB Developer Guide</i>.
+         * </p>
+         *
+         * @param attributesToProject A collection of the attributes names to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder attributesToProject(Collection<String> attributesToProject) {
+            if (this.attributesToProject != null) {
+                this.attributesToProject.clear();
+            }
+            if (attributesToProject != null) {
+                addNestedAttributesToProject(new ArrayList<>(attributesToProject).stream()
+                        .map(NestedAttributeName::create).collect(Collectors.toList()));
+            }
+            return this;
+        }
+
+        /**
+         * <p>
+         * Sets one or more attribute names to be retrieved from the database. These attributes can include
+         * scalars, sets, or elements of a JSON document.
+         * <p>
+         * If no attribute names are specified, then all attributes will be returned. If any of the requested attributes
+         * are not found, they will not appear in the result.
+         * <p>
+         * If there are nested attributes, use any of the addNestedAttributesToProject methods, such as
+         * {@link #addNestedAttributesToProject(NestedAttributeName...)}.
+         * <p>
+         * For more information, see <a href=
+         * "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.AccessingItemAttributes.html"
+         * >Accessing Item Attributes</a> in the <i>Amazon DynamoDB Developer Guide</i>.
+         *
+         * @param attributesToProject One or more  attributes names to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder attributesToProject(String... attributesToProject) {
+            return attributesToProject(Arrays.asList(attributesToProject));
+        }
+
+        /**
+         * <p> Adds a single attribute name to be retrieved from the database. This attribute can include
+         * scalars, sets, or elements of a JSON document.
+         * <p> If there are nested attributes, use any of the addNestedAttributesToProject methods, such as
+         * {@link #addNestedAttributesToProject(NestedAttributeName...)}.
+         *
+         * @param attributeToProject An additional single attribute name to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder addAttributeToProject(String attributeToProject) {
+            if (attributeToProject != null) {
+                addNestedAttributesToProject(NestedAttributeName.create(attributeToProject));
+            }
+            return this;
+        }
+
+        /**
+         * Adds a collection of nested attributes to be retrieved from the database. These attributes can include
+         * scalars, sets, or elements of a JSON document.
+         * <p>
+         * This method is additive, so calling it multiple times will add to the list of nested attribute names.
+         * @see NestedAttributeName
+         *
+         * @param nestedAttributeNames A collection of attributes to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder addNestedAttributesToProject(Collection<NestedAttributeName> nestedAttributeNames) {
+            if (nestedAttributeNames != null) {
+                Validate.noNullElements(nestedAttributeNames,
+                        "nestedAttributeNames list must not contain null elements");
+                if (attributesToProject == null) {
+                    this.attributesToProject = new ArrayList<>(nestedAttributeNames);
+                } else {
+                    this.attributesToProject.addAll(nestedAttributeNames);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * Adds a collection of nested attributes to be retrieved from the database. These attributes can include
+         * scalars, sets, or elements of a JSON document.
+         * <p>
+         * This method is additive, so calling it multiple times will add to the list of nested attribute names.
+         * @see NestedAttributeName
+         *
+         * @param nestedAttributeNames A collection of attributes to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder addNestedAttributesToProject(NestedAttributeName... nestedAttributeNames) {
+            addNestedAttributesToProject(Arrays.asList(nestedAttributeNames));
+            return this;
+        }
+
+        /**
+         * Adds a single nested attribute to be retrieved from the database. The attribute can include
+         * scalars, sets, or elements of a JSON document.
+         * <p>
+         * This method is additive, so calling it multiple times will add to the list of nested attribute names.
+         * @see NestedAttributeName
+         *
+         *
+         * @param nestedAttributeName A single attribute name to be retrieved from the database.
+         * @return Returns a reference to this object so that method calls can be chained together.
+         */
+        public Builder addNestedAttributeToProject(NestedAttributeName nestedAttributeName) {
+            if (nestedAttributeName != null) {
+                addNestedAttributesToProject(Arrays.asList(nestedAttributeName));
+            }
             return this;
         }
 

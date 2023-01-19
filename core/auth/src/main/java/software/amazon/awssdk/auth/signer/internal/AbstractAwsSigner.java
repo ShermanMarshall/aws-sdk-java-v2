@@ -21,18 +21,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
+import software.amazon.awssdk.core.checksums.SdkChecksum;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.io.SdkDigestInputStream;
 import software.amazon.awssdk.core.signer.Signer;
@@ -40,7 +35,6 @@ import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.utils.BinaryUtils;
 import software.amazon.awssdk.utils.StringUtils;
-import software.amazon.awssdk.utils.http.SdkHttpUtils;
 
 /**
  * Abstract base class for AWS signing protocol implementations. Provides
@@ -164,12 +158,12 @@ public abstract class AbstractAwsSigner implements Signer {
         return AbstractAwsSigner.doHash(text);
     }
 
-    byte[] hash(InputStream input) throws SdkClientException {
+    byte[] hash(InputStream input, SdkChecksum sdkChecksum) throws SdkClientException {
         try {
             MessageDigest md = getMessageDigestInstance();
             @SuppressWarnings("resource")
             DigestInputStream digestInputStream = new SdkDigestInputStream(
-                    input, md);
+                    input, md, sdkChecksum);
             byte[] buffer = new byte[1024];
             while (digestInputStream.read(buffer) > -1) {
                 ;
@@ -187,13 +181,17 @@ public abstract class AbstractAwsSigner implements Signer {
      * Hashes the binary data using the SHA-256 algorithm.
      *
      * @param data The binary data to hash.
+     * @param sdkChecksum Checksum Instance which gets updated as data is read while hashing.
      * @return The hashed bytes from the specified data.
      * @throws SdkClientException If the hash cannot be computed.
      */
-    byte[] hash(byte[] data) throws SdkClientException {
+    byte[] hash(byte[] data, SdkChecksum sdkChecksum) throws SdkClientException {
         try {
             MessageDigest md = getMessageDigestInstance();
             md.update(data);
+            if (sdkChecksum != null) {
+                sdkChecksum.update(data);
+            }
             return md.digest();
         } catch (Exception e) {
             throw SdkClientException.builder()
@@ -204,43 +202,14 @@ public abstract class AbstractAwsSigner implements Signer {
     }
 
     /**
-     * Examines the specified query string parameters and returns a
-     * canonicalized form.
-     * <p>
-     * The canonicalized query string is formed by first sorting all the query
-     * string parameters, then URI encoding both the key and value and then
-     * joining them, in order, separating key value pairs with an '&amp;'.
+     * Hashes the binary data using the SHA-256 algorithm.
      *
-     * @param parameters The query string parameters to be canonicalized.
-     * @return A canonicalized form for the specified query string parameters.
+     * @param data The binary data to hash.
+     * @return The hashed bytes from the specified data.
+     * @throws SdkClientException If the hash cannot be computed.
      */
-    protected String getCanonicalizedQueryString(Map<String, List<String>> parameters) {
-
-        SortedMap<String, List<String>> sorted = new TreeMap<>();
-
-        /**
-         * Signing protocol expects the param values also to be sorted after url
-         * encoding in addition to sorted parameter names.
-         */
-        for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
-            String encodedParamName = SdkHttpUtils.urlEncode(entry.getKey());
-            List<String> paramValues = entry.getValue();
-            List<String> encodedValues = new ArrayList<>(paramValues.size());
-            for (String value : paramValues) {
-                String encodedValue = SdkHttpUtils.urlEncode(value);
-
-                // Null values should be treated as empty for the purposes of signing, not missing.
-                // For example "?foo=" instead of "?foo".
-                String signatureFormattedEncodedValue = encodedValue == null ? "" : encodedValue;
-
-                encodedValues.add(signatureFormattedEncodedValue);
-            }
-            Collections.sort(encodedValues);
-            sorted.put(encodedParamName, encodedValues);
-
-        }
-
-        return SdkHttpUtils.flattenQueryParameters(sorted).orElse("");
+    byte[] hash(byte[] data) throws SdkClientException {
+        return hash(data, null);
     }
 
     protected InputStream getBinaryRequestPayloadStream(ContentStreamProvider streamProvider) {
@@ -257,31 +226,6 @@ public abstract class AbstractAwsSigner implements Signer {
                                     .cause(e)
                                     .build();
         }
-    }
-
-    String getCanonicalizedResourcePath(String resourcePath, boolean urlEncode) {
-        if (StringUtils.isEmpty(resourcePath)) {
-            return "/";
-        } else {
-            String value = urlEncode ? SdkHttpUtils.urlEncodeIgnoreSlashes(resourcePath) : resourcePath;
-            if (value.startsWith("/")) {
-                return value;
-            } else {
-                return "/".concat(value);
-            }
-        }
-    }
-
-    protected String getCanonicalizedEndpoint(SdkHttpFullRequest request) {
-        String endpointForStringToSign = StringUtils.lowerCase(request.host());
-
-        // Omit the port from the endpoint if we're using the default port for the protocol. Some HTTP clients (ie. Apache) don't
-        // allow you to specify it in the request, so we're standardizing around not including it. See SdkHttpRequest#port().
-        if (!SdkHttpUtils.isUsingStandardPort(request.protocol(), request.port())) {
-            endpointForStringToSign += ":" + request.port();
-        }
-
-        return endpointForStringToSign;
     }
 
     /**

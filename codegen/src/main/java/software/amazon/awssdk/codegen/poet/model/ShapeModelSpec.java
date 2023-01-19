@@ -35,7 +35,7 @@ import software.amazon.awssdk.codegen.model.intermediate.ShapeModel;
 import software.amazon.awssdk.codegen.model.intermediate.ShapeType;
 import software.amazon.awssdk.codegen.model.service.XmlNamespace;
 import software.amazon.awssdk.codegen.naming.NamingStrategy;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.core.SdkField;
 import software.amazon.awssdk.core.protocol.MarshallLocation;
 import software.amazon.awssdk.core.protocol.MarshallingType;
@@ -45,6 +45,7 @@ import software.amazon.awssdk.core.traits.ListTrait;
 import software.amazon.awssdk.core.traits.LocationTrait;
 import software.amazon.awssdk.core.traits.MapTrait;
 import software.amazon.awssdk.core.traits.PayloadTrait;
+import software.amazon.awssdk.core.traits.RequiredTrait;
 import software.amazon.awssdk.core.traits.TimestampFormatTrait;
 import software.amazon.awssdk.core.traits.XmlAttributeTrait;
 import software.amazon.awssdk.core.traits.XmlAttributesTrait;
@@ -58,14 +59,14 @@ class ShapeModelSpec {
 
     private final ShapeModel shapeModel;
     private final TypeProvider typeProvider;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
     private final NamingStrategy namingStrategy;
     private final CustomizationConfig customizationConfig;
     private final IntermediateModel model;
 
     ShapeModelSpec(ShapeModel shapeModel,
                    TypeProvider typeProvider,
-                   PoetExtensions poetExtensions,
+                   PoetExtension poetExtensions,
                    IntermediateModel model) {
         this.shapeModel = shapeModel;
         this.typeProvider = typeProvider;
@@ -128,6 +129,7 @@ class ShapeModelSpec {
                         .add("$T.<$T>builder($T.$L)\n",
                              sdkFieldType, typeProvider.fieldType(m),
                              ClassName.get(MarshallingType.class), m.getMarshallingType())
+                        .add(".memberName($S)\n", m.getC2jName())
                         .add(".getter(getter($T::$L))\n",
                              className(), m.getFluentGetterMethodName())
                         .add(".setter(setter($T::$L))\n",
@@ -182,6 +184,9 @@ class ShapeModelSpec {
 
         if (m.isXmlAttribute()) {
             traits.add(createXmlAttributeTrait());
+        }
+        if (customizationConfig.isRequiredTraitValidationEnabled() && m.isRequired()) {
+            traits.add(createRequiredTrait());
         }
 
         if (!traits.isEmpty()) {
@@ -267,6 +272,12 @@ class ShapeModelSpec {
                         .build();
     }
 
+    private CodeBlock createRequiredTrait() {
+        return CodeBlock.builder()
+                        .add("$T.create()", ClassName.get(RequiredTrait.class))
+                        .build();
+    }
+
     private CodeBlock createMapTrait(MemberModel m) {
         return CodeBlock.builder()
                         .add("$T.builder()\n"
@@ -305,7 +316,7 @@ class ShapeModelSpec {
         String uri = xmlNamespace.getUri();
         String prefix = xmlNamespace.getPrefix();
         CodeBlock.Builder codeBlockBuilder = CodeBlock.builder()
-                                         .add("$T.create(", ClassName.get(XmlAttributesTrait.class));
+                                                      .add("$T.create(", ClassName.get(XmlAttributesTrait.class));
 
         String namespacePrefix = "xmlns:" + prefix;
         codeBlockBuilder.add("$T.of($S, $T.builder().attributeGetter((ignore) -> $S).build())",

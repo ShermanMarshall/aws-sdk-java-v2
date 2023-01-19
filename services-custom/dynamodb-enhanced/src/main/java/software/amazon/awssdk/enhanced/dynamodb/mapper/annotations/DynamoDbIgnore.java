@@ -19,11 +19,29 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
 import software.amazon.awssdk.annotations.SdkPublicApi;
 
 /**
  * Opts this attribute out of participating in the table schema. It will be completely ignored by the mapper.
+ * <p>
+ * Example using {@link DynamoDbAttribute}:
+ * <pre>
+ * {@code
+ * @DynamoDbBean
+ * public class Bean {
+ *      private String internalKey;
+ *
+ *      @DynamoDbIgnore
+ *      public String getInternalKey() {
+ *          return this.internalKey;
+ *      }
+ *
+ *      public void setInternalKey(String internalKey) {
+ *          return this.internalKey = internalKey;}
+ *      }
+ * }
+ * }
+ * </pre>
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

@@ -19,7 +19,7 @@ import static java.util.Collections.unmodifiableList;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,6 +31,8 @@ import software.amazon.awssdk.core.SdkPojo;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.http.HttpResponseHandler;
+import software.amazon.awssdk.core.http.MetricCollectingHttpResponseHandler;
+import software.amazon.awssdk.core.metrics.CoreMetric;
 import software.amazon.awssdk.core.protocol.MarshallLocation;
 import software.amazon.awssdk.core.traits.TimestampFormatTrait;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
@@ -39,13 +41,13 @@ import software.amazon.awssdk.protocols.core.ExceptionMetadata;
 import software.amazon.awssdk.protocols.core.OperationInfo;
 import software.amazon.awssdk.protocols.core.ProtocolMarshaller;
 import software.amazon.awssdk.protocols.json.internal.AwsStructuredPlainJsonFactory;
-import software.amazon.awssdk.protocols.json.internal.dom.JsonDomParser;
 import software.amazon.awssdk.protocols.json.internal.marshall.JsonProtocolMarshallerBuilder;
 import software.amazon.awssdk.protocols.json.internal.unmarshall.AwsJsonErrorMessageParser;
 import software.amazon.awssdk.protocols.json.internal.unmarshall.AwsJsonProtocolErrorUnmarshaller;
 import software.amazon.awssdk.protocols.json.internal.unmarshall.AwsJsonResponseHandler;
 import software.amazon.awssdk.protocols.json.internal.unmarshall.JsonProtocolUnmarshaller;
 import software.amazon.awssdk.protocols.json.internal.unmarshall.JsonResponseHandler;
+import software.amazon.awssdk.protocols.jsoncore.JsonNodeParser;
 
 @SdkProtectedApi
 public abstract class BaseAwsJsonProtocolFactory {
@@ -59,6 +61,7 @@ public abstract class BaseAwsJsonProtocolFactory {
     private final List<ExceptionMetadata> modeledExceptions;
     private final Supplier<SdkPojo> defaultServiceExceptionSupplier;
     private final String customErrorCodeFieldName;
+    private final boolean hasAwsQueryCompatible;
     private final SdkClientConfiguration clientConfiguration;
     private final JsonProtocolUnmarshaller protocolUnmarshaller;
 
@@ -67,10 +70,13 @@ public abstract class BaseAwsJsonProtocolFactory {
         this.modeledExceptions = unmodifiableList(builder.modeledExceptions);
         this.defaultServiceExceptionSupplier = builder.defaultServiceExceptionSupplier;
         this.customErrorCodeFieldName = builder.customErrorCodeFieldName;
+        this.hasAwsQueryCompatible = builder.hasAwsQueryCompatible;
         this.clientConfiguration = builder.clientConfiguration;
         this.protocolUnmarshaller = JsonProtocolUnmarshaller
             .builder()
-            .parser(JsonDomParser.create(getSdkFactory().getJsonFactory()))
+            .parser(JsonNodeParser.builder()
+                                  .jsonFactory(getSdkFactory().getJsonFactory())
+                                  .build())
             .defaultTimestampFormats(getDefaultTimestampFormats())
             .build();
     }
@@ -102,11 +108,12 @@ public abstract class BaseAwsJsonProtocolFactory {
     public final <T extends SdkPojo> HttpResponseHandler<T> createResponseHandler(
         JsonOperationMetadata operationMetadata,
         Function<SdkHttpFullResponse, SdkPojo> pojoSupplier) {
-        return new AwsJsonResponseHandler<>(
-            new JsonResponseHandler<>(protocolUnmarshaller,
-                                      pojoSupplier,
-                                      operationMetadata.hasStreamingSuccessResponse(),
-                                      operationMetadata.isPayloadJson()));
+        return timeUnmarshalling(
+            new AwsJsonResponseHandler<>(
+                new JsonResponseHandler<>(protocolUnmarshaller,
+                                          pojoSupplier,
+                                          operationMetadata.hasStreamingSuccessResponse(),
+                                          operationMetadata.isPayloadJson())));
     }
 
     /**
@@ -114,15 +121,20 @@ public abstract class BaseAwsJsonProtocolFactory {
      */
     public final HttpResponseHandler<AwsServiceException> createErrorResponseHandler(
         JsonOperationMetadata errorResponseMetadata) {
-        return AwsJsonProtocolErrorUnmarshaller
+        return timeUnmarshalling(AwsJsonProtocolErrorUnmarshaller
             .builder()
             .jsonProtocolUnmarshaller(protocolUnmarshaller)
             .exceptions(modeledExceptions)
             .errorCodeParser(getSdkFactory().getErrorCodeParser(customErrorCodeFieldName))
+            .hasAwsQueryCompatible(hasAwsQueryCompatible)
             .errorMessageParser(AwsJsonErrorMessageParser.DEFAULT_ERROR_MESSAGE_PARSER)
             .jsonFactory(getSdkFactory().getJsonFactory())
             .defaultExceptionSupplier(defaultServiceExceptionSupplier)
-            .build();
+            .build());
+    }
+
+    private <T> MetricCollectingHttpResponseHandler<T> timeUnmarshalling(HttpResponseHandler<T> delegate) {
+        return MetricCollectingHttpResponseHandler.create(CoreMetric.UNMARSHALLING_DURATION, delegate);
     }
 
     private StructuredJsonGenerator createGenerator(OperationInfo operationInfo) {
@@ -139,8 +151,9 @@ public abstract class BaseAwsJsonProtocolFactory {
     }
 
     @SdkTestInternalApi
-    protected final String getContentType() {
-        return getContentTypeResolver().resolveContentType(protocolMetadata);
+    public final String getContentType() {
+        return protocolMetadata.contentType() != null ? protocolMetadata.contentType()
+                : getContentTypeResolver().resolveContentType(protocolMetadata);
     }
 
     /**
@@ -162,7 +175,7 @@ public abstract class BaseAwsJsonProtocolFactory {
      * can be overridden by subclasses to customize behavior.
      */
     protected Map<MarshallLocation, TimestampFormatTrait.Format> getDefaultTimestampFormats() {
-        Map<MarshallLocation, TimestampFormatTrait.Format> formats = new HashMap<>();
+        Map<MarshallLocation, TimestampFormatTrait.Format> formats = new EnumMap<>(MarshallLocation.class);
         formats.put(MarshallLocation.HEADER, TimestampFormatTrait.Format.RFC_822);
         formats.put(MarshallLocation.PAYLOAD, TimestampFormatTrait.Format.UNIX_TIMESTAMP);
         return Collections.unmodifiableMap(formats);
@@ -175,6 +188,7 @@ public abstract class BaseAwsJsonProtocolFactory {
                                             .contentType(getContentType())
                                             .operationInfo(operationInfo)
                                             .sendExplicitNullForPayload(false)
+                                            .protocolMetadata(protocolMetadata)
                                             .build();
     }
 
@@ -188,6 +202,7 @@ public abstract class BaseAwsJsonProtocolFactory {
         private Supplier<SdkPojo> defaultServiceExceptionSupplier;
         private String customErrorCodeFieldName;
         private SdkClientConfiguration clientConfiguration;
+        private boolean hasAwsQueryCompatible;
 
         protected Builder() {
         }
@@ -236,6 +251,18 @@ public abstract class BaseAwsJsonProtocolFactory {
         }
 
         /**
+         * ContentType  of the client (By default it is used from {@link #AWS_JSON} ).
+         * Used to determine content type.
+         *
+         * @param contentType JSON protocol contentType.
+         * @return This builder for method chaining.
+         */
+        public final SubclassT contentType(String contentType) {
+            protocolMetadata.contentType(contentType);
+            return getSubclass();
+        }
+
+        /**
          * Custom field name containing the error code that identifies the exception. Currently only used by Glacier
          * which uses the "code" field instead of the traditional "__type".
          *
@@ -255,6 +282,18 @@ public abstract class BaseAwsJsonProtocolFactory {
          */
         public final SubclassT clientConfiguration(SdkClientConfiguration clientConfiguration) {
             this.clientConfiguration = clientConfiguration;
+            return getSubclass();
+        }
+
+        /**
+         * Provides a check on whether AwsQueryCompatible trait is found in Metadata.
+         * If true, custom error codes can be provided
+         *
+         * @param hasAwsQueryCompatible boolean of whether the AwsQueryCompatible trait is found
+         * @return This builder for method chaining.
+         */
+        public final SubclassT hasAwsQueryCompatible(boolean hasAwsQueryCompatible) {
+            this.hasAwsQueryCompatible = hasAwsQueryCompatible;
             return getSubclass();
         }
 

@@ -16,7 +16,8 @@
 package software.amazon.awssdk.codegen;
 
 import software.amazon.awssdk.codegen.model.config.customization.CustomizationConfig;
-import software.amazon.awssdk.codegen.model.intermediate.ServiceExamples;
+import software.amazon.awssdk.codegen.model.rules.endpoints.EndpointTestSuiteModel;
+import software.amazon.awssdk.codegen.model.service.EndpointRuleSetModel;
 import software.amazon.awssdk.codegen.model.service.Paginators;
 import software.amazon.awssdk.codegen.model.service.ServiceModel;
 import software.amazon.awssdk.codegen.model.service.Waiters;
@@ -29,18 +30,21 @@ public class C2jModels {
 
     private final ServiceModel serviceModel;
     private final Waiters waitersModel;
-    private final ServiceExamples examplesModel;
+    private final EndpointRuleSetModel endpointRuleSetModel;
+    private final EndpointTestSuiteModel endpointTestSuiteModel;
     private final CustomizationConfig customizationConfig;
     private final Paginators paginatorsModel;
 
     private C2jModels(ServiceModel serviceModel,
                       Waiters waitersModel,
-                      ServiceExamples examplesModel,
+                      EndpointRuleSetModel endpointRuleSetModel,
+                      EndpointTestSuiteModel endpointTestSuiteModel,
                       CustomizationConfig customizationConfig,
                       Paginators paginatorsModel) {
         this.serviceModel = serviceModel;
         this.waitersModel = waitersModel;
-        this.examplesModel = examplesModel;
+        this.endpointRuleSetModel = endpointRuleSetModel;
+        this.endpointTestSuiteModel = endpointTestSuiteModel;
         this.customizationConfig = customizationConfig;
         this.paginatorsModel = paginatorsModel;
     }
@@ -57,10 +61,6 @@ public class C2jModels {
         return waitersModel;
     }
 
-    public ServiceExamples examplesModel() {
-        return examplesModel;
-    }
-
     public CustomizationConfig customizationConfig() {
         return customizationConfig;
     }
@@ -69,11 +69,20 @@ public class C2jModels {
         return paginatorsModel;
     }
 
+    public EndpointRuleSetModel endpointRuleSetModel() {
+        return endpointRuleSetModel;
+    }
+
+    public EndpointTestSuiteModel endpointTestSuiteModel() {
+        return endpointTestSuiteModel;
+    }
+
     public static class Builder implements SdkBuilder<Builder, C2jModels> {
 
         private ServiceModel serviceModel;
         private Waiters waitersModel;
-        private ServiceExamples examplesModel;
+        private EndpointRuleSetModel endpointRuleSetModel;
+        private EndpointTestSuiteModel endpointTestSuiteModel;
         private CustomizationConfig customizationConfig;
         private Paginators paginatorsModel;
 
@@ -90,11 +99,6 @@ public class C2jModels {
             return this;
         }
 
-        public Builder examplesModel(ServiceExamples examplesModel) {
-            this.examplesModel = examplesModel;
-            return this;
-        }
-
         public Builder customizationConfig(CustomizationConfig customizationConfig) {
             this.customizationConfig = customizationConfig;
             return this;
@@ -105,11 +109,22 @@ public class C2jModels {
             return this;
         }
 
+        public Builder endpointRuleSetModel(EndpointRuleSetModel endpointRuleSetModel) {
+            this.endpointRuleSetModel = endpointRuleSetModel;
+            return this;
+        }
+
+        public Builder endpointTestSuiteModel(EndpointTestSuiteModel endpointTestSuiteModel) {
+            this.endpointTestSuiteModel = endpointTestSuiteModel;
+            return this;
+        }
+
+        @Override
         public C2jModels build() {
             Waiters waiters = waitersModel != null ? waitersModel : Waiters.none();
             Paginators paginators = paginatorsModel != null ? paginatorsModel : Paginators.none();
-            ServiceExamples examples = examplesModel != null ? examplesModel : ServiceExamples.none();
-            return new C2jModels(serviceModel, waiters, examples, customizationConfig, paginators);
+            return new C2jModels(serviceModel, waiters, endpointRuleSetModel, endpointTestSuiteModel, customizationConfig,
+                                 paginators);
         }
     }
 }

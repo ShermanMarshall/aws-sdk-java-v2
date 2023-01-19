@@ -55,12 +55,16 @@ public final class AbortedException extends SdkClientException {
         Builder cause(Throwable cause);
 
         @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
+
+        @Override
         AbortedException build();
     }
 
     protected static final class BuilderImpl extends SdkClientException.BuilderImpl implements Builder {
 
-        protected BuilderImpl() {}
+        protected BuilderImpl() {
+        }
 
         protected BuilderImpl(AbortedException ex) {
             super(ex);
@@ -75,6 +79,12 @@ public final class AbortedException extends SdkClientException {
         @Override
         public Builder cause(Throwable cause) {
             this.cause = cause;
+            return this;
+        }
+
+        @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
             return this;
         }
 

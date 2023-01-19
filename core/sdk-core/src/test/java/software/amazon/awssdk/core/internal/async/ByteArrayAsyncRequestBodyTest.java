@@ -15,12 +15,14 @@
 
 package software.amazon.awssdk.core.internal.async;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import software.amazon.awssdk.core.internal.util.Mimetype;
 
 public class ByteArrayAsyncRequestBodyTest {
     private class testSubscriber implements Subscriber<ByteBuffer> {
@@ -54,7 +56,8 @@ public class ByteArrayAsyncRequestBodyTest {
 
     @Test
     public void concurrentRequests_shouldCompleteNormally() {
-        ByteArrayAsyncRequestBody byteArrayReq = new ByteArrayAsyncRequestBody("Hello World!".getBytes());
+        ByteArrayAsyncRequestBody byteArrayReq = new ByteArrayAsyncRequestBody("Hello World!".getBytes(),
+                                                                               Mimetype.MIMETYPE_OCTET_STREAM);
         byteArrayReq.subscribe(subscriber);
         assertTrue(subscriber.onCompleteCalled.get());
     }

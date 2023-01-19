@@ -17,9 +17,10 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute;
 
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedTypeDocumentConfiguration;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.enhanced.dynamodb.TypeToken;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -29,27 +30,36 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 public class DocumentAttributeConverter<T> implements AttributeConverter<T> {
 
     private final TableSchema<T> tableSchema;
-    private final TypeToken<T> typeToken;
+    private final EnhancedType<T> enhancedType;
+    private final boolean preserveEmptyObject;
+    private final boolean ignoreNulls;
 
     private DocumentAttributeConverter(TableSchema<T> tableSchema,
-                                       TypeToken<T> typeToken) {
+                                       EnhancedType<T> enhancedType) {
         this.tableSchema = tableSchema;
-        this.typeToken = typeToken;
+        this.enhancedType = enhancedType;
+        this.preserveEmptyObject = enhancedType.documentConfiguration()
+                                               .map(EnhancedTypeDocumentConfiguration::preserveEmptyObject)
+                                               .orElse(false);
+        this.ignoreNulls = enhancedType.documentConfiguration()
+                                       .map(EnhancedTypeDocumentConfiguration::ignoreNulls)
+                                       .orElse(false);
+
     }
 
-    public static <T> DocumentAttributeConverter create(TableSchema<T> tableSchema,
-                                                        TypeToken<T> typeToken) {
-        return new DocumentAttributeConverter(tableSchema, typeToken);
+    public static <T> DocumentAttributeConverter<T> create(TableSchema<T> tableSchema,
+                                                           EnhancedType<T> enhancedType) {
+        return new DocumentAttributeConverter<>(tableSchema, enhancedType);
     }
 
     @Override
     public AttributeValue transformFrom(T input) {
-        return AttributeValue.builder().m(tableSchema.itemToMap(input, false)).build();
+        return AttributeValue.builder().m(tableSchema.itemToMap(input, ignoreNulls)).build();
     }
 
     @Override
     public T transformTo(AttributeValue input) {
-        return tableSchema.mapToItem(input.m());
+        return tableSchema.mapToItem(input.m(), preserveEmptyObject);
     }
 
     @Override
@@ -58,7 +68,7 @@ public class DocumentAttributeConverter<T> implements AttributeConverter<T> {
     }
 
     @Override
-    public TypeToken<T> type() {
-        return typeToken;
+    public EnhancedType<T> type() {
+        return enhancedType;
     }
 }

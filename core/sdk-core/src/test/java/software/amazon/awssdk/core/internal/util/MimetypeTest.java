@@ -16,15 +16,18 @@
 package software.amazon.awssdk.core.internal.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
+import java.nio.file.Path;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 public class MimetypeTest {
 
     private static Mimetype mimetype;
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         mimetype = Mimetype.getInstance();
     }
@@ -47,5 +50,12 @@ public class MimetypeTest {
     @Test
     public void noExtensions_defaulttoBeStream() throws Exception {
         assertThat(mimetype.getMimetype("test")).isEqualTo(Mimetype.MIMETYPE_OCTET_STREAM);
+    }
+
+    @Test
+    public void pathWithoutFileName_defaulttoBeStream() throws Exception {
+        Path mockPath = mock(Path.class);
+        when(mockPath.getFileName()).thenReturn(null);
+        assertThat(mimetype.getMimetype(mockPath)).isEqualTo(Mimetype.MIMETYPE_OCTET_STREAM);
     }
 }

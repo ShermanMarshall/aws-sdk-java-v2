@@ -45,6 +45,14 @@ public final class NonRetryableException extends SdkClientException {
         return new BuilderImpl();
     }
 
+    public static NonRetryableException create(String message) {
+        return builder().message(message).build();
+    }
+
+    public static NonRetryableException create(String message, Throwable cause) {
+        return builder().message(message).cause(cause).build();
+    }
+
     public interface Builder extends SdkClientException.Builder {
         @Override
         Builder message(String message);
@@ -53,12 +61,16 @@ public final class NonRetryableException extends SdkClientException {
         Builder cause(Throwable cause);
 
         @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
+
+        @Override
         NonRetryableException build();
     }
 
     protected static final class BuilderImpl extends SdkClientException.BuilderImpl implements Builder {
 
-        protected BuilderImpl() {}
+        protected BuilderImpl() {
+        }
 
         protected BuilderImpl(NonRetryableException ex) {
             super(ex);
@@ -83,6 +95,12 @@ public final class NonRetryableException extends SdkClientException {
         @Override
         public Builder cause(Throwable cause) {
             this.cause = cause;
+            return this;
+        }
+
+        @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
             return this;
         }
 

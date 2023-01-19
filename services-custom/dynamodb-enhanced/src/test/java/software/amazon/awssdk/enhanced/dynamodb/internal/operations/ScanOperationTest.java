@@ -22,7 +22,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +30,7 @@ import static software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.Fa
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.stringValue;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,12 +44,15 @@ import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.core.async.SdkPublisher;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbExtensionContext;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.ReadModification;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithIndices;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithSort;
+import software.amazon.awssdk.enhanced.dynamodb.internal.extensions.DefaultDynamoDbExtensionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.ScanEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -64,9 +67,9 @@ import software.amazon.awssdk.services.dynamodb.paginators.ScanPublisher;
 public class ScanOperationTest {
     private static final String TABLE_NAME = "table-name";
     private static final OperationContext PRIMARY_CONTEXT =
-        OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+        DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
     private static final OperationContext GSI_1_CONTEXT =
-        OperationContext.create(TABLE_NAME, "gsi_1");
+        DefaultOperationContext.create(TABLE_NAME, "gsi_1");
 
     private final ScanOperation<FakeItem> scanOperation = ScanOperation.create(ScanEnhancedRequest.builder().build());
 
@@ -139,6 +142,21 @@ public class ScanOperationTest {
     }
 
     @Test
+    public void generateRequest_segment_totalSegments() {
+        ScanOperation<FakeItem> operation = ScanOperation.create(ScanEnhancedRequest.builder().segment(0).totalSegments(5).build());
+        ScanRequest request = operation.generateRequest(FakeItem.getTableSchema(),
+            PRIMARY_CONTEXT,
+            null);
+
+        ScanRequest expectedRequest = ScanRequest.builder()
+            .tableName(TABLE_NAME)
+            .segment(0)
+            .totalSegments(5)
+            .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
     public void generateRequest_filterCondition_expressionAndValues() {
         Map<String, AttributeValue> expressionValues = singletonMap(":test-key", stringValue("test-value"));
         Expression filterExpression =
@@ -184,6 +202,30 @@ public class ScanOperationTest {
                                                  .tableName(TABLE_NAME)
                                                  .consistentRead(true)
                                                  .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
+    public void generateRequest_projectionExpression() {
+        ScanOperation<FakeItem> operation = ScanOperation.create(
+                ScanEnhancedRequest.builder()
+                        .attributesToProject("id")
+                        .addAttributeToProject("version")
+                        .build()
+        );
+        ScanRequest request = operation.generateRequest(FakeItem.getTableSchema(),
+                PRIMARY_CONTEXT,
+                null);
+
+        Map<String, String> expectedExpressionAttributeNames = new HashMap<>();
+        expectedExpressionAttributeNames.put("#AMZN_MAPPED_id", "id");
+        expectedExpressionAttributeNames.put("#AMZN_MAPPED_version", "version");
+
+        ScanRequest expectedRequest = ScanRequest.builder()
+                .tableName(TABLE_NAME)
+                .projectionExpression("#AMZN_MAPPED_id,#AMZN_MAPPED_version")
+                .expressionAttributeNames(expectedExpressionAttributeNames)
+                .build();
         assertThat(request, is(expectedRequest));
     }
 
@@ -268,7 +310,7 @@ public class ScanOperationTest {
                   .map(attributeMap -> ReadModification.builder().transformedItem(attributeMap).build())
                   .collect(Collectors.toList())
                   .toArray(new ReadModification[]{});
-        when(mockDynamoDbEnhancedClientExtension.afterRead(anyMap(), any(), any()))
+        when(mockDynamoDbEnhancedClientExtension.afterRead(any(DynamoDbExtensionContext.AfterRead.class)))
             .thenReturn(readModifications[0], Arrays.copyOfRange(readModifications, 1, readModifications.length));
 
         ScanResponse scanResponse = generateFakeScanResults(scanResultMaps);
@@ -282,9 +324,12 @@ public class ScanOperationTest {
 
         InOrder inOrder = Mockito.inOrder(mockDynamoDbEnhancedClientExtension);
         scanResultMaps.forEach(
-            attributeMap -> inOrder.verify(mockDynamoDbEnhancedClientExtension).afterRead(attributeMap,
-                                                                                          PRIMARY_CONTEXT,
-                                                                                          FakeItem.getTableMetadata()));
+            attributeMap -> inOrder.verify(mockDynamoDbEnhancedClientExtension).afterRead(
+                DefaultDynamoDbExtensionContext.builder()
+                                               .tableMetadata(FakeItem.getTableMetadata())
+                                               .operationContext(PRIMARY_CONTEXT)
+                                               .tableSchema(FakeItem.getTableSchema())
+                                               .items(attributeMap).build()));
     }
 
     private static ScanResponse generateFakeScanResults(List<Map<String, AttributeValue>> scanItemMapsPage) {

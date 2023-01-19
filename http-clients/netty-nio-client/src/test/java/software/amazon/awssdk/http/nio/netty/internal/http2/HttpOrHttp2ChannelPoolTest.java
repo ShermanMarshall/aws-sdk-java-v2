@@ -16,11 +16,13 @@
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.http.SdkHttpConfigurationOption.CONNECTION_ACQUIRE_TIMEOUT;
 import static software.amazon.awssdk.http.SdkHttpConfigurationOption.MAX_PENDING_CONNECTION_ACQUIRES;
+import static software.amazon.awssdk.http.SdkHttpConfigurationOption.REAP_IDLE_CONNECTIONS;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.PROTOCOL_FUTURE;
 
 import io.netty.channel.Channel;
@@ -38,10 +40,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
+import software.amazon.awssdk.http.HttpMetric;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.MockChannel;
 import software.amazon.awssdk.http.nio.netty.internal.NettyConfiguration;
+import software.amazon.awssdk.metrics.MetricCollection;
+import software.amazon.awssdk.metrics.MetricCollector;
 import software.amazon.awssdk.utils.AttributeMap;
 
 /**
@@ -74,6 +79,7 @@ public class HttpOrHttp2ChannelPoolTest {
                                                             new NettyConfiguration(AttributeMap.builder()
                                                                     .put(CONNECTION_ACQUIRE_TIMEOUT, Duration.ofSeconds(1))
                                                                     .put(MAX_PENDING_CONNECTION_ACQUIRES, 5)
+                                                                    .put(REAP_IDLE_CONNECTIONS, false)
                                                                     .build()));
     }
 
@@ -201,5 +207,95 @@ public class HttpOrHttp2ChannelPoolTest {
         } finally {
             channel.close();
         }
+    }
+
+    @Test(timeout = 5_000)
+    public void incompleteProtocolFutureDelaysMetricsDelegationAndForwardsFailures() throws InterruptedException {
+        Promise<Channel> acquirePromise = eventLoopGroup.next().newPromise();
+        when(mockDelegatePool.acquire()).thenReturn(acquirePromise);
+
+        // startConnection
+        httpOrHttp2ChannelPool.acquire();
+
+        // query for metrics before the config can complete (we haven't completed acquirePromise yet)
+        CompletableFuture<Void> metrics = httpOrHttp2ChannelPool.collectChannelPoolMetrics(MetricCollector.create("test"));
+
+        Thread.sleep(500);
+
+        assertThat(metrics.isDone()).isFalse();
+        acquirePromise.setFailure(new RuntimeException("Some failure"));
+
+        Thread.sleep(500);
+
+        assertThat(metrics.isCompletedExceptionally()).isTrue();
+    }
+
+    @Test(timeout = 5_000)
+    public void incompleteProtocolFutureDelaysMetricsDelegationAndForwardsSuccessForHttp1() throws Exception {
+        incompleteProtocolFutureDelaysMetricsDelegationAndForwardsSuccessForProtocol(Protocol.HTTP1_1);
+    }
+
+    @Test(timeout = 5_000)
+    public void incompleteProtocolFutureDelaysMetricsDelegationAndForwardsSuccessForHttp2() throws Exception {
+        incompleteProtocolFutureDelaysMetricsDelegationAndForwardsSuccessForProtocol(Protocol.HTTP2);
+    }
+
+    public void incompleteProtocolFutureDelaysMetricsDelegationAndForwardsSuccessForProtocol(Protocol protocol) throws Exception {
+        Promise<Channel> acquirePromise = eventLoopGroup.next().newPromise();
+        Promise<Void> releasePromise = eventLoopGroup.next().newPromise();
+        when(mockDelegatePool.acquire()).thenReturn(acquirePromise);
+        when(mockDelegatePool.release(any(Channel.class))).thenReturn(releasePromise);
+
+        // startConnection
+        httpOrHttp2ChannelPool.acquire();
+
+        // query for metrics before the config can complete (we haven't completed acquirePromise yet)
+        MetricCollector metricCollector = MetricCollector.create("foo");
+        CompletableFuture<Void> metricsFuture = httpOrHttp2ChannelPool.collectChannelPoolMetrics(metricCollector);
+
+        Thread.sleep(500);
+
+        assertThat(metricsFuture.isDone()).isFalse();
+
+        Channel channel = new MockChannel();
+        eventLoopGroup.register(channel);
+        channel.attr(PROTOCOL_FUTURE).set(CompletableFuture.completedFuture(protocol));
+        acquirePromise.setSuccess(channel);
+        releasePromise.setSuccess(null);
+
+        metricsFuture.join();
+        MetricCollection metrics = metricCollector.collect();
+
+        assertThat(metrics.metricValues(HttpMetric.PENDING_CONCURRENCY_ACQUIRES).get(0)).isEqualTo(0);
+        assertThat(metrics.metricValues(HttpMetric.MAX_CONCURRENCY).get(0)).isEqualTo(4);
+        assertThat(metrics.metricValues(HttpMetric.AVAILABLE_CONCURRENCY).get(0)).isBetween(0, 1);
+        assertThat(metrics.metricValues(HttpMetric.LEASED_CONCURRENCY).get(0)).isBetween(0, 1);
+    }
+
+    @Test(timeout = 5_000)
+    public void protocolFutureAwaitsReleaseFuture() throws Exception {
+        Promise<Channel> delegateAcquirePromise = eventLoopGroup.next().newPromise();
+        Promise<Void> releasePromise = eventLoopGroup.next().newPromise();
+        when(mockDelegatePool.acquire()).thenReturn(delegateAcquirePromise);
+        when(mockDelegatePool.release(any(Channel.class))).thenReturn(releasePromise);
+
+        MockChannel channel = new MockChannel();
+        eventLoopGroup.register(channel);
+        channel.attr(PROTOCOL_FUTURE).set(CompletableFuture.completedFuture(Protocol.HTTP1_1));
+
+        // Acquire a new connection and save the returned future
+        Future<Channel> acquireFuture = httpOrHttp2ChannelPool.acquire();
+        
+        // Return a successful connection from the delegate pool
+        delegateAcquirePromise.setSuccess(channel);
+
+        // The returned future should not complete until the release completes
+        assertThat(acquireFuture.isDone()).isFalse();
+        
+        // Complete the release
+        releasePromise.setSuccess(null);
+        
+        // Assert the returned future completes (within the test timeout)
+        acquireFuture.await();
     }
 }

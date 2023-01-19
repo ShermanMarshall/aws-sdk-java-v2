@@ -15,6 +15,11 @@
 
 package software.amazon.awssdk.codegen.docs;
 
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_CLIENT_SOURCE_PATH_PARAM_NAME;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_STREAMING_INPUT_PARAM;
+import static software.amazon.awssdk.codegen.internal.Constant.SYNC_STREAMING_OUTPUT_PARAM;
+
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.utils.PaginatorUtils;
@@ -73,11 +78,11 @@ class SyncOperationDocProvider extends OperationDocProvider {
     protected void applyParams(DocumentationBuilder docBuilder) {
         emitRequestParm(docBuilder);
         if (opModel.hasStreamingInput()) {
-            docBuilder.param("requestBody", REQUEST_BODY_DOCS + getStreamingInputDocs());
+            docBuilder.param(SYNC_STREAMING_INPUT_PARAM, REQUEST_BODY_DOCS + getStreamingInputDocs());
 
         }
         if (opModel.hasStreamingOutput()) {
-            docBuilder.param("responseTransformer", STREAM_RESPONSE_HANDLER_DOCS + getStreamingOutputDocs(),
+            docBuilder.param(SYNC_STREAMING_OUTPUT_PARAM, STREAM_RESPONSE_HANDLER_DOCS + getStreamingOutputDocs(),
                              opModel.getOutputShape().getShapeName(), getStreamingOutputDocs());
         }
     }
@@ -101,12 +106,12 @@ class SyncOperationDocProvider extends OperationDocProvider {
         protected void applyParams(DocumentationBuilder docBuilder) {
             emitRequestParm(docBuilder);
             if (opModel.hasStreamingInput()) {
-                docBuilder.param("sourcePath", SIMPLE_FILE_INPUT_DOCS + getStreamingInputDocs())
+                docBuilder.param(SYNC_CLIENT_SOURCE_PATH_PARAM_NAME, SIMPLE_FILE_INPUT_DOCS + getStreamingInputDocs())
                           // Link to non-simple method for discoverability
                           .see("#%s(%s, RequestBody)", opModel.getMethodName(), opModel.getInput().getVariableType());
             }
             if (opModel.hasStreamingOutput()) {
-                docBuilder.param("destinationPath", SIMPLE_FILE_OUTPUT_DOCS + getStreamingOutputDocs())
+                docBuilder.param(SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME, SIMPLE_FILE_OUTPUT_DOCS + getStreamingOutputDocs())
                           // Link to non-simple method for discoverability
                           .see("#%s(%s, ResponseTransformer)", opModel.getMethodName(),
                                opModel.getInput().getVariableType());

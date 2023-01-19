@@ -15,6 +15,8 @@
 
 package software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans;
 
+import java.util.List;
+import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 
@@ -23,6 +25,11 @@ public class DocumentBean {
     private String id;
     private String attribute1;
     private AbstractBean abstractBean;
+    private AbstractImmutable abstractImmutable;
+    private List<AbstractBean> abstractBeanList;
+    private List<AbstractImmutable> abstractImmutableList;
+    private Map<String, AbstractBean> abstractBeanMap;
+    private Map<String, AbstractImmutable> abstractImmutableMap;
 
     @DynamoDbPartitionKey
     public String getId() {
@@ -44,5 +51,40 @@ public class DocumentBean {
     }
     public void setAbstractBean(AbstractBean abstractBean) {
         this.abstractBean = abstractBean;
+    }
+
+    public List<AbstractBean> getAbstractBeanList() {
+        return abstractBeanList;
+    }
+    public void setAbstractBeanList(List<AbstractBean> abstractBeanList) {
+        this.abstractBeanList = abstractBeanList;
+    }
+
+    public Map<String, AbstractBean> getAbstractBeanMap() {
+        return abstractBeanMap;
+    }
+    public void setAbstractBeanMap(Map<String, AbstractBean> abstractBeanMap) {
+        this.abstractBeanMap = abstractBeanMap;
+    }
+
+    public AbstractImmutable getAbstractImmutable() {
+        return abstractImmutable;
+    }
+    public void setAbstractImmutable(AbstractImmutable abstractImmutable) {
+        this.abstractImmutable = abstractImmutable;
+    }
+
+    public List<AbstractImmutable> getAbstractImmutableList() {
+        return abstractImmutableList;
+    }
+    public void setAbstractImmutableList(List<AbstractImmutable> abstractImmutableList) {
+        this.abstractImmutableList = abstractImmutableList;
+    }
+
+    public Map<String, AbstractImmutable> getAbstractImmutableMap() {
+        return abstractImmutableMap;
+    }
+    public void setAbstractImmutableMap(Map<String, AbstractImmutable> abstractImmutableMap) {
+        this.abstractImmutableMap = abstractImmutableMap;
     }
 }

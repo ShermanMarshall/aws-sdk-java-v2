@@ -21,15 +21,12 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.ChannelPoolHandler;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -39,18 +36,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.TrustManagerFactory;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.ProxyConfiguration;
 import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.http.nio.netty.internal.http2.HttpOrHttp2ChannelPool;
-import software.amazon.awssdk.utils.Logger;
-import software.amazon.awssdk.utils.Validate;
+import software.amazon.awssdk.http.nio.netty.internal.utils.NettyClientLogger;
 
 /**
  * Implementation of {@link SdkChannelPoolMap} that awaits channel pools to be closed upon closing.
@@ -58,7 +50,7 @@ import software.amazon.awssdk.utils.Validate;
 @SdkInternalApi
 public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, SimpleChannelPoolAwareChannelPool> {
 
-    private static final Logger log = Logger.loggerFor(AwaitCloseChannelPoolMap.class);
+    private static final NettyClientLogger log = NettyClientLogger.getLogger(AwaitCloseChannelPoolMap.class);
 
     private static final ChannelPoolHandler NOOP_HANDLER = new ChannelPoolHandler() {
         @Override
@@ -90,6 +82,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
     private final SslProvider sslProvider;
     private final ProxyConfiguration proxyConfiguration;
     private final BootstrapProvider bootstrapProvider;
+    private final SslContextProvider sslContextProvider;
 
     private AwaitCloseChannelPoolMap(Builder builder, Function<Builder, BootstrapProvider> createBootStrapProvider) {
         this.configuration = builder.configuration;
@@ -100,6 +93,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
         this.sslProvider = builder.sslProvider;
         this.proxyConfiguration = builder.proxyConfiguration;
         this.bootstrapProvider = createBootStrapProvider.apply(builder);
+        this.sslContextProvider = new SslContextProvider(configuration, protocol, sslProvider);
     }
 
     private AwaitCloseChannelPoolMap(Builder builder) {
@@ -123,14 +117,15 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
 
     @Override
     protected SimpleChannelPoolAwareChannelPool newPool(URI key) {
-        SslContext sslContext = sslContext(key);
-        
+        SslContext sslContext = needSslContext(key) ? sslContextProvider.sslContext() : null;
+
         Bootstrap bootstrap = createBootstrap(key);
 
         AtomicReference<ChannelPool> channelPoolRef = new AtomicReference<>();
 
         ChannelPipelineInitializer pipelineInitializer = new ChannelPipelineInitializer(protocol,
                                                                                         sslContext,
+                                                                                        sslProvider,
                                                                                         maxStreams,
                                                                                         initialWindowSize,
                                                                                         healthCheckPingPeriod,
@@ -142,14 +137,15 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
         ChannelPool baseChannelPool;
         if (shouldUseProxyForHost(key)) {
             tcpChannelPool = new BetterSimpleChannelPool(bootstrap, NOOP_HANDLER);
-            baseChannelPool = new Http1TunnelConnectionPool(bootstrap.config().group().next(), tcpChannelPool,
-                                                            sslContext, proxyAddress(key), key, pipelineInitializer);
+            baseChannelPool = new Http1TunnelConnectionPool(bootstrap.config().group().next(), tcpChannelPool, sslContext,
+                                            proxyAddress(key), proxyConfiguration.username(), proxyConfiguration.password(),
+                                            key, pipelineInitializer, configuration);
         } else {
             tcpChannelPool = new BetterSimpleChannelPool(bootstrap, pipelineInitializer);
             baseChannelPool = tcpChannelPool;
         }
 
-        ChannelPool wrappedPool = wrapBaseChannelPool(bootstrap, baseChannelPool);
+        SdkChannelPool wrappedPool = wrapBaseChannelPool(bootstrap, baseChannelPool);
 
         channelPoolRef.set(wrappedPool);
         return new SimpleChannelPoolAwareChannelPool(wrappedPool, tcpChannelPool);
@@ -157,7 +153,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
 
     @Override
     public void close() {
-        log.trace(() -> "Closing channel pools");
+        log.trace(null, () -> "Closing channel pools");
         // If there is a new pool being added while we are iterating the pools, there might be a
         // race condition between the close call of the newly acquired pool and eventLoopGroup.shutdown and it
         // could cause the eventLoopGroup#shutdownGracefully to hang before it times out.
@@ -230,82 +226,45 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
         }
     }
 
-    private ChannelPool wrapBaseChannelPool(Bootstrap bootstrap, ChannelPool channelPool) {
+    private SdkChannelPool wrapBaseChannelPool(Bootstrap bootstrap, ChannelPool channelPool) {
 
         // Wrap the channel pool such that the ChannelAttributeKey.CLOSE_ON_RELEASE flag is honored.
         channelPool = new HonorCloseOnReleaseChannelPool(channelPool);
 
         // Wrap the channel pool such that HTTP 2 channels won't be released to the underlying pool while they're still in use.
-        channelPool = new HttpOrHttp2ChannelPool(channelPool,
-                                                 bootstrap.config().group(),
-                                                 configuration.maxConnections(),
-                                                 configuration);
+        SdkChannelPool sdkChannelPool = new HttpOrHttp2ChannelPool(channelPool,
+                                                                   bootstrap.config().group(),
+                                                                   configuration.maxConnections(),
+                                                                   configuration);
 
+        sdkChannelPool = new ListenerInvokingChannelPool(bootstrap.config().group(), sdkChannelPool, Arrays.asList(
+            // Add a listener that ensures acquired channels are marked IN_USE and thus not eligible for certain idle timeouts.
+            InUseTrackingChannelPoolListener.create(),
 
-        // Wrap the channel pool such that we remove request-specific handlers with each request.
-        channelPool = new HandlerRemovingChannelPool(channelPool);
+            // Add a listener that removes request-specific handlers with each request.
+            HandlerRemovingChannelPoolListener.create()
+        ));
 
         // Wrap the channel pool such that an individual channel can only be released to the underlying pool once.
-        channelPool = new ReleaseOnceChannelPool(channelPool);
+        sdkChannelPool = new ReleaseOnceChannelPool(sdkChannelPool);
 
         // Wrap the channel pool to guarantee all channels checked out are healthy, and all unhealthy channels checked in are
         // closed.
-        channelPool = new HealthCheckedChannelPool(bootstrap.config().group(), configuration, channelPool);
+        sdkChannelPool = new HealthCheckedChannelPool(bootstrap.config().group(), configuration, sdkChannelPool);
 
         // Wrap the channel pool such that if the Promise given to acquire(Promise) is done when the channel is acquired
         // from the underlying pool, the channel is closed and released.
-        channelPool = new CancellableAcquireChannelPool(bootstrap.config().group().next(), channelPool);
+        sdkChannelPool = new CancellableAcquireChannelPool(bootstrap.config().group().next(), sdkChannelPool);
 
-        return channelPool;
+        return sdkChannelPool;
     }
 
-    private SslContext sslContext(URI targetAddress) {
+    private boolean needSslContext(URI targetAddress) {
         URI proxyAddress = proxyAddress(targetAddress);
-
         boolean needContext = targetAddress.getScheme().equalsIgnoreCase("https")
-                || proxyAddress != null && proxyAddress.getScheme().equalsIgnoreCase("https");
+                              || proxyAddress != null && proxyAddress.getScheme().equalsIgnoreCase("https");
 
-        if (!needContext) {
-            return null;
-        }
-
-        try {
-            return SslContextBuilder.forClient()
-                                    .sslProvider(sslProvider)
-                                    .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
-                                    .trustManager(getTrustManager())
-                                    .keyManager(getKeyManager())
-                                    .build();
-        } catch (SSLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private TrustManagerFactory getTrustManager() {
-        Validate.isTrue(configuration.tlsTrustManagersProvider() == null || !configuration.trustAllCertificates(),
-                        "A TlsTrustManagerProvider can't be provided if TrustAllCertificates is also set");
-
-        if (configuration.tlsTrustManagersProvider() != null) {
-            return StaticTrustManagerFactory.create(configuration.tlsTrustManagersProvider().trustManagers());
-        }
-
-        if (configuration.trustAllCertificates()) {
-            log.warn(() -> "SSL Certificate verification is disabled. This is not a safe setting and should only be "
-                           + "used for testing.");
-            return InsecureTrustManagerFactory.INSTANCE;
-        }
-
-        return null;
-    }
-
-    private KeyManagerFactory getKeyManager() {
-        if (configuration.tlsKeyManagersProvider() != null) {
-            KeyManager[] keyManagers = configuration.tlsKeyManagersProvider().keyManagers();
-            if (keyManagers != null) {
-                return StaticKeyManagerFactory.create(keyManagers);
-            }
-        }
-        return null;
+        return needContext;
     }
 
     public static class Builder {

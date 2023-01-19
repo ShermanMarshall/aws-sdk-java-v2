@@ -15,13 +15,13 @@
 
 package software.amazon.awssdk.enhanced.dynamodb.internal.operations;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -35,23 +35,30 @@ import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbExtensionContext;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.ReadModification;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemComposedClass;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithSort;
+import software.amazon.awssdk.enhanced.dynamodb.internal.extensions.DefaultDynamoDbExtensionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.DeleteItemEnhancedRequest;
+import software.amazon.awssdk.enhanced.dynamodb.model.TransactDeleteItemEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemResponse;
+import software.amazon.awssdk.services.dynamodb.model.ReturnConsumedCapacity;
+import software.amazon.awssdk.services.dynamodb.model.ReturnItemCollectionMetrics;
 import software.amazon.awssdk.services.dynamodb.model.ReturnValue;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 
@@ -59,10 +66,11 @@ import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 public class DeleteItemOperationTest {
     private static final String TABLE_NAME = "table-name";
     private static final OperationContext PRIMARY_CONTEXT =
-        OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+        DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
     private static final OperationContext GSI_1_CONTEXT =
-        OperationContext.create(TABLE_NAME, "gsi_1");
+        DefaultOperationContext.create(TABLE_NAME, "gsi_1");
     private static final Expression CONDITION_EXPRESSION;
+    private static final Expression MINIMAL_CONDITION_EXPRESSION = Expression.builder().expression("foo = bar").build();
 
     static {
         Map<String, String> expressionNames = new HashMap<>();
@@ -100,10 +108,16 @@ public class DeleteItemOperationTest {
     }
 
     @Test
-    public void generateRequest_partitionKeyOnly() {
+    public void generateRequest_withReturnConsumedCapacity_unknownValue_generatesCorrectRequest() {
         FakeItem keyItem = createUniqueFakeItem();
+
+        String returnConsumedCapacity = UUID.randomUUID().toString();
+
         DeleteItemOperation<FakeItem> deleteItemOperation =
-            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder().key(k -> k.partitionValue(keyItem.getId())).build());
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
+                                                                .key(k -> k.partitionValue(keyItem.getId()))
+                                                                .returnConsumedCapacity(returnConsumedCapacity)
+                                                                .build());
 
         DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
                                                                         PRIMARY_CONTEXT,
@@ -112,10 +126,92 @@ public class DeleteItemOperationTest {
         Map<String, AttributeValue> expectedKeyMap = new HashMap<>();
         expectedKeyMap.put("id", AttributeValue.builder().s(keyItem.getId()).build());
         DeleteItemRequest expectedRequest = DeleteItemRequest.builder()
-            .tableName(TABLE_NAME)
-            .key(expectedKeyMap)
-            .returnValues(ReturnValue.ALL_OLD)
-            .build();
+                                                             .tableName(TABLE_NAME)
+                                                             .key(expectedKeyMap)
+                                                             .returnValues(ReturnValue.ALL_OLD)
+                                                             .returnConsumedCapacity(returnConsumedCapacity)
+                                                             .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
+    public void generateRequest_withReturnConsumedCapacity_knownValue_generatesCorrectRequest() {
+        FakeItem keyItem = createUniqueFakeItem();
+
+        ReturnConsumedCapacity returnConsumedCapacity = ReturnConsumedCapacity.TOTAL;
+
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
+                                                                .key(k -> k.partitionValue(keyItem.getId()))
+                                                                .returnConsumedCapacity(returnConsumedCapacity)
+                                                                .build());
+
+        DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
+                                                                        PRIMARY_CONTEXT,
+                                                                        null);
+
+        Map<String, AttributeValue> expectedKeyMap = new HashMap<>();
+        expectedKeyMap.put("id", AttributeValue.builder().s(keyItem.getId()).build());
+        DeleteItemRequest expectedRequest = DeleteItemRequest.builder()
+                                                             .tableName(TABLE_NAME)
+                                                             .key(expectedKeyMap)
+                                                             .returnValues(ReturnValue.ALL_OLD)
+                                                             .returnConsumedCapacity(returnConsumedCapacity)
+                                                             .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
+    public void generateRequest_withReturnItemCollectionMetrics_unknownValue_generatesCorrectRequest() {
+        FakeItem keyItem = createUniqueFakeItem();
+
+        String returnItemCollectionMetrics = UUID.randomUUID().toString();
+
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
+                                                                .key(k -> k.partitionValue(keyItem.getId()))
+                                                                .returnItemCollectionMetrics(returnItemCollectionMetrics)
+                                                                .build());
+
+        DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
+                                                                        PRIMARY_CONTEXT,
+                                                                        null);
+
+        Map<String, AttributeValue> expectedKeyMap = new HashMap<>();
+        expectedKeyMap.put("id", AttributeValue.builder().s(keyItem.getId()).build());
+        DeleteItemRequest expectedRequest = DeleteItemRequest.builder()
+                                                             .tableName(TABLE_NAME)
+                                                             .key(expectedKeyMap)
+                                                             .returnValues(ReturnValue.ALL_OLD)
+                                                             .returnItemCollectionMetrics(returnItemCollectionMetrics)
+                                                             .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
+    public void generateRequest_withReturnItemCollectionMetrics_knownValue_generatesCorrectRequest() {
+        FakeItem keyItem = createUniqueFakeItem();
+
+        ReturnItemCollectionMetrics returnItemCollectionMetrics = ReturnItemCollectionMetrics.SIZE;
+
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
+                                                                .key(k -> k.partitionValue(keyItem.getId()))
+                                                                .returnItemCollectionMetrics(returnItemCollectionMetrics)
+                                                                .build());
+
+        DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
+                                                                        PRIMARY_CONTEXT,
+                                                                        null);
+
+        Map<String, AttributeValue> expectedKeyMap = new HashMap<>();
+        expectedKeyMap.put("id", AttributeValue.builder().s(keyItem.getId()).build());
+        DeleteItemRequest expectedRequest = DeleteItemRequest.builder()
+                                                             .tableName(TABLE_NAME)
+                                                             .key(expectedKeyMap)
+                                                             .returnValues(ReturnValue.ALL_OLD)
+                                                             .returnItemCollectionMetrics(returnItemCollectionMetrics)
+                                                             .build();
         assertThat(request, is(expectedRequest));
     }
 
@@ -160,6 +256,24 @@ public class DeleteItemOperationTest {
         assertThat(request.expressionAttributeValues(), is(CONDITION_EXPRESSION.expressionValues()));
     }
 
+    @Test
+    public void generateRequest_withMinimalConditionExpression() {
+        FakeItem keyItem = createUniqueFakeItem();
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
+                                                                .key(k -> k.partitionValue(keyItem.getId()))
+                                                                .conditionExpression(MINIMAL_CONDITION_EXPRESSION)
+                                                                .build());
+
+        DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
+                                                                        PRIMARY_CONTEXT,
+                                                                        null);
+
+        assertThat(request.conditionExpression(), is(MINIMAL_CONDITION_EXPRESSION.expression()));
+        assertThat(request.expressionAttributeNames(), is(emptyMap()));
+        assertThat(request.expressionAttributeValues(), is(emptyMap()));
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void generateRequest_noPartitionKey_throwsIllegalArgumentException() {
         DeleteItemOperation<FakeItemComposedClass> deleteItemOperation =
@@ -177,6 +291,26 @@ public class DeleteItemOperationTest {
     }
 
     @Test
+    public void generateRequest_partitionKeyOnly() {
+        FakeItem keyItem = createUniqueFakeItem();
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            DeleteItemOperation.create(DeleteItemEnhancedRequest.builder().key(k -> k.partitionValue(keyItem.getId())).build());
+
+        DeleteItemRequest request = deleteItemOperation.generateRequest(FakeItem.getTableSchema(),
+                                                                        PRIMARY_CONTEXT,
+                                                                        null);
+
+        Map<String, AttributeValue> expectedKeyMap = new HashMap<>();
+        expectedKeyMap.put("id", AttributeValue.builder().s(keyItem.getId()).build());
+        DeleteItemRequest expectedRequest = DeleteItemRequest.builder()
+                                                             .tableName(TABLE_NAME)
+                                                             .key(expectedKeyMap)
+                                                             .returnValues(ReturnValue.ALL_OLD)
+                                                             .build();
+        assertThat(request, is(expectedRequest));
+    }
+
+    @Test
     public void transformResponse_correctlyTransformsIntoAnItem() {
         FakeItem keyItem = createUniqueFakeItem();
         DeleteItemOperation<FakeItem> deleteItemOperation =
@@ -191,7 +325,8 @@ public class DeleteItemOperationTest {
         FakeItem result = deleteItemOperation.transformResponse(response,
                                                                 FakeItem.getTableSchema(),
                                                                 PRIMARY_CONTEXT,
-                                                                null);
+                                                                null)
+                                             .attributes();
 
         assertThat(result.getId(), is(keyItem.getId()));
         assertThat(result.getSubclassAttribute(), is("test-value"));
@@ -208,7 +343,8 @@ public class DeleteItemOperationTest {
         FakeItem result = deleteItemOperation.transformResponse(response,
                                                                 FakeItem.getTableSchema(),
                                                                 PRIMARY_CONTEXT,
-                                                                null);
+                                                                null)
+                                             .attributes();
 
         assertThat(result, is(nullValue()));
     }
@@ -228,7 +364,7 @@ public class DeleteItemOperationTest {
                                                                         mockDynamoDbEnhancedClientExtension);
 
         assertThat(request.key(), is(keyMap));
-        verify(mockDynamoDbEnhancedClientExtension, never()).beforeWrite(anyMap(), any(), any());
+        verify(mockDynamoDbEnhancedClientExtension, never()).beforeWrite(any(DynamoDbExtensionContext.BeforeWrite.class));
     }
 
     @Test
@@ -245,16 +381,21 @@ public class DeleteItemOperationTest {
         DeleteItemResponse response = DeleteItemResponse.builder()
                                                         .attributes(baseFakeItemMap)
                                                         .build();
-        when(mockDynamoDbEnhancedClientExtension.afterRead(anyMap(), any(), any()))
+        when(mockDynamoDbEnhancedClientExtension.afterRead(any(DynamoDbExtensionContext.AfterRead.class)))
             .thenReturn(ReadModification.builder().transformedItem(fakeItemMap).build());
 
         FakeItem resultItem = deleteItemOperation.transformResponse(response,
                                                                     FakeItem.getTableSchema(),
                                                                     PRIMARY_CONTEXT,
-                                                                    mockDynamoDbEnhancedClientExtension);
+                                                                    mockDynamoDbEnhancedClientExtension)
+                                                 .attributes();
 
         assertThat(resultItem, is(fakeItem));
-        verify(mockDynamoDbEnhancedClientExtension).afterRead(baseFakeItemMap, PRIMARY_CONTEXT, FakeItem.getTableMetadata());
+        verify(mockDynamoDbEnhancedClientExtension).afterRead(DefaultDynamoDbExtensionContext.builder()
+                                                                                             .tableMetadata(FakeItem.getTableMetadata())
+                                                                                             .operationContext(PRIMARY_CONTEXT)
+                                                                                             .tableSchema(FakeItem.getTableSchema())
+                                                                                             .items(baseFakeItemMap).build());
     }
 
     @Test
@@ -265,7 +406,7 @@ public class DeleteItemOperationTest {
             spy(DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
                                                                     .key(k -> k.partitionValue(fakeItem.getId()))
                                                                     .build()));
-        OperationContext context = OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+        OperationContext context = DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
 
         DeleteItemRequest deleteItemRequest = DeleteItemRequest.builder()
                                                                .tableName(TABLE_NAME)
@@ -295,7 +436,7 @@ public class DeleteItemOperationTest {
             spy(DeleteItemOperation.create(DeleteItemEnhancedRequest.builder()
                                                                     .key(k -> k.partitionValue(fakeItem.getId()))
                                                                     .build()));
-        OperationContext context = OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+        OperationContext context = DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
 
         String conditionExpression = "condition-expression";
         Map<String, AttributeValue> attributeValues = Collections.singletonMap("key", stringValue("value1"));
@@ -321,6 +462,40 @@ public class DeleteItemOperationTest {
                                                                           .conditionExpression(conditionExpression)
                                                                           .expressionAttributeNames(attributeNames)
                                                                           .expressionAttributeValues(attributeValues)
+                                                                          .build())
+                                                            .build();
+        assertThat(actualResult, is(expectedResult));
+        verify(deleteItemOperation).generateRequest(FakeItem.getTableSchema(), context, mockDynamoDbEnhancedClientExtension);
+    }
+
+    @Test
+    public void generateTransactWriteItem_returnValuesOnConditionCheckFailure_generatesCorrectRequest() {
+        FakeItem fakeItem = createUniqueFakeItem();
+        Map<String, AttributeValue> fakeItemMap = FakeItem.getTableSchema().itemToMap(fakeItem, true);
+        String returnValues = "return-values";
+
+        DeleteItemOperation<FakeItem> deleteItemOperation =
+            spy(DeleteItemOperation.create(TransactDeleteItemEnhancedRequest.builder()
+                                                                            .key(k -> k.partitionValue(fakeItem.getId()))
+                                                                            .returnValuesOnConditionCheckFailure(returnValues)
+                                                                            .build()));
+        OperationContext context = DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+
+        DeleteItemRequest deleteItemRequest = DeleteItemRequest.builder()
+                                                               .tableName(TABLE_NAME)
+                                                               .key(fakeItemMap)
+                                                               .build();
+        doReturn(deleteItemRequest).when(deleteItemOperation).generateRequest(any(), any(), any());
+
+        TransactWriteItem actualResult = deleteItemOperation.generateTransactWriteItem(FakeItem.getTableSchema(),
+                                                                                       context,
+                                                                                       mockDynamoDbEnhancedClientExtension);
+
+        TransactWriteItem expectedResult = TransactWriteItem.builder()
+                                                            .delete(Delete.builder()
+                                                                          .key(fakeItemMap)
+                                                                          .tableName(TABLE_NAME)
+                                                                          .returnValuesOnConditionCheckFailure(returnValues)
                                                                           .build())
                                                             .build();
         assertThat(actualResult, is(expectedResult));

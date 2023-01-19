@@ -24,6 +24,7 @@ import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.util.Optional;
 import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.internal.http.AbstractFileStoreTlsKeyManagersProvider;
 import software.amazon.awssdk.utils.Logger;
@@ -37,6 +38,9 @@ import software.amazon.awssdk.utils.internal.SystemSettingUtils;
  * {@code javax.net.ssl.keyStorePassword}, and
  * {@code javax.net.ssl.keyStoreType} properties defined by the
  * <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/security/jsse/JSSERefGuide.html">JSSE</a>.
+ * <p>
+ * This uses {@link KeyManagerFactory#getDefaultAlgorithm()} to determine the
+ * {@code KeyManagerFactory} algorithm to use.
  */
 @SdkPublicApi
 public final class SystemPropertyTlsKeyManagersProvider extends AbstractFileStoreTlsKeyManagersProvider {
@@ -71,7 +75,7 @@ public final class SystemPropertyTlsKeyManagersProvider extends AbstractFileStor
 
     private static String getKeyStoreType() {
         return SystemSettingUtils.resolveSetting(SSL_KEY_STORE_TYPE)
-                .orElse(KeyStore.getDefaultType());
+                .orElseGet(KeyStore::getDefaultType);
     }
 
     private static Optional<String> getKeyStorePassword() {

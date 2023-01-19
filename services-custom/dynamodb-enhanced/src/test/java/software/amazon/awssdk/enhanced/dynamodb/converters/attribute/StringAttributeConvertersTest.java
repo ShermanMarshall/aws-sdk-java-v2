@@ -16,6 +16,9 @@
 package software.amazon.awssdk.enhanced.dynamodb.converters.attribute;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.assertFails;
+import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformFrom;
+import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformTo;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromBoolean;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromBytes;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromListOfAttributeValues;
@@ -25,9 +28,6 @@ import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attrib
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromSetOfNumbers;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromSetOfStrings;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.EnhancedAttributeValue.fromString;
-import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.assertFails;
-import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformFrom;
-import static software.amazon.awssdk.enhanced.dynamodb.converters.attribute.ConverterTestUtils.transformTo;
 
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -35,13 +35,17 @@ import java.net.URL;
 import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.CharSequenceAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.CharacterArrayAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.CharacterAttributeConverter;
+import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.LocaleAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.PeriodAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.SetAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.StringAttributeConverter;
@@ -52,7 +56,6 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.Url
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.UuidAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.ZoneIdAttributeConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.attribute.ZoneOffsetAttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
 import software.amazon.awssdk.utils.ImmutableMap;
 
 public class StringAttributeConvertersTest {
@@ -128,6 +131,7 @@ public class StringAttributeConvertersTest {
         String chars = "foo";
         String numChars = "42";
 
+        assertThat(transformFrom(converter, null)).isSameAs(AttributeValues.nullAttributeValue());
         assertThat(transformFrom(converter, chars).s()).isSameAs(chars);
         assertThat(transformFrom(converter, emptyChars).s()).isSameAs(emptyChars);
 
@@ -138,11 +142,11 @@ public class StringAttributeConvertersTest {
         assertThat(transformTo(converter, fromBytes(SdkBytes.fromUtf8String("foo")))).isEqualTo("Zm9v");
         assertThat(transformTo(converter, fromBoolean(true))).isEqualTo("true");
         assertThat(transformTo(converter, fromBoolean(false))).isEqualTo("false");
-        assertThat(transformTo(converter, fromMap(ImmutableMap.of("a", fromString("b"),
-                                                                  "c", fromBytes(SdkBytes.fromUtf8String("d"))))))
+        assertThat(transformTo(converter, fromMap(ImmutableMap.of("a", fromString("b").toAttributeValue(),
+                                                                  "c", fromBytes(SdkBytes.fromUtf8String("d")).toAttributeValue()))))
                 .isEqualTo("{a=b, c=ZA==}");
-        assertThat(transformTo(converter, fromListOfAttributeValues(fromString("a"),
-                                                                           fromBytes(SdkBytes.fromUtf8String("d")))))
+        assertThat(transformTo(converter, fromListOfAttributeValues(fromString("a").toAttributeValue(),
+                                                                    fromBytes(SdkBytes.fromUtf8String("d")).toAttributeValue())))
                 .isEqualTo("[a, ZA==]");
         assertThat(transformTo(converter, fromSetOfStrings("a", "b"))).isEqualTo("[a, b]");
         assertThat(transformTo(converter, fromSetOfBytes(SdkBytes.fromUtf8String("a"), SdkBytes.fromUtf8String("b"))))
@@ -175,6 +179,15 @@ public class StringAttributeConvertersTest {
         assertThat(transformTo(converter, fromString("foo")).toString()).isEqualTo("foo");
         assertThat(transformTo(converter, fromNumber("42")).toString()).isEqualTo("42");
     }
+
+    @Test
+    public void localeAttributeConverterBehaves() {
+        LocaleAttributeConverter converter = LocaleAttributeConverter.create();
+
+        assertThat(transformFrom(converter, Locale.US).s()).isEqualTo("en-US");
+
+        assertThat(transformTo(converter, fromString("en-US"))).isEqualTo(Locale.US);
+    }    
 
     @Test
     public void uriAttributeConverterBehaves() {

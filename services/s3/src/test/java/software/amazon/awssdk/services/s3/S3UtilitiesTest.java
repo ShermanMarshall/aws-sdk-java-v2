@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -130,6 +131,20 @@ public class S3UtilitiesTest {
     }
 
     @Test
+    public void test_EndpointOverrideOnClientWorks() {
+        S3Utilities customizeUtilities = S3Client.builder()
+                                                 .endpointOverride(URI.create("https://s3.custom.host"))
+                                                 .build()
+                                                 .utilities();
+        assertThat(customizeUtilities.getUrl(GetUrlRequest.builder()
+                                                          .bucket("foo-bucket")
+                                                          .key("key-without-spaces")
+                                                          .build())
+                                     .toExternalForm())
+            .isEqualTo("https://foo-bucket.s3.custom.host/key-without-spaces");
+    }
+
+    @Test
     public void testWithAccelerateAndDualStackEnabled() throws MalformedURLException {
         S3Utilities utilities = S3Client.builder()
                                         .credentialsProvider(dummyCreds())
@@ -141,6 +156,35 @@ public class S3UtilitiesTest {
         assertThat(utilities.getUrl(requestWithSpecialCharacters())
                             .toExternalForm())
             .isEqualTo("https://foo-bucket.s3-accelerate.dualstack.amazonaws.com/key%20with%40spaces");
+    }
+
+    @Test
+    public void testWithAccelerateAndDualStackViaClientEnabled() throws MalformedURLException {
+        S3Utilities utilities = S3Client.builder()
+                                        .credentialsProvider(dummyCreds())
+                                        .region(Region.US_WEST_2)
+                                        .serviceConfiguration(S3Configuration.builder()
+                                                                             .accelerateModeEnabled(true)
+                                                                             .build())
+                                        .dualstackEnabled(true)
+                                        .build()
+                                        .utilities();
+
+        assertThat(utilities.getUrl(requestWithSpecialCharacters())
+                            .toExternalForm())
+            .isEqualTo("https://foo-bucket.s3-accelerate.dualstack.amazonaws.com/key%20with%40spaces");
+    }
+
+    @Test
+    public void testWithDualStackViaUtilitiesBuilderEnabled() throws MalformedURLException {
+        S3Utilities utilities = S3Utilities.builder()
+                                           .region(Region.US_WEST_2)
+                                           .dualstackEnabled(true)
+                                           .build();
+
+        assertThat(utilities.getUrl(requestWithSpecialCharacters())
+                            .toExternalForm())
+            .isEqualTo("https://foo-bucket.s3.dualstack.us-west-2.amazonaws.com/key%20with%40spaces");
     }
 
     @Test
@@ -157,6 +201,19 @@ public class S3UtilitiesTest {
     @Test (expected = NullPointerException.class)
     public void failIfRegionIsNotSetOnS3UtilitiesObject() throws MalformedURLException {
         S3Utilities.builder().build();
+    }
+
+    @Test
+    public void getUrlWithVersionId() {
+        S3Utilities utilities = S3Utilities.builder().region(Region.US_WEST_2).build();
+
+        assertThat(utilities.getUrl(b -> b.bucket("foo").key("bar").versionId("1"))
+                            .toExternalForm())
+            .isEqualTo("https://foo.s3.us-west-2.amazonaws.com/bar?versionId=1");
+
+        assertThat(utilities.getUrl(b -> b.bucket("foo").key("bar").versionId("@1"))
+                            .toExternalForm())
+            .isEqualTo("https://foo.s3.us-west-2.amazonaws.com/bar?versionId=%401");
     }
 
     private static GetUrlRequest requestWithoutSpaces() {

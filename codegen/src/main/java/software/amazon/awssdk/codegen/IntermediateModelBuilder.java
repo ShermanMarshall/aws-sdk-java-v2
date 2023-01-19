@@ -32,17 +32,17 @@ import software.amazon.awssdk.codegen.internal.Constant;
 import software.amazon.awssdk.codegen.internal.TypeUtils;
 import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.codegen.model.config.customization.CustomizationConfig;
-import software.amazon.awssdk.codegen.model.intermediate.AuthorizerModel;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.MemberModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
-import software.amazon.awssdk.codegen.model.intermediate.Protocol;
-import software.amazon.awssdk.codegen.model.intermediate.ServiceExamples;
 import software.amazon.awssdk.codegen.model.intermediate.ShapeModel;
+import software.amazon.awssdk.codegen.model.rules.endpoints.EndpointTestSuiteModel;
 import software.amazon.awssdk.codegen.model.service.AuthType;
+import software.amazon.awssdk.codegen.model.service.EndpointRuleSetModel;
 import software.amazon.awssdk.codegen.model.service.Operation;
 import software.amazon.awssdk.codegen.model.service.Paginators;
 import software.amazon.awssdk.codegen.model.service.ServiceModel;
+import software.amazon.awssdk.codegen.model.service.Waiters;
 import software.amazon.awssdk.codegen.naming.DefaultNamingStrategy;
 import software.amazon.awssdk.codegen.naming.NamingStrategy;
 import software.amazon.awssdk.utils.CollectionUtils;
@@ -56,20 +56,24 @@ public class IntermediateModelBuilder {
     private static final Logger log = LoggerFactory.getLogger(IntermediateModelBuilder.class);
     private final CustomizationConfig customConfig;
     private final ServiceModel service;
-    private final ServiceExamples examples;
     private final NamingStrategy namingStrategy;
     private final TypeUtils typeUtils;
     private final List<IntermediateModelShapeProcessor> shapeProcessors;
     private final Paginators paginators;
+    private final Waiters waiters;
+    private final EndpointRuleSetModel endpointRuleSet;
+    private final EndpointTestSuiteModel endpointTestSuiteModel;
 
     public IntermediateModelBuilder(C2jModels models) {
         this.customConfig = models.customizationConfig();
         this.service = models.serviceModel();
-        this.examples = models.examplesModel();
         this.namingStrategy = new DefaultNamingStrategy(service, customConfig);
         this.typeUtils = new TypeUtils(namingStrategy);
         this.shapeProcessors = createShapeProcessors();
         this.paginators = models.paginatorsModel();
+        this.waiters = models.waitersModel();
+        this.endpointRuleSet = models.endpointRuleSetModel();
+        this.endpointTestSuiteModel = models.endpointTestSuiteModel();
     }
 
 
@@ -88,13 +92,6 @@ public class IntermediateModelBuilder {
     }
 
     public IntermediateModel build() {
-        // Note: This needs to come before any pre/post processing of the
-        // models, as the transformer must have access to the original shapes,
-        // before any customizations have been applied (which modifies them).
-        log.info("Applying customizations to examples...");
-        new ExamplesCustomizer(service, customConfig).applyCustomizationsToExamples(examples);
-        log.info("Examples customized.");
-
         CodegenCustomizationProcessor customization = DefaultCustomizationProcessor
             .getProcessorFor(customConfig);
 
@@ -103,16 +100,26 @@ public class IntermediateModelBuilder {
         Map<String, ShapeModel> shapes = new HashMap<>();
 
         Map<String, OperationModel> operations = new TreeMap<>(new AddOperations(this).constructOperations());
-        Map<String, AuthorizerModel> authorizers =
-            new HashMap<>(new AddCustomAuthorizers(this.service, getNamingStrategy()).constructAuthorizers());
 
+        // Iterate through every operation and build an 'endpointOperation' if at least one operation that supports
+        // endpoint discovery is found. If -any operations that require- endpoint discovery are found, then the flag
+        // 'endpointCacheRequired' will be set on the 'endpointOperation'. This 'endpointOperation' summary is then
+        // passed directly into the constructor of the intermediate model and is referred to by the codegen.
         OperationModel endpointOperation = null;
+        boolean endpointCacheRequired = false;
 
         for (OperationModel o : operations.values()) {
             if (o.isEndpointOperation()) {
                 endpointOperation = o;
-                break;
             }
+
+            if (o.getEndpointDiscovery() != null && o.getEndpointDiscovery().isRequired()) {
+                endpointCacheRequired = true;
+            }
+        }
+
+        if (endpointOperation != null) {
+            endpointOperation.setEndpointCacheRequired(endpointCacheRequired);
         }
 
         for (IntermediateModelShapeProcessor processor : shapeProcessors) {
@@ -122,13 +129,14 @@ public class IntermediateModelBuilder {
 
         // Remove deprecated operations and their paginators
         operations.entrySet().removeIf(e -> customConfig.getDeprecatedOperations().contains(e.getKey()));
-        paginators.getPaginators().entrySet().removeIf(e -> customConfig.getDeprecatedOperations().contains(e.getKey()));
+        paginators.getPagination().entrySet().removeIf(e -> customConfig.getDeprecatedOperations().contains(e.getKey()));
 
         log.info("{} shapes found in total.", shapes.size());
 
         IntermediateModel fullModel = new IntermediateModel(
             constructMetadata(service, customConfig), operations, shapes,
-            customConfig, examples, endpointOperation, authorizers, paginators.getPaginators(), namingStrategy);
+            customConfig, endpointOperation, paginators.getPagination(), namingStrategy,
+            waiters.getWaiters(), endpointRuleSet, endpointTestSuiteModel, service.getClientContextParams());
 
         customization.postprocess(fullModel);
 
@@ -144,17 +152,21 @@ public class IntermediateModelBuilder {
                                                                fullModel.getOperations(),
                                                                trimmedShapes,
                                                                fullModel.getCustomizationConfig(),
-                                                               fullModel.getExamples(),
                                                                endpointOperation,
-                                                               fullModel.getCustomAuthorizers(),
                                                                fullModel.getPaginators(),
-                                                               namingStrategy);
+                                                               namingStrategy,
+                                                               fullModel.getWaiters(),
+                                                               fullModel.getEndpointRuleSetModel(),
+                                                               endpointTestSuiteModel,
+                                                               service.getClientContextParams());
 
         linkMembersToShapes(trimmedModel);
         linkOperationsToInputOutputShapes(trimmedModel);
         linkCustomAuthorizationToRequestShapes(trimmedModel);
 
         setSimpleMethods(trimmedModel);
+
+        namingStrategy.validateCustomerVisibleNaming(trimmedModel);
 
         return trimmedModel;
     }
@@ -168,8 +180,7 @@ public class IntermediateModelBuilder {
         for (Map.Entry<String, ShapeModel> entry : model.getShapes().entrySet()) {
             if (entry.getValue().getMembers() != null) {
                 for (MemberModel member : entry.getValue().getMembers()) {
-                    member.setShape(
-                        Utils.findShapeModelByC2jNameIfExists(model, member.getC2jShape()));
+                    member.setShape(Utils.findMemberShapeModelByC2jNameIfExists(model, member.getC2jShape()));
                 }
             }
         }
@@ -186,7 +197,9 @@ public class IntermediateModelBuilder {
 
             if (operation.getOutput() != null) {
                 String outputShapeName = operation.getOutput().getShape();
-                entry.getValue().setOutputShape(model.getShapeByC2jName(outputShapeName));
+                ShapeModel outputShape =
+                    model.getShapeByNameAndC2jName(entry.getValue().getReturnType().getReturnType(), outputShapeName);
+                entry.getValue().setOutputShape(outputShape);
             }
         }
     }
@@ -203,33 +216,15 @@ public class IntermediateModelBuilder {
                                                               operation.getOperationName()));
                  }
 
-                 if (model.getMetadata().getProtocol() == Protocol.API_GATEWAY) {
-                     linkAuthorizationToRequestShapeForApiGatewayProtocol(model, c2jOperation, shape);
-                 } else {
-                     linkAuthorizationToRequestShapeForAwsProtocol(c2jOperation.getAuthType(), shape);
-                 }
+                 linkAuthorizationToRequestShapeForAwsProtocol(c2jOperation.getAuthtype(), shape);
              });
     }
 
-    private void linkAuthorizationToRequestShapeForApiGatewayProtocol(IntermediateModel model,
-                                                                      Operation c2jOperation,
-                                                                      ShapeModel shape) {
-        if (AuthType.CUSTOM.equals(c2jOperation.getAuthType())) {
-            AuthorizerModel auth = model.getCustomAuthorizers().get(c2jOperation.getAuthorizer());
-            if (auth == null) {
-                throw new RuntimeException(String.format("Required custom auth not defined: %s",
-                                                         c2jOperation.getAuthorizer()));
-            }
-            shape.setRequestSignerClassFqcn(model.getMetadata().getAuthPolicyPackageName() + '.' +
-                                            auth.getInterfaceName());
-        } else if (AuthType.IAM.equals(c2jOperation.getAuthType())) {
-            model.getMetadata().setRequiresIamSigners(true);
-            // TODO IamRequestSigner does not exist
-            shape.setRequestSignerClassFqcn("software.amazon.awssdk.opensdk.protect.auth.IamRequestSigner");
-        }
-    }
-
     private void linkAuthorizationToRequestShapeForAwsProtocol(AuthType authType, ShapeModel shape) {
+        if (authType == null) {
+            return;
+        }
+
         switch (authType) {
             case V4:
                 shape.setRequestSignerClassFqcn("software.amazon.awssdk.auth.signer.Aws4Signer");
@@ -237,9 +232,10 @@ public class IntermediateModelBuilder {
             case V4_UNSIGNED_BODY:
                 shape.setRequestSignerClassFqcn("software.amazon.awssdk.auth.signer.Aws4UnsignedPayloadSigner");
                 break;
+            case BEARER:
+                shape.setRequestSignerClassFqcn("software.amazon.awssdk.auth.token.signer.aws.BearerTokenSigner");
+                break;
             case NONE:
-            case IAM:
-                // just ignore this, this is the default value but only applicable to APIG generated clients
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported authtype for AWS Request: " + authType);
@@ -276,10 +272,6 @@ public class IntermediateModelBuilder {
 
     public ServiceModel getService() {
         return service;
-    }
-
-    public ServiceExamples getExamples() {
-        return examples;
     }
 
     public NamingStrategy getNamingStrategy() {

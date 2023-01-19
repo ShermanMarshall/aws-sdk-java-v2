@@ -15,6 +15,8 @@
 
 package software.amazon.awssdk.http.nio.netty.internal;
 
+import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.newSslHandler;
+
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -29,7 +31,8 @@ import io.netty.util.concurrent.Promise;
 import java.net.URI;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
-import software.amazon.awssdk.utils.Logger;
+import software.amazon.awssdk.http.nio.netty.internal.utils.NettyClientLogger;
+import software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils;
 import software.amazon.awssdk.utils.StringUtils;
 
 /**
@@ -37,36 +40,54 @@ import software.amazon.awssdk.utils.StringUtils;
  */
 @SdkInternalApi
 public class Http1TunnelConnectionPool implements ChannelPool {
-    static final AttributeKey<Boolean> TUNNEL_ESTABLISHED_KEY = AttributeKey.newInstance(
+    static final AttributeKey<Boolean> TUNNEL_ESTABLISHED_KEY = NettyUtils.getOrCreateAttributeKey(
             "aws.http.nio.netty.async.Http1TunnelConnectionPool.tunnelEstablished");
 
-    private static final Logger log = Logger.loggerFor(Http1TunnelConnectionPool.class);
+    private static final NettyClientLogger log = NettyClientLogger.getLogger(Http1TunnelConnectionPool.class);
 
     private final EventLoop eventLoop;
     private final ChannelPool delegate;
     private final SslContext sslContext;
     private final URI proxyAddress;
+    private final String proxyUser;
+    private final String proxyPassword;
     private final URI remoteAddress;
     private final ChannelPoolHandler handler;
     private final InitHandlerSupplier initHandlerSupplier;
+    private final NettyConfiguration nettyConfiguration;
 
     public Http1TunnelConnectionPool(EventLoop eventLoop, ChannelPool delegate, SslContext sslContext,
-                                     URI proxyAddress, URI remoteAddress, ChannelPoolHandler handler) {
-        this(eventLoop, delegate, sslContext, proxyAddress, remoteAddress, handler, ProxyTunnelInitHandler::new);
+                                     URI proxyAddress, String proxyUsername, String proxyPassword,
+                                     URI remoteAddress, ChannelPoolHandler handler, NettyConfiguration nettyConfiguration) {
+        this(eventLoop, delegate, sslContext,
+             proxyAddress, proxyUsername, proxyPassword, remoteAddress, handler,
+             ProxyTunnelInitHandler::new, nettyConfiguration);
+    }
+
+    public Http1TunnelConnectionPool(EventLoop eventLoop, ChannelPool delegate, SslContext sslContext,
+                                     URI proxyAddress, URI remoteAddress, ChannelPoolHandler handler,
+                                     NettyConfiguration nettyConfiguration) {
+        this(eventLoop, delegate, sslContext,
+             proxyAddress, null, null, remoteAddress, handler,
+             ProxyTunnelInitHandler::new, nettyConfiguration);
 
     }
 
     @SdkTestInternalApi
     Http1TunnelConnectionPool(EventLoop eventLoop, ChannelPool delegate, SslContext sslContext,
-                              URI proxyAddress, URI remoteAddress, ChannelPoolHandler handler,
-                              InitHandlerSupplier initHandlerSupplier) {
+                              URI proxyAddress, String proxyUser, String proxyPassword, URI remoteAddress,
+                              ChannelPoolHandler handler, InitHandlerSupplier initHandlerSupplier,
+                              NettyConfiguration nettyConfiguration) {
         this.eventLoop = eventLoop;
         this.delegate = delegate;
         this.sslContext = sslContext;
         this.proxyAddress = proxyAddress;
+        this.proxyUser = proxyUser;
+        this.proxyPassword = proxyPassword;
         this.remoteAddress = remoteAddress;
         this.handler = handler;
         this.initHandlerSupplier = initHandlerSupplier;
+        this.nettyConfiguration = nettyConfiguration;
     }
 
     @Override
@@ -103,13 +124,13 @@ public class Http1TunnelConnectionPool implements ChannelPool {
 
     private void setupChannel(Channel ch, Promise<Channel> acquirePromise) {
         if (isTunnelEstablished(ch)) {
-            log.debug(() -> String.format("Tunnel already established for %s", ch.id().asShortText()));
+            log.debug(ch, () -> String.format("Tunnel already established for %s", ch.id().asShortText()));
             acquirePromise.setSuccess(ch);
             return;
         }
 
-        log.debug(() -> String.format("Tunnel not yet established for channel %s. Establishing tunnel now.",
-                ch.id().asShortText()));
+        log.debug(ch, () -> String.format("Tunnel not yet established for channel %s. Establishing tunnel now.",
+                                          ch.id().asShortText()));
 
         Promise<Channel> tunnelEstablishedPromise = eventLoop.newPromise();
 
@@ -117,8 +138,8 @@ public class Http1TunnelConnectionPool implements ChannelPool {
         if (sslHandler != null) {
             ch.pipeline().addLast(sslHandler);
         }
-        ch.pipeline().addLast(initHandlerSupplier.newInitHandler(delegate, remoteAddress, tunnelEstablishedPromise));
-
+        ch.pipeline().addLast(initHandlerSupplier.newInitHandler(delegate, proxyUser, proxyPassword, remoteAddress,
+                                                                    tunnelEstablishedPromise));
         tunnelEstablishedPromise.addListener((Future<Channel> f) -> {
             if (f.isSuccess()) {
                 Channel tunnel = f.getNow();
@@ -130,7 +151,7 @@ public class Http1TunnelConnectionPool implements ChannelPool {
                 delegate.release(ch);
 
                 Throwable cause = f.cause();
-                log.error(() -> String.format("Unable to establish tunnel for channel %s", ch.id().asShortText()), cause);
+                log.error(ch, () -> String.format("Unable to establish tunnel for channel %s", ch.id().asShortText()), cause);
                 acquirePromise.setFailure(cause);
             }
         });
@@ -147,7 +168,8 @@ public class Http1TunnelConnectionPool implements ChannelPool {
             return null;
         }
 
-        return sslContext.newHandler(alloc, proxyAddress.getHost(), proxyAddress.getPort());
+        return newSslHandler(sslContext, alloc, proxyAddress.getHost(), proxyAddress.getPort(),
+                             nettyConfiguration.tlsHandshakeTimeout());
     }
 
     private static boolean isTunnelEstablished(Channel ch) {
@@ -158,6 +180,7 @@ public class Http1TunnelConnectionPool implements ChannelPool {
     @SdkTestInternalApi
     @FunctionalInterface
     interface InitHandlerSupplier {
-        ChannelHandler newInitHandler(ChannelPool sourcePool, URI remoteAddress, Promise<Channel> tunnelInitFuture);
+        ChannelHandler newInitHandler(ChannelPool sourcePool, String proxyUsername, String proxyPassword, URI remoteAddress,
+                                      Promise<Channel> tunnelInitFuture);
     }
 }

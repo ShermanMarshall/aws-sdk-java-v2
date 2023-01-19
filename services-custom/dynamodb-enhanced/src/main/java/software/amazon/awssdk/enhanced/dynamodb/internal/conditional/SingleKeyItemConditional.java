@@ -16,16 +16,14 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.conditional;
 
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.nullAttributeValue;
-import static software.amazon.awssdk.enhanced.dynamodb.internal.EnhancedClientUtils.cleanAttributeName;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.UnaryOperator;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.Expression;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.internal.EnhancedClientUtils;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -34,14 +32,10 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * sort key value comparison. The partition key value will always have an equivalence comparison applied.
  * <p>
  * This class is used by higher-level (more specific) {@link QueryConditional} implementations such as
- * {@link QueryConditional#greaterThan(Key)} to reduce code duplication.
+ * {@link QueryConditional#sortGreaterThan(Key)} to reduce code duplication.
  */
 @SdkInternalApi
 public class SingleKeyItemConditional implements QueryConditional {
-    private static final UnaryOperator<String> EXPRESSION_KEY_MAPPER =
-        k -> "#AMZN_MAPPED_" + cleanAttributeName(k);
-    private static final UnaryOperator<String> EXPRESSION_VALUE_KEY_MAPPER =
-        k -> ":AMZN_MAPPED_" + cleanAttributeName(k);
 
     private final Key key;
     private final String operator;
@@ -60,10 +54,10 @@ public class SingleKeyItemConditional implements QueryConditional {
                                                + "null sort key.");
         }
 
-        String partitionKeyToken = EXPRESSION_KEY_MAPPER.apply(queryConditionalKeyValues.partitionKey());
-        String partitionValueToken = EXPRESSION_VALUE_KEY_MAPPER.apply(queryConditionalKeyValues.partitionKey());
-        String sortKeyToken = EXPRESSION_KEY_MAPPER.apply(queryConditionalKeyValues.sortKey());
-        String sortValueToken = EXPRESSION_VALUE_KEY_MAPPER.apply(queryConditionalKeyValues.sortKey());
+        String partitionKeyToken = EnhancedClientUtils.keyRef(queryConditionalKeyValues.partitionKey());
+        String partitionValueToken = EnhancedClientUtils.valueRef(queryConditionalKeyValues.partitionKey());
+        String sortKeyToken = EnhancedClientUtils.keyRef(queryConditionalKeyValues.sortKey());
+        String sortValueToken = EnhancedClientUtils.valueRef(queryConditionalKeyValues.sortKey());
 
         String queryExpression = String.format("%s = %s AND %s %s %s",
                                                partitionKeyToken,

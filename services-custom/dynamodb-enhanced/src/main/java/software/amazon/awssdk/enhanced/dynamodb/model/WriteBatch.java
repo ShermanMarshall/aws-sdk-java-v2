@@ -22,13 +22,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.MappedTableResource;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.BatchableWriteOperation;
+import software.amazon.awssdk.enhanced.dynamodb.internal.operations.DefaultOperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.DeleteItemOperation;
-import software.amazon.awssdk.enhanced.dynamodb.internal.operations.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.PutItemOperation;
 import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
@@ -41,6 +43,7 @@ import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
  * A valid write batch should contain one or more delete or put action reference.
  */
 @SdkPublicApi
+@ThreadSafe
 public final class WriteBatch {
     private final String tableName;
     private final List<WriteRequest> writeRequests;
@@ -109,6 +112,7 @@ public final class WriteBatch {
      *
      * @param <T> the type that items in this table map to
      */
+    @NotThreadSafe
     public interface Builder<T> {
 
         /**
@@ -138,6 +142,22 @@ public final class WriteBatch {
         Builder<T> addDeleteItem(Consumer<DeleteItemEnhancedRequest.Builder> requestConsumer);
 
         /**
+         * Adds a DeleteItem request to the builder.
+         *
+         * @param key a {@link Key} to match the item to be deleted from the database.
+         * @return a builder of this type
+         */
+        Builder<T> addDeleteItem(Key key);
+
+        /**
+         * Adds a DeleteItem request to the builder.
+         *
+         * @param keyItem an item that will have its key fields used to match a record to delete from the database.
+         * @return a builder of this type
+         */
+        Builder<T> addDeleteItem(T keyItem);
+
+        /**
          * Adds a {@link PutItemEnhancedRequest} to the builder, this request should contain the item
          * to be written.
          *
@@ -155,6 +175,14 @@ public final class WriteBatch {
          */
         Builder<T> addPutItem(Consumer<PutItemEnhancedRequest.Builder<T>> requestConsumer);
 
+        /**
+         * Adds a PutItem request to the builder.
+         *
+         * @param item the item to insert or overwrite in the database.
+         * @return a builder of this type
+         */
+        Builder<T> addPutItem(T item);
+
         WriteBatch build();
     }
 
@@ -168,33 +196,54 @@ public final class WriteBatch {
             this.itemClass = itemClass;
         }
 
+        @Override
         public Builder<T> mappedTableResource(MappedTableResource<T> mappedTableResource) {
             this.mappedTableResource = mappedTableResource;
             return this;
         }
 
+        @Override
         public Builder<T> addDeleteItem(DeleteItemEnhancedRequest request) {
             itemSupplierList.add(() -> generateWriteRequest(() -> mappedTableResource, DeleteItemOperation.create(request)));
             return this;
         }
 
+        @Override
         public Builder<T> addDeleteItem(Consumer<DeleteItemEnhancedRequest.Builder> requestConsumer) {
             DeleteItemEnhancedRequest.Builder builder = DeleteItemEnhancedRequest.builder();
             requestConsumer.accept(builder);
             return addDeleteItem(builder.build());
         }
 
+        @Override
+        public Builder<T> addDeleteItem(Key key) {
+            return addDeleteItem(r -> r.key(key));
+        }
+
+        @Override
+        public Builder<T> addDeleteItem(T keyItem) {
+            return addDeleteItem(this.mappedTableResource.keyFrom(keyItem));
+        }
+
+        @Override
         public Builder<T> addPutItem(PutItemEnhancedRequest<T> request) {
             itemSupplierList.add(() -> generateWriteRequest(() -> mappedTableResource, PutItemOperation.create(request)));
             return this;
         }
 
+        @Override
         public Builder<T> addPutItem(Consumer<PutItemEnhancedRequest.Builder<T>> requestConsumer) {
             PutItemEnhancedRequest.Builder<T> builder = PutItemEnhancedRequest.builder(this.itemClass);
             requestConsumer.accept(builder);
             return addPutItem(builder.build());
         }
 
+        @Override
+        public Builder<T> addPutItem(T item) {
+            return addPutItem(r -> r.item(item));
+        }
+
+        @Override
         public WriteBatch build() {
             return new WriteBatch(this);
         }
@@ -202,7 +251,7 @@ public final class WriteBatch {
         private WriteRequest generateWriteRequest(Supplier<MappedTableResource<T>> mappedTableResourceSupplier,
                                                   BatchableWriteOperation<T> operation) {
             return operation.generateWriteRequest(mappedTableResourceSupplier.get().tableSchema(),
-                                                  OperationContext.create(mappedTableResourceSupplier.get().tableName()),
+                                                  DefaultOperationContext.create(mappedTableResourceSupplier.get().tableName()),
                                                   mappedTableResourceSupplier.get().mapperExtension());
         }
     }

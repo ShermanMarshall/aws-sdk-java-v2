@@ -3,6 +3,8 @@ package software.amazon.awssdk.services.json;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.Generated;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -15,14 +17,22 @@ import software.amazon.awssdk.services.json.model.APostOperationRequest;
 import software.amazon.awssdk.services.json.model.APostOperationResponse;
 import software.amazon.awssdk.services.json.model.APostOperationWithOutputRequest;
 import software.amazon.awssdk.services.json.model.APostOperationWithOutputResponse;
+import software.amazon.awssdk.services.json.model.BearerAuthOperationRequest;
+import software.amazon.awssdk.services.json.model.BearerAuthOperationResponse;
+import software.amazon.awssdk.services.json.model.GetOperationWithChecksumRequest;
+import software.amazon.awssdk.services.json.model.GetOperationWithChecksumResponse;
 import software.amazon.awssdk.services.json.model.GetWithoutRequiredMembersRequest;
 import software.amazon.awssdk.services.json.model.GetWithoutRequiredMembersResponse;
 import software.amazon.awssdk.services.json.model.InvalidInputException;
 import software.amazon.awssdk.services.json.model.JsonException;
+import software.amazon.awssdk.services.json.model.OperationWithChecksumRequiredRequest;
+import software.amazon.awssdk.services.json.model.OperationWithChecksumRequiredResponse;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyResponse;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyResponse;
+import software.amazon.awssdk.services.json.model.PutOperationWithChecksumRequest;
+import software.amazon.awssdk.services.json.model.PutOperationWithChecksumResponse;
 import software.amazon.awssdk.services.json.model.StreamingInputOperationRequest;
 import software.amazon.awssdk.services.json.model.StreamingInputOperationResponse;
 import software.amazon.awssdk.services.json.model.StreamingInputOutputOperationRequest;
@@ -38,8 +48,16 @@ import software.amazon.awssdk.services.json.paginators.PaginatedOperationWithout
  * A service that is implemented using the query protocol
  */
 @Generated("software.amazon.awssdk:codegen")
+@SdkPublicApi
+@ThreadSafe
 public interface JsonClient extends SdkClient {
     String SERVICE_NAME = "json-service";
+
+    /**
+     * Value for looking up the service's metadata from the
+     * {@link software.amazon.awssdk.regions.ServiceMetadataProvider}.
+     */
+    String SERVICE_METADATA_ID = "json-service-endpoint";
 
     /**
      * Create a {@link JsonClient} with the region loaded from the
@@ -74,9 +92,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.APostOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperation" target="_top">AWS
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperation" target="_top">AWS
      *      API Documentation</a>
+     *
+     * @deprecated This API is deprecated, use something else
      */
+    @Deprecated
     default APostOperationResponse aPostOperation(APostOperationRequest aPostOperationRequest) throws InvalidInputException,
                                                                                                       AwsServiceException, SdkClientException, JsonException {
         throw new UnsupportedOperationException();
@@ -105,11 +126,14 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.APostOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperation" target="_top">AWS
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperation" target="_top">AWS
      *      API Documentation</a>
+     *
+     * @deprecated This API is deprecated, use something else
      */
+    @Deprecated
     default APostOperationResponse aPostOperation(Consumer<APostOperationRequest.Builder> aPostOperationRequest)
-            throws InvalidInputException, AwsServiceException, SdkClientException, JsonException {
+        throws InvalidInputException, AwsServiceException, SdkClientException, JsonException {
         return aPostOperation(APostOperationRequest.builder().applyMutation(aPostOperationRequest).build());
     }
 
@@ -130,12 +154,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.APostOperationWithOutput
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperationWithOutput"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperationWithOutput"
      *      target="_top">AWS API Documentation</a>
      */
     default APostOperationWithOutputResponse aPostOperationWithOutput(
-            APostOperationWithOutputRequest aPostOperationWithOutputRequest) throws InvalidInputException, AwsServiceException,
-                                                                                    SdkClientException, JsonException {
+        APostOperationWithOutputRequest aPostOperationWithOutputRequest) throws InvalidInputException, AwsServiceException,
+                                                                                SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -163,13 +187,112 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.APostOperationWithOutput
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperationWithOutput"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/APostOperationWithOutput"
      *      target="_top">AWS API Documentation</a>
      */
     default APostOperationWithOutputResponse aPostOperationWithOutput(
-            Consumer<APostOperationWithOutputRequest.Builder> aPostOperationWithOutputRequest) throws InvalidInputException,
-                                                                                                      AwsServiceException, SdkClientException, JsonException {
+        Consumer<APostOperationWithOutputRequest.Builder> aPostOperationWithOutputRequest) throws InvalidInputException,
+                                                                                                  AwsServiceException, SdkClientException, JsonException {
         return aPostOperationWithOutput(APostOperationWithOutputRequest.builder().applyMutation(aPostOperationWithOutputRequest)
+                                                                       .build());
+    }
+
+    /**
+     * Invokes the BearerAuthOperation operation.
+     *
+     * @param bearerAuthOperationRequest
+     * @return Result of the BearerAuthOperation operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.BearerAuthOperation
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/BearerAuthOperation"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default BearerAuthOperationResponse bearerAuthOperation(BearerAuthOperationRequest bearerAuthOperationRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the BearerAuthOperation operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link BearerAuthOperationRequest.Builder} avoiding the
+     * need to create one manually via {@link BearerAuthOperationRequest#builder()}
+     * </p>
+     *
+     * @param bearerAuthOperationRequest
+     *        A {@link Consumer} that will call methods on {@link BearerAuthOperationRequest.Builder} to create a
+     *        request.
+     * @return Result of the BearerAuthOperation operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.BearerAuthOperation
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/BearerAuthOperation"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default BearerAuthOperationResponse bearerAuthOperation(
+        Consumer<BearerAuthOperationRequest.Builder> bearerAuthOperationRequest) throws AwsServiceException,
+                                                                                        SdkClientException, JsonException {
+        return bearerAuthOperation(BearerAuthOperationRequest.builder().applyMutation(bearerAuthOperationRequest).build());
+    }
+
+    /**
+     * Invokes the GetOperationWithChecksum operation.
+     *
+     * @param getOperationWithChecksumRequest
+     * @return Result of the GetOperationWithChecksum operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.GetOperationWithChecksum
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default GetOperationWithChecksumResponse getOperationWithChecksum(
+        GetOperationWithChecksumRequest getOperationWithChecksumRequest) throws AwsServiceException, SdkClientException,
+                                                                                JsonException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the GetOperationWithChecksum operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link GetOperationWithChecksumRequest.Builder} avoiding
+     * the need to create one manually via {@link GetOperationWithChecksumRequest#builder()}
+     * </p>
+     *
+     * @param getOperationWithChecksumRequest
+     *        A {@link Consumer} that will call methods on {@link ChecksumStructure.Builder} to create a request.
+     * @return Result of the GetOperationWithChecksum operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.GetOperationWithChecksum
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default GetOperationWithChecksumResponse getOperationWithChecksum(
+        Consumer<GetOperationWithChecksumRequest.Builder> getOperationWithChecksumRequest) throws AwsServiceException,
+                                                                                                  SdkClientException, JsonException {
+        return getOperationWithChecksum(GetOperationWithChecksumRequest.builder().applyMutation(getOperationWithChecksumRequest)
                                                                        .build());
     }
 
@@ -190,12 +313,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.GetWithoutRequiredMembers
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetWithoutRequiredMembers"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetWithoutRequiredMembers"
      *      target="_top">AWS API Documentation</a>
      */
     default GetWithoutRequiredMembersResponse getWithoutRequiredMembers(
-            GetWithoutRequiredMembersRequest getWithoutRequiredMembersRequest) throws InvalidInputException, AwsServiceException,
-                                                                                      SdkClientException, JsonException {
+        GetWithoutRequiredMembersRequest getWithoutRequiredMembersRequest) throws InvalidInputException, AwsServiceException,
+                                                                                  SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -223,14 +346,65 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.GetWithoutRequiredMembers
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetWithoutRequiredMembers"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/GetWithoutRequiredMembers"
      *      target="_top">AWS API Documentation</a>
      */
     default GetWithoutRequiredMembersResponse getWithoutRequiredMembers(
-            Consumer<GetWithoutRequiredMembersRequest.Builder> getWithoutRequiredMembersRequest) throws InvalidInputException,
-                                                                                                        AwsServiceException, SdkClientException, JsonException {
+        Consumer<GetWithoutRequiredMembersRequest.Builder> getWithoutRequiredMembersRequest) throws InvalidInputException,
+                                                                                                    AwsServiceException, SdkClientException, JsonException {
         return getWithoutRequiredMembers(GetWithoutRequiredMembersRequest.builder()
                                                                          .applyMutation(getWithoutRequiredMembersRequest).build());
+    }
+
+    /**
+     * Invokes the OperationWithChecksumRequired operation.
+     *
+     * @param operationWithChecksumRequiredRequest
+     * @return Result of the OperationWithChecksumRequired operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.OperationWithChecksumRequired
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/OperationWithChecksumRequired"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default OperationWithChecksumRequiredResponse operationWithChecksumRequired(
+        OperationWithChecksumRequiredRequest operationWithChecksumRequiredRequest) throws AwsServiceException,
+                                                                                          SdkClientException, JsonException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the OperationWithChecksumRequired operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link OperationWithChecksumRequiredRequest.Builder}
+     * avoiding the need to create one manually via {@link OperationWithChecksumRequiredRequest#builder()}
+     * </p>
+     *
+     * @param operationWithChecksumRequiredRequest
+     *        A {@link Consumer} that will call methods on {@link OperationWithChecksumRequiredRequest.Builder} to
+     *        create a request.
+     * @return Result of the OperationWithChecksumRequired operation returned by the service.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.OperationWithChecksumRequired
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/OperationWithChecksumRequired"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default OperationWithChecksumRequiredResponse operationWithChecksumRequired(
+        Consumer<OperationWithChecksumRequiredRequest.Builder> operationWithChecksumRequiredRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
+        return operationWithChecksumRequired(OperationWithChecksumRequiredRequest.builder()
+                                                                                 .applyMutation(operationWithChecksumRequiredRequest).build());
     }
 
     /**
@@ -246,7 +420,7 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
      * @see #paginatedOperationWithResultKey(PaginatedOperationWithResultKeyRequest)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyResponse paginatedOperationWithResultKey() throws AwsServiceException,
@@ -267,12 +441,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyResponse paginatedOperationWithResultKey(
-            PaginatedOperationWithResultKeyRequest paginatedOperationWithResultKeyRequest) throws AwsServiceException,
-                                                                                                  SdkClientException, JsonException {
+        PaginatedOperationWithResultKeyRequest paginatedOperationWithResultKeyRequest) throws AwsServiceException,
+                                                                                              SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -295,12 +469,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyResponse paginatedOperationWithResultKey(
-            Consumer<PaginatedOperationWithResultKeyRequest.Builder> paginatedOperationWithResultKeyRequest)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<PaginatedOperationWithResultKeyRequest.Builder> paginatedOperationWithResultKeyRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
         return paginatedOperationWithResultKey(PaginatedOperationWithResultKeyRequest.builder()
                                                                                      .applyMutation(paginatedOperationWithResultKeyRequest).build());
     }
@@ -354,6 +528,10 @@ public interface JsonClient extends SdkClient {
      * }
      * </pre>
      * <p>
+     * <b>Please notice that the configuration of MaxResults won't limit the number of results you get with the
+     * paginator. It only limits the number of results in each page.</b>
+     * </p>
+     * <p>
      * <b>Note: If you prefer to have control on service calls, use the
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
      * operation.</b>
@@ -369,7 +547,7 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
      * @see #paginatedOperationWithResultKeyPaginator(PaginatedOperationWithResultKeyRequest)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyIterable paginatedOperationWithResultKeyPaginator() throws AwsServiceException,
@@ -426,6 +604,10 @@ public interface JsonClient extends SdkClient {
      * }
      * </pre>
      * <p>
+     * <b>Please notice that the configuration of MaxResults won't limit the number of results you get with the
+     * paginator. It only limits the number of results in each page.</b>
+     * </p>
+     * <p>
      * <b>Note: If you prefer to have control on service calls, use the
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
      * operation.</b>
@@ -441,12 +623,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyIterable paginatedOperationWithResultKeyPaginator(
-            PaginatedOperationWithResultKeyRequest paginatedOperationWithResultKeyRequest) throws AwsServiceException,
-                                                                                                  SdkClientException, JsonException {
+        PaginatedOperationWithResultKeyRequest paginatedOperationWithResultKeyRequest) throws AwsServiceException,
+                                                                                              SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -499,6 +681,10 @@ public interface JsonClient extends SdkClient {
      * }
      * </pre>
      * <p>
+     * <b>Please notice that the configuration of MaxResults won't limit the number of results you get with the
+     * paginator. It only limits the number of results in each page.</b>
+     * </p>
+     * <p>
      * <b>Note: If you prefer to have control on service calls, use the
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
      * operation.</b>
@@ -520,12 +706,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithResultKeyIterable paginatedOperationWithResultKeyPaginator(
-            Consumer<PaginatedOperationWithResultKeyRequest.Builder> paginatedOperationWithResultKeyRequest)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<PaginatedOperationWithResultKeyRequest.Builder> paginatedOperationWithResultKeyRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
         return paginatedOperationWithResultKeyPaginator(PaginatedOperationWithResultKeyRequest.builder()
                                                                                               .applyMutation(paginatedOperationWithResultKeyRequest).build());
     }
@@ -543,12 +729,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithoutResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithoutResultKeyResponse paginatedOperationWithoutResultKey(
-            PaginatedOperationWithoutResultKeyRequest paginatedOperationWithoutResultKeyRequest) throws AwsServiceException,
-                                                                                                        SdkClientException, JsonException {
+        PaginatedOperationWithoutResultKeyRequest paginatedOperationWithoutResultKeyRequest) throws AwsServiceException,
+                                                                                                    SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -571,12 +757,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithoutResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithoutResultKeyResponse paginatedOperationWithoutResultKey(
-            Consumer<PaginatedOperationWithoutResultKeyRequest.Builder> paginatedOperationWithoutResultKeyRequest)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<PaginatedOperationWithoutResultKeyRequest.Builder> paginatedOperationWithoutResultKeyRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
         return paginatedOperationWithoutResultKey(PaginatedOperationWithoutResultKeyRequest.builder()
                                                                                            .applyMutation(paginatedOperationWithoutResultKeyRequest).build());
     }
@@ -630,6 +816,10 @@ public interface JsonClient extends SdkClient {
      * }
      * </pre>
      * <p>
+     * <b>Please notice that the configuration of MaxResults won't limit the number of results you get with the
+     * paginator. It only limits the number of results in each page.</b>
+     * </p>
+     * <p>
      * <b>Note: If you prefer to have control on service calls, use the
      * {@link #paginatedOperationWithoutResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest)}
      * operation.</b>
@@ -645,12 +835,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithoutResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithoutResultKeyIterable paginatedOperationWithoutResultKeyPaginator(
-            PaginatedOperationWithoutResultKeyRequest paginatedOperationWithoutResultKeyRequest) throws AwsServiceException,
-                                                                                                        SdkClientException, JsonException {
+        PaginatedOperationWithoutResultKeyRequest paginatedOperationWithoutResultKeyRequest) throws AwsServiceException,
+                                                                                                    SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -703,6 +893,10 @@ public interface JsonClient extends SdkClient {
      * }
      * </pre>
      * <p>
+     * <b>Please notice that the configuration of MaxResults won't limit the number of results you get with the
+     * paginator. It only limits the number of results in each page.</b>
+     * </p>
+     * <p>
      * <b>Note: If you prefer to have control on service calls, use the
      * {@link #paginatedOperationWithoutResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest)}
      * operation.</b>
@@ -724,14 +918,208 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.PaginatedOperationWithoutResultKey
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PaginatedOperationWithoutResultKey"
      *      target="_top">AWS API Documentation</a>
      */
     default PaginatedOperationWithoutResultKeyIterable paginatedOperationWithoutResultKeyPaginator(
-            Consumer<PaginatedOperationWithoutResultKeyRequest.Builder> paginatedOperationWithoutResultKeyRequest)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<PaginatedOperationWithoutResultKeyRequest.Builder> paginatedOperationWithoutResultKeyRequest)
+        throws AwsServiceException, SdkClientException, JsonException {
         return paginatedOperationWithoutResultKeyPaginator(PaginatedOperationWithoutResultKeyRequest.builder()
                                                                                                     .applyMutation(paginatedOperationWithoutResultKeyRequest).build());
+    }
+
+    /**
+     * Invokes the PutOperationWithChecksum operation.
+     *
+     * @param putOperationWithChecksumRequest
+     * @param requestBody
+     *        The content to send to the service. A {@link RequestBody} can be created using one of several factory
+     *        methods for various sources of data. For example, to create a request body from a file you can do the
+     *        following.
+     *
+     *        <pre>
+     * {@code RequestBody.fromFile(new File("myfile.txt"))}
+     * </pre>
+     *
+     *        See documentation in {@link RequestBody} for additional details and which sources of data are supported.
+     *        The service documentation for the request content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '
+     * @param responseTransformer
+     *        Functional interface for processing the streamed response content. The unmarshalled
+     *        PutOperationWithChecksumResponse and an InputStream to the response content are provided as parameters to
+     *        the callback. The callback may return a transformed type which will be the return value of this method.
+     *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
+     *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
+     *        service documentation for the response content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '.
+     * @return The transformed result of the ResponseTransformer.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.PutOperationWithChecksum
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PutOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default <ReturnT> ReturnT putOperationWithChecksum(PutOperationWithChecksumRequest putOperationWithChecksumRequest,
+                                                       RequestBody requestBody, ResponseTransformer<PutOperationWithChecksumResponse, ReturnT> responseTransformer)
+        throws AwsServiceException, SdkClientException, JsonException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the PutOperationWithChecksum operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link PutOperationWithChecksumRequest.Builder} avoiding
+     * the need to create one manually via {@link PutOperationWithChecksumRequest#builder()}
+     * </p>
+     *
+     * @param putOperationWithChecksumRequest
+     *        A {@link Consumer} that will call methods on {@link ChecksumStructureWithStreaming.Builder} to create a
+     *        request.
+     * @param requestBody
+     *        The content to send to the service. A {@link RequestBody} can be created using one of several factory
+     *        methods for various sources of data. For example, to create a request body from a file you can do the
+     *        following.
+     *
+     *        <pre>
+     * {@code RequestBody.fromFile(new File("myfile.txt"))}
+     * </pre>
+     *
+     *        See documentation in {@link RequestBody} for additional details and which sources of data are supported.
+     *        The service documentation for the request content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '
+     * @param responseTransformer
+     *        Functional interface for processing the streamed response content. The unmarshalled
+     *        PutOperationWithChecksumResponse and an InputStream to the response content are provided as parameters to
+     *        the callback. The callback may return a transformed type which will be the return value of this method.
+     *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
+     *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
+     *        service documentation for the response content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '.
+     * @return The transformed result of the ResponseTransformer.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.PutOperationWithChecksum
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PutOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default <ReturnT> ReturnT putOperationWithChecksum(
+        Consumer<PutOperationWithChecksumRequest.Builder> putOperationWithChecksumRequest, RequestBody requestBody,
+        ResponseTransformer<PutOperationWithChecksumResponse, ReturnT> responseTransformer) throws AwsServiceException,
+                                                                                                   SdkClientException, JsonException {
+        return putOperationWithChecksum(PutOperationWithChecksumRequest.builder().applyMutation(putOperationWithChecksumRequest)
+                                                                       .build(), requestBody, responseTransformer);
+    }
+
+    /**
+     * Invokes the PutOperationWithChecksum operation.
+     *
+     * @param putOperationWithChecksumRequest
+     * @param sourcePath
+     *        {@link Path} to file containing data to send to the service. File will be read entirely and may be read
+     *        multiple times in the event of a retry. If the file does not exist or the current user does not have
+     *        access to read it then an exception will be thrown. The service documentation for the request content is
+     *        as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '
+     * @param destinationPath
+     *        {@link Path} to file that response contents will be written to. The file must not exist or this method
+     *        will throw an exception. If the file is not writable by the current user then an exception will be thrown.
+     *        The service documentation for the response content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '.
+     * @return The transformed result of the ResponseTransformer.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.PutOperationWithChecksum
+     * @see #putOperationWithChecksum(PutOperationWithChecksumRequest, RequestBody)
+     * @see #putOperationWithChecksum(PutOperationWithChecksumRequest, ResponseTransformer)
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PutOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default PutOperationWithChecksumResponse putOperationWithChecksum(
+        PutOperationWithChecksumRequest putOperationWithChecksumRequest, Path sourcePath, Path destinationPath)
+        throws AwsServiceException, SdkClientException, JsonException {
+        return putOperationWithChecksum(putOperationWithChecksumRequest, RequestBody.fromFile(sourcePath),
+                                        ResponseTransformer.toFile(destinationPath));
+    }
+
+    /**
+     * Invokes the PutOperationWithChecksum operation.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link PutOperationWithChecksumRequest.Builder} avoiding
+     * the need to create one manually via {@link PutOperationWithChecksumRequest#builder()}
+     * </p>
+     *
+     * @param putOperationWithChecksumRequest
+     *        A {@link Consumer} that will call methods on {@link ChecksumStructureWithStreaming.Builder} to create a
+     *        request.
+     * @param sourcePath
+     *        {@link Path} to file containing data to send to the service. File will be read entirely and may be read
+     *        multiple times in the event of a retry. If the file does not exist or the current user does not have
+     *        access to read it then an exception will be thrown. The service documentation for the request content is
+     *        as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '
+     * @param destinationPath
+     *        {@link Path} to file that response contents will be written to. The file must not exist or this method
+     *        will throw an exception. If the file is not writable by the current user then an exception will be thrown.
+     *        The service documentation for the response content is as follows '
+     *        <p>
+     *        Object data.
+     *        </p>
+     *        '.
+     * @return The transformed result of the ResponseTransformer.
+     * @throws SdkException
+     *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
+     *         catch all scenarios.
+     * @throws SdkClientException
+     *         If any client side error occurs such as an IO related failure, failure to get credentials, etc.
+     * @throws JsonException
+     *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
+     * @sample JsonClient.PutOperationWithChecksum
+     * @see #putOperationWithChecksum(PutOperationWithChecksumRequest, RequestBody)
+     * @see #putOperationWithChecksum(PutOperationWithChecksumRequest, ResponseTransformer)
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/PutOperationWithChecksum"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default PutOperationWithChecksumResponse putOperationWithChecksum(
+        Consumer<PutOperationWithChecksumRequest.Builder> putOperationWithChecksumRequest, Path sourcePath,
+        Path destinationPath) throws AwsServiceException, SdkClientException, JsonException {
+        return putOperationWithChecksum(PutOperationWithChecksumRequest.builder().applyMutation(putOperationWithChecksumRequest)
+                                                                       .build(), sourcePath, destinationPath);
     }
 
     /**
@@ -758,12 +1146,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOperationResponse streamingInputOperation(
-            StreamingInputOperationRequest streamingInputOperationRequest, RequestBody requestBody) throws AwsServiceException,
-                                                                                                           SdkClientException, JsonException {
+        StreamingInputOperationRequest streamingInputOperationRequest, RequestBody requestBody) throws AwsServiceException,
+                                                                                                       SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -797,12 +1185,12 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOperationResponse streamingInputOperation(
-            Consumer<StreamingInputOperationRequest.Builder> streamingInputOperationRequest, RequestBody requestBody)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<StreamingInputOperationRequest.Builder> streamingInputOperationRequest, RequestBody requestBody)
+        throws AwsServiceException, SdkClientException, JsonException {
         return streamingInputOperation(StreamingInputOperationRequest.builder().applyMutation(streamingInputOperationRequest)
                                                                      .build(), requestBody);
     }
@@ -826,13 +1214,13 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOperation
      * @see #streamingInputOperation(StreamingInputOperationRequest, RequestBody)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOperationResponse streamingInputOperation(
-            StreamingInputOperationRequest streamingInputOperationRequest, Path filePath) throws AwsServiceException,
-                                                                                                 SdkClientException, JsonException {
-        return streamingInputOperation(streamingInputOperationRequest, RequestBody.fromFile(filePath));
+        StreamingInputOperationRequest streamingInputOperationRequest, Path sourcePath) throws AwsServiceException,
+                                                                                               SdkClientException, JsonException {
+        return streamingInputOperation(streamingInputOperationRequest, RequestBody.fromFile(sourcePath));
     }
 
     /**
@@ -860,14 +1248,14 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOperation
      * @see #streamingInputOperation(StreamingInputOperationRequest, RequestBody)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOperationResponse streamingInputOperation(
-            Consumer<StreamingInputOperationRequest.Builder> streamingInputOperationRequest, Path filePath)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<StreamingInputOperationRequest.Builder> streamingInputOperationRequest, Path sourcePath)
+        throws AwsServiceException, SdkClientException, JsonException {
         return streamingInputOperation(StreamingInputOperationRequest.builder().applyMutation(streamingInputOperationRequest)
-                                                                     .build(), filePath);
+                                                                     .build(), sourcePath);
     }
 
     /**
@@ -887,11 +1275,11 @@ public interface JsonClient extends SdkClient {
      *        The service documentation for the request content is as follows 'This be a stream'
      * @param responseTransformer
      *        Functional interface for processing the streamed response content. The unmarshalled
-     *        StreamingInputOutputOperationRequest and an InputStream to the response content are provided as parameters
-     *        to the callback. The callback may return a transformed type which will be the return value of this method.
-     *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
-     *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
-     *        service documentation for the response content is as follows 'This be a stream'.
+     *        StreamingInputOutputOperationResponse and an InputStream to the response content are provided as
+     *        parameters to the callback. The callback may return a transformed type which will be the return value of
+     *        this method. See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing
+     *        this interface and for links to pre-canned implementations for common scenarios like downloading to a
+     *        file. The service documentation for the response content is as follows 'This be a stream'.
      * @return The transformed result of the ResponseTransformer.
      * @throws SdkException
      *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
@@ -901,13 +1289,13 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOutputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default <ReturnT> ReturnT streamingInputOutputOperation(
-            StreamingInputOutputOperationRequest streamingInputOutputOperationRequest, RequestBody requestBody,
-            ResponseTransformer<StreamingInputOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
-                                                                                                            SdkClientException, JsonException {
+        StreamingInputOutputOperationRequest streamingInputOutputOperationRequest, RequestBody requestBody,
+        ResponseTransformer<StreamingInputOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
+                                                                                                        SdkClientException, JsonException {
         throw new UnsupportedOperationException();
     }
 
@@ -934,11 +1322,11 @@ public interface JsonClient extends SdkClient {
      *        The service documentation for the request content is as follows 'This be a stream'
      * @param responseTransformer
      *        Functional interface for processing the streamed response content. The unmarshalled
-     *        StreamingInputOutputOperationRequest and an InputStream to the response content are provided as parameters
-     *        to the callback. The callback may return a transformed type which will be the return value of this method.
-     *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
-     *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
-     *        service documentation for the response content is as follows 'This be a stream'.
+     *        StreamingInputOutputOperationResponse and an InputStream to the response content are provided as
+     *        parameters to the callback. The callback may return a transformed type which will be the return value of
+     *        this method. See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing
+     *        this interface and for links to pre-canned implementations for common scenarios like downloading to a
+     *        file. The service documentation for the response content is as follows 'This be a stream'.
      * @return The transformed result of the ResponseTransformer.
      * @throws SdkException
      *         Base class for all exceptions that can be thrown by the SDK (both service and client). Can be used for
@@ -948,16 +1336,16 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingInputOutputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default <ReturnT> ReturnT streamingInputOutputOperation(
-            Consumer<StreamingInputOutputOperationRequest.Builder> streamingInputOutputOperationRequest, RequestBody requestBody,
-            ResponseTransformer<StreamingInputOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
-                                                                                                            SdkClientException, JsonException {
+        Consumer<StreamingInputOutputOperationRequest.Builder> streamingInputOutputOperationRequest, RequestBody requestBody,
+        ResponseTransformer<StreamingInputOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
+                                                                                                        SdkClientException, JsonException {
         return streamingInputOutputOperation(
-                StreamingInputOutputOperationRequest.builder().applyMutation(streamingInputOutputOperationRequest).build(),
-                requestBody, responseTransformer);
+            StreamingInputOutputOperationRequest.builder().applyMutation(streamingInputOutputOperationRequest).build(),
+            requestBody, responseTransformer);
     }
 
     /**
@@ -984,12 +1372,12 @@ public interface JsonClient extends SdkClient {
      * @sample JsonClient.StreamingInputOutputOperation
      * @see #streamingInputOutputOperation(StreamingInputOutputOperationRequest, RequestBody)
      * @see #streamingInputOutputOperation(StreamingInputOutputOperationRequest, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOutputOperationResponse streamingInputOutputOperation(
-            StreamingInputOutputOperationRequest streamingInputOutputOperationRequest, Path sourcePath, Path destinationPath)
-            throws AwsServiceException, SdkClientException, JsonException {
+        StreamingInputOutputOperationRequest streamingInputOutputOperationRequest, Path sourcePath, Path destinationPath)
+        throws AwsServiceException, SdkClientException, JsonException {
         return streamingInputOutputOperation(streamingInputOutputOperationRequest, RequestBody.fromFile(sourcePath),
                                              ResponseTransformer.toFile(destinationPath));
     }
@@ -1024,15 +1412,15 @@ public interface JsonClient extends SdkClient {
      * @sample JsonClient.StreamingInputOutputOperation
      * @see #streamingInputOutputOperation(StreamingInputOutputOperationRequest, RequestBody)
      * @see #streamingInputOutputOperation(StreamingInputOutputOperationRequest, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingInputOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingInputOutputOperationResponse streamingInputOutputOperation(
-            Consumer<StreamingInputOutputOperationRequest.Builder> streamingInputOutputOperationRequest, Path sourcePath,
-            Path destinationPath) throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<StreamingInputOutputOperationRequest.Builder> streamingInputOutputOperationRequest, Path sourcePath,
+        Path destinationPath) throws AwsServiceException, SdkClientException, JsonException {
         return streamingInputOutputOperation(
-                StreamingInputOutputOperationRequest.builder().applyMutation(streamingInputOutputOperationRequest).build(),
-                sourcePath, destinationPath);
+            StreamingInputOutputOperationRequest.builder().applyMutation(streamingInputOutputOperationRequest).build(),
+            sourcePath, destinationPath);
     }
 
     /**
@@ -1041,8 +1429,8 @@ public interface JsonClient extends SdkClient {
      * @param streamingOutputOperationRequest
      * @param responseTransformer
      *        Functional interface for processing the streamed response content. The unmarshalled
-     *        StreamingInputOutputOperationRequest and an InputStream to the response content are provided as parameters
-     *        to the callback. The callback may return a transformed type which will be the return value of this method.
+     *        StreamingOutputOperationResponse and an InputStream to the response content are provided as parameters to
+     *        the callback. The callback may return a transformed type which will be the return value of this method.
      *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
      *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
      *        service documentation for the response content is as follows 'This be a stream'.
@@ -1055,7 +1443,7 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default <ReturnT> ReturnT streamingOutputOperation(StreamingOutputOperationRequest streamingOutputOperationRequest,
@@ -1076,8 +1464,8 @@ public interface JsonClient extends SdkClient {
      *        request.
      * @param responseTransformer
      *        Functional interface for processing the streamed response content. The unmarshalled
-     *        StreamingInputOutputOperationRequest and an InputStream to the response content are provided as parameters
-     *        to the callback. The callback may return a transformed type which will be the return value of this method.
+     *        StreamingOutputOperationResponse and an InputStream to the response content are provided as parameters to
+     *        the callback. The callback may return a transformed type which will be the return value of this method.
      *        See {@link software.amazon.awssdk.core.sync.ResponseTransformer} for details on implementing this
      *        interface and for links to pre-canned implementations for common scenarios like downloading to a file. The
      *        service documentation for the response content is as follows 'This be a stream'.
@@ -1090,13 +1478,13 @@ public interface JsonClient extends SdkClient {
      * @throws JsonException
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default <ReturnT> ReturnT streamingOutputOperation(
-            Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest,
-            ResponseTransformer<StreamingOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
-                                                                                                       SdkClientException, JsonException {
+        Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest,
+        ResponseTransformer<StreamingOutputOperationResponse, ReturnT> responseTransformer) throws AwsServiceException,
+                                                                                                   SdkClientException, JsonException {
         return streamingOutputOperation(StreamingOutputOperationRequest.builder().applyMutation(streamingOutputOperationRequest)
                                                                        .build(), responseTransformer);
     }
@@ -1119,13 +1507,13 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #streamingOutputOperation(StreamingOutputOperationRequest, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingOutputOperationResponse streamingOutputOperation(
-            StreamingOutputOperationRequest streamingOutputOperationRequest, Path filePath) throws AwsServiceException,
-                                                                                                   SdkClientException, JsonException {
-        return streamingOutputOperation(streamingOutputOperationRequest, ResponseTransformer.toFile(filePath));
+        StreamingOutputOperationRequest streamingOutputOperationRequest, Path destinationPath) throws AwsServiceException,
+                                                                                                      SdkClientException, JsonException {
+        return streamingOutputOperation(streamingOutputOperationRequest, ResponseTransformer.toFile(destinationPath));
     }
 
     /**
@@ -1152,14 +1540,14 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #streamingOutputOperation(StreamingOutputOperationRequest, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default StreamingOutputOperationResponse streamingOutputOperation(
-            Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest, Path filePath)
-            throws AwsServiceException, SdkClientException, JsonException {
+        Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest, Path destinationPath)
+        throws AwsServiceException, SdkClientException, JsonException {
         return streamingOutputOperation(StreamingOutputOperationRequest.builder().applyMutation(streamingOutputOperationRequest)
-                                                                       .build(), filePath);
+                                                                       .build(), destinationPath);
     }
 
     /**
@@ -1181,12 +1569,12 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #getObject(streamingOutputOperation, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default ResponseInputStream<StreamingOutputOperationResponse> streamingOutputOperation(
-            StreamingOutputOperationRequest streamingOutputOperationRequest) throws AwsServiceException, SdkClientException,
-                                                                                    JsonException {
+        StreamingOutputOperationRequest streamingOutputOperationRequest) throws AwsServiceException, SdkClientException,
+                                                                                JsonException {
         return streamingOutputOperation(streamingOutputOperationRequest, ResponseTransformer.toInputStream());
     }
 
@@ -1215,12 +1603,12 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #getObject(streamingOutputOperation, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default ResponseInputStream<StreamingOutputOperationResponse> streamingOutputOperation(
-            Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest) throws AwsServiceException,
-                                                                                                      SdkClientException, JsonException {
+        Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest) throws AwsServiceException,
+                                                                                                  SdkClientException, JsonException {
         return streamingOutputOperation(StreamingOutputOperationRequest.builder().applyMutation(streamingOutputOperationRequest)
                                                                        .build());
     }
@@ -1242,12 +1630,12 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #getObject(streamingOutputOperation, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default ResponseBytes<StreamingOutputOperationResponse> streamingOutputOperationAsBytes(
-            StreamingOutputOperationRequest streamingOutputOperationRequest) throws AwsServiceException, SdkClientException,
-                                                                                    JsonException {
+        StreamingOutputOperationRequest streamingOutputOperationRequest) throws AwsServiceException, SdkClientException,
+                                                                                JsonException {
         return streamingOutputOperation(streamingOutputOperationRequest, ResponseTransformer.toBytes());
     }
 
@@ -1274,18 +1662,18 @@ public interface JsonClient extends SdkClient {
      *         Base class for all service exceptions. Unknown exceptions will be thrown as an instance of this type.
      * @sample JsonClient.StreamingOutputOperation
      * @see #getObject(streamingOutputOperation, ResponseTransformer)
-     * @see <a href="http://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/StreamingOutputOperation"
      *      target="_top">AWS API Documentation</a>
      */
     default ResponseBytes<StreamingOutputOperationResponse> streamingOutputOperationAsBytes(
-            Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest) throws AwsServiceException,
-                                                                                                      SdkClientException, JsonException {
+        Consumer<StreamingOutputOperationRequest.Builder> streamingOutputOperationRequest) throws AwsServiceException,
+                                                                                                  SdkClientException, JsonException {
         return streamingOutputOperationAsBytes(StreamingOutputOperationRequest.builder()
                                                                               .applyMutation(streamingOutputOperationRequest).build());
     }
 
     static ServiceMetadata serviceMetadata() {
-        return ServiceMetadata.of("json-service");
+        return ServiceMetadata.of(SERVICE_METADATA_ID);
     }
 
     /**

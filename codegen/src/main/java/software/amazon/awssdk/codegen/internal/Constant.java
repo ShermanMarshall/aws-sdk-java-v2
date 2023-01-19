@@ -15,6 +15,8 @@
 
 package software.amazon.awssdk.codegen.internal;
 
+import java.nio.file.Path;
+
 public final class Constant {
 
     public static final String CUSTOMIZATION_CONFIG_FILE = "customization.config";
@@ -26,6 +28,18 @@ public final class Constant {
 
     public static final String SYNC_CLIENT_INTERFACE_NAME_PATTERN = "%sClient";
     public static final String SYNC_CLIENT_CLASS_NAME_PATTERN = "Default%sClient";
+
+    /**
+     * Name of the source {@link Path}-typed formal method parameters of streaming input operations.
+     */
+    public static final String SYNC_CLIENT_SOURCE_PATH_PARAM_NAME = "sourcePath";
+
+    /**
+     * Name of the destination {@link Path}-typed formal method parameters of streaming output
+     * operations.
+     */
+    public static final String SYNC_CLIENT_DESTINATION_PATH_PARAM_NAME = "destinationPath";
+
     public static final String SYNC_BUILDER_INTERFACE_NAME_PATTERN = "%sClientBuilder";
     public static final String SYNC_BUILDER_CLASS_NAME_PATTERN = "Default%sClientBuilder";
 
@@ -52,6 +66,10 @@ public final class Constant {
 
     public static final String PACKAGE_NAME_PAGINATORS_PATTERN = "%s.paginators";
 
+    public static final String PACKAGE_NAME_WAITERS_PATTERN = "%s.waiters";
+
+    public static final String PACKAGE_NAME_RULES_PATTERN = "%s.endpoints";
+
     public static final String PACKAGE_NAME_SMOKE_TEST_PATTERN = "%s.smoketests";
 
     public static final String PACKAGE_NAME_CUSTOM_AUTH_PATTERN = "%s.auth";
@@ -75,6 +93,13 @@ public final class Constant {
     public static final String AWS_DOCS_HOST = "docs.aws.amazon.com";
 
     public static final String APPROVED_SIMPLE_METHOD_VERBS = "(get|list|describe|lookup|batchGet).*";
+
+    public static final String ASYNC_STREAMING_INPUT_PARAM = "requestBody";
+    public static final String ASYNC_STREAMING_OUTPUT_PARAM = "asyncResponseTransformer";
+    public static final String SYNC_STREAMING_INPUT_PARAM = "requestBody";
+    public static final String SYNC_STREAMING_OUTPUT_PARAM = "responseTransformer";
+    public static final String EVENT_PUBLISHER_PARAM_NAME = "requestStream";
+    public static final String EVENT_RESPONSE_HANDLER_PARAM_NAME = "asyncResponseHandler";
 
     private Constant() {
     }

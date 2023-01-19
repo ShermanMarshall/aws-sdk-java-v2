@@ -20,7 +20,7 @@
     <parent>
         <artifactId>aws-sdk-java-pom</artifactId>
         <groupId>software.amazon.awssdk</groupId>
-        <version>2.10.82-SNAPSHOT</version>
+        <version>2.19.20-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -85,6 +85,11 @@
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
+            <artifactId>metrics-spi</artifactId>
+            <version>${awsjavasdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
             <artifactId>sdk-core</artifactId>
             <version>${awsjavasdk.version}</version>
         </dependency>
@@ -103,6 +108,16 @@
             <artifactId>utils</artifactId>
             <version>${awsjavasdk.version}</version>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>json-utils</artifactId>
+            <version>${awsjavasdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>endpoints-spi</artifactId>
+            <version>${awsjavasdk.version}</version>
+        </dependency>
 
         <!--Test Dependencies-->
         <dependency>
@@ -118,8 +133,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -145,12 +165,27 @@
         </dependency>
         <dependency>
             <groupId>com.github.tomakehurst</groupId>
-            <artifactId>wiremock</artifactId>
+            <artifactId>wiremock-jre8</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.eventstream</groupId>
+            <artifactId>eventstream</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -167,6 +202,9 @@
                         <goals>
                             <goal>generate</goal>
                         </goals>
+                        <configuration>
+                            <writeIntermediateModel>true</writeIntermediateModel>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -198,6 +236,13 @@
                             <Automatic-Module-Name>software.amazon.awssdk.protocol.tests</Automatic-Module-Name>
                         </manifestEntries>
                     </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
         </plugins>

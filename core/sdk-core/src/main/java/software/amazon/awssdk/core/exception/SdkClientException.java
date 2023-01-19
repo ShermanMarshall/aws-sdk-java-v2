@@ -16,15 +16,19 @@
 package software.amazon.awssdk.core.exception;
 
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.core.internal.retry.SdkDefaultRetrySetting;
 
 /**
  * Base type for all client exceptions thrown by the SDK.
  *
  * This exception is thrown when service could not be contacted for a response,
  * or when client is unable to parse the response from service.
- *
- * All exceptions that extend {@link SdkClientException} are assumed to be
- * not retryable.
+ * <p>
+ * Exceptions that extend {@link SdkClientException} are assumed to be not retryable, with a few exceptions:
+ * <ul>
+ *     <li>{@link RetryableException} - usable when calls should explicitly be retried</li>
+ *     <li>Exceptions mentioned as a retryable exception in {@link SdkDefaultRetrySetting}</li>
+ * </ul>
  *
  * @see SdkServiceException
  */
@@ -69,12 +73,16 @@ public class SdkClientException extends SdkException {
         Builder cause(Throwable cause);
 
         @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
+
+        @Override
         SdkClientException build();
     }
 
     protected static class BuilderImpl extends SdkException.BuilderImpl implements Builder {
 
-        protected BuilderImpl() {}
+        protected BuilderImpl() {
+        }
 
         protected BuilderImpl(SdkClientException ex) {
             super(ex);
@@ -89,6 +97,12 @@ public class SdkClientException extends SdkException {
         @Override
         public Builder cause(Throwable cause) {
             this.cause = cause;
+            return this;
+        }
+
+        @Override
+        public Builder writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
             return this;
         }
 

@@ -17,11 +17,14 @@ package software.amazon.awssdk.enhanced.dynamodb;
 
 import java.util.List;
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
 import software.amazon.awssdk.enhanced.dynamodb.internal.client.DefaultDynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetResultPage;
+import software.amazon.awssdk.enhanced.dynamodb.model.BatchGetResultPageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteItemEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConditionCheck;
@@ -32,6 +35,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TransactGetItemsEnhancedRe
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.UpdateItemEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.BatchGetItemRequest;
 
 /**
  * Synchronous interface for running commands against a DynamoDb database.
@@ -40,6 +44,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
  * implementing classes.
  */
 @SdkPublicApi
+@ThreadSafe
 public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
@@ -66,14 +71,14 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * provisional throughput is exceeded or there is an internal DynamoDb processing failure. The operation automatically
      * retries any unprocessed keys returned from DynamoDb in subsequent calls for pages.
      * <p>
-     * This operation calls the low-level DynamoDb API BatchGetItem operation. Consult the BatchGetItem documentation for
-     * further details and constraints as well as current limits of data retrieval.
+     * This operation calls the low-level {@link DynamoDbClient#batchGetItemPaginator} operation. Consult the BatchGetItem
+     * documentation for further details and constraints as well as current limits of data retrieval.
      * <p>
      * Example:
      * <pre>
      * {@code
      *
-     * Iterator<BatchGetResultPage> batchResults = enhancedClient.batchGetItem(
+     * BatchGetResultPageIterable batchResults = enhancedClient.batchGetItem(
      *            BatchGetItemEnhancedRequest.builder()
      *                                       .readBatches(ReadBatch.builder(FirstItem.class)
      *                                                             .mappedTableResource(firstItemTable)
@@ -88,10 +93,36 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * }
      * </pre>
      *
+     * <p>
+     * The result can be accessed either through iterable {@link BatchGetResultPage}s or flattened results belonging to the
+     * supplied table across all pages.
+     *
+     * <p>
+     * 1) Iterating through pages
+     * <pre>
+     * {@code
+     * batchResults.forEach(page -> {
+     *     page.resultsForTable(firstItemTable).forEach(item -> System.out.println(item));
+     *     page.resultsForTable(secondItemTable).forEach(item -> System.out.println(item));
+     * });
+     * }
+     * </pre>
+     *
+     * <p>
+     * 2) Iterating through results across all pages
+     * <pre>
+     * {@code
+     * results.resultsForTable(firstItemTable).forEach(item -> System.out.println(item));
+     * results.resultsForTable(secondItemTable).forEach(item -> System.out.println(item));
+     * }
+     * </pre>
+     *
      * @param request A {@link BatchGetItemEnhancedRequest} containing keys grouped by tables.
      * @return an iterator of type {@link SdkIterable} with paginated results of type {@link BatchGetResultPage}.
+     * @see #batchGetItem(Consumer)
+     * @see DynamoDbClient#batchGetItemPaginator
      */
-    default SdkIterable<BatchGetResultPage> batchGetItem(BatchGetItemEnhancedRequest request) {
+    default BatchGetResultPageIterable batchGetItem(BatchGetItemEnhancedRequest request) {
         throw new UnsupportedOperationException();
     }
 
@@ -101,17 +132,6 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * The operation makes several calls to the database; each time you iterate over the result to retrieve a page,
      * a call is made for the items on that page.
      * <p>
-     * The additional configuration parameters that the enhanced client supports are defined
-     * in the {@link BatchGetItemEnhancedRequest}.
-     * <p>
-     * <b>Partial results</b>. A single call to DynamoDb has restraints on how much data can be retrieved.
-     * If those limits are exceeded, the call yields a partial result. This may also be the case if
-     * provisional throughput is exceeded or there is an internal DynamoDb processing failure. The operation automatically
-     * retries any unprocessed keys returned from DynamoDb in subsequent calls for pages.
-     * <p>
-     * This operation calls the low-level DynamoDB API BatchGetItem operation. Consult the BatchGetItem documentation for
-     * further details and constraints as well as current limits of data retrieval.
-     * <p>
      * <b>Note:</b> This is a convenience method that creates an instance of the request builder avoiding the need to create one
      * manually via {@link BatchGetItemEnhancedRequest#builder()}.
      * <p>
@@ -119,7 +139,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * <pre>
      * {@code
      *
-     * Iterator<BatchGetResultPage> batchResults = enhancedClient.batchGetItem(r -> r.addReadBatches(
+     * BatchGetResultPageIterable batchResults = enhancedClient.batchGetItem(r -> r.addReadBatches(
      *     ReadBatch.builder(FirstItem.class)
      *              .mappedTableResource(firstItemTable)
      *              .addGetItem(i -> i.key(key1))
@@ -134,8 +154,10 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      *
      * @param requestConsumer a {@link Consumer} of {@link BatchGetItemEnhancedRequest.Builder} containing keys grouped by tables.
      * @return an iterator of type {@link SdkIterable} with paginated results of type {@link BatchGetResultPage}.
+     * @see #batchGetItem(BatchGetItemEnhancedRequest)
+     * @see DynamoDbClient#batchGetItemPaginator(BatchGetItemRequest)
      */
-    default SdkIterable<BatchGetResultPage> batchGetItem(Consumer<BatchGetItemEnhancedRequest.Builder> requestConsumer) {
+    default BatchGetResultPageIterable batchGetItem(Consumer<BatchGetItemEnhancedRequest.Builder> requestConsumer) {
         throw new UnsupportedOperationException();
     }
 
@@ -145,6 +167,9 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * <p>
      * The additional configuration parameters that the enhanced client supports are defined
      * in the {@link BatchWriteItemEnhancedRequest}.
+     * <p>
+     * A single call to BatchWriteItem has the same limit of items as the low-level DynamoDB API BatchWriteItem operation,
+     * considering all items across all WriteBatches.
      * <p>
      * <b>Note: </b> BatchWriteItem cannot update items. Instead, use the individual updateItem operation
      * {@link DynamoDbTable#updateItem(UpdateItemEnhancedRequest)}.
@@ -195,6 +220,9 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * <p>
      * The additional configuration parameters that the enhanced client supports are defined
      * in the {@link BatchWriteItemEnhancedRequest}.
+     * <p>
+     * A single call to BatchWriteItem has the same limit of items as the low-level DynamoDB API BatchWriteItem operation,
+     * considering all items across all WriteBatches.
      * <p>
      * <b>Note: </b> BatchWriteItem cannot update items. Instead, use the individual updateItem operation
      * {@link DynamoDbTable#updateItem(UpdateItemEnhancedRequest)}.
@@ -415,8 +443,16 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
     }
 
     /**
+     * Creates a {@link DynamoDbEnhancedClient} with a default {@link DynamoDbClient}
+     */
+    static DynamoDbEnhancedClient create() {
+        return builder().build();
+    }
+
+    /**
      * The builder definition for a {@link DynamoDbEnhancedClient}.
      */
+    @NotThreadSafe
     interface Builder extends DynamoDbEnhancedResource.Builder {
         /**
          * The regular low-level SDK client to use with the enhanced client.

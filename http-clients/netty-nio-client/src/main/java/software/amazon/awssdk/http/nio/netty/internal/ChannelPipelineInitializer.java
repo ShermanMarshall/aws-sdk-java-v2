@@ -15,15 +15,19 @@
 
 package software.amazon.awssdk.http.nio.netty.internal;
 
+import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.CHANNEL_DIAGNOSTICS;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.HTTP2_CONNECTION;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.HTTP2_INITIAL_WINDOW_SIZE;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.PROTOCOL_FUTURE;
 import static software.amazon.awssdk.http.nio.netty.internal.NettyConfiguration.HTTP2_CONNECTION_PING_TIMEOUT_SECONDS;
+import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.newSslHandler;
 import static software.amazon.awssdk.utils.NumericUtils.saturatedCast;
 import static software.amazon.awssdk.utils.StringUtils.lowerCase;
 
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.pool.ChannelPool;
@@ -37,12 +41,11 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslProvider;
 import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2GoAwayEventListener;
@@ -56,6 +59,7 @@ import software.amazon.awssdk.http.nio.netty.internal.http2.Http2SettingsFrameHa
 public final class ChannelPipelineInitializer extends AbstractChannelPoolHandler {
     private final Protocol protocol;
     private final SslContext sslCtx;
+    private final SslProvider sslProvider;
     private final long clientMaxStreams;
     private final int clientInitialWindowSize;
     private final Duration healthCheckPingPeriod;
@@ -65,6 +69,7 @@ public final class ChannelPipelineInitializer extends AbstractChannelPoolHandler
 
     public ChannelPipelineInitializer(Protocol protocol,
                                       SslContext sslCtx,
+                                      SslProvider sslProvider,
                                       long clientMaxStreams,
                                       int clientInitialWindowSize,
                                       Duration healthCheckPingPeriod,
@@ -73,6 +78,7 @@ public final class ChannelPipelineInitializer extends AbstractChannelPoolHandler
                                       URI poolKey) {
         this.protocol = protocol;
         this.sslCtx = sslCtx;
+        this.sslProvider = sslProvider;
         this.clientMaxStreams = clientMaxStreams;
         this.clientInitialWindowSize = clientInitialWindowSize;
         this.healthCheckPingPeriod = healthCheckPingPeriod;
@@ -83,17 +89,22 @@ public final class ChannelPipelineInitializer extends AbstractChannelPoolHandler
 
     @Override
     public void channelCreated(Channel ch) {
+        ch.attr(CHANNEL_DIAGNOSTICS).set(new ChannelDiagnostics(ch));
         ch.attr(PROTOCOL_FUTURE).set(new CompletableFuture<>());
         ChannelPipeline pipeline = ch.pipeline();
         if (sslCtx != null) {
 
-            // Need to provide host and port to enable SNI
-            // https://github.com/netty/netty/issues/3801#issuecomment-104274440
-            SslHandler sslHandler = sslCtx.newHandler(ch.alloc(), poolKey.getHost(), poolKey.getPort());
-            configureSslEngine(sslHandler.engine());
+            SslHandler sslHandler = newSslHandler(sslCtx, ch.alloc(), poolKey.getHost(), poolKey.getPort(),
+                                                  configuration.tlsHandshakeTimeout());
 
             pipeline.addLast(sslHandler);
             pipeline.addLast(SslCloseCompletionEventHandler.getInstance());
+
+            // Use unpooled allocator to avoid increased heap memory usage from Netty 4.1.43.
+            // See https://github.com/netty/netty/issues/9768
+            if (sslProvider == SslProvider.JDK) {
+                ch.config().setOption(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT);
+            }
         }
 
         if (protocol == Protocol.HTTP2) {
@@ -120,20 +131,6 @@ public final class ChannelPipelineInitializer extends AbstractChannelPoolHandler
         }
 
         pipeline.addLast(new LoggingHandler(LogLevel.DEBUG));
-    }
-
-    /**
-     * Enable HostName verification.
-     *
-     * See https://netty.io/4.0/api/io/netty/handler/ssl/SslContext.html#newHandler-io.netty.buffer.ByteBufAllocator-java.lang
-     * .String-int-
-     *
-     * @param sslEngine the sslEngine to configure
-     */
-    private void configureSslEngine(SSLEngine sslEngine) {
-        SSLParameters sslParameters = sslEngine.getSSLParameters();
-        sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
-        sslEngine.setSSLParameters(sslParameters);
     }
 
     private void configureHttp2(Channel ch, ChannelPipeline pipeline) {

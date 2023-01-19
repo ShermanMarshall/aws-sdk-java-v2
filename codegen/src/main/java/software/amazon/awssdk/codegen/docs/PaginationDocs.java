@@ -23,7 +23,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
-import software.amazon.awssdk.codegen.poet.PoetExtensions;
+import software.amazon.awssdk.codegen.model.service.PaginatorDefinition;
+import software.amazon.awssdk.codegen.poet.PoetExtension;
 import software.amazon.awssdk.codegen.utils.PaginatorUtils;
 import software.amazon.awssdk.utils.async.SequentialSubscriber;
 
@@ -32,11 +33,14 @@ public class PaginationDocs {
     private static final String SUBSCRIBE_METHOD_NAME = "subscribe";
 
     private final OperationModel operationModel;
-    private final PoetExtensions poetExtensions;
+    private final PoetExtension poetExtensions;
+    private final PaginatorDefinition paginatorDefinition;
 
-    public PaginationDocs(IntermediateModel intermediateModel, OperationModel operationModel) {
+    public PaginationDocs(IntermediateModel intermediateModel, OperationModel operationModel,
+                          PaginatorDefinition paginatorDefinition) {
         this.operationModel = operationModel;
-        this.poetExtensions = new PoetExtensions(intermediateModel);
+        this.poetExtensions = new PoetExtension(intermediateModel);
+        this.paginatorDefinition = paginatorDefinition;
     }
 
     /**
@@ -149,6 +153,7 @@ public class PaginationDocs {
                                                 .add(callOperationOnClient)
                                                 .addStatement("responses.iterator().forEachRemaining(....)")
                                                 .build()))
+                        .add(noteAboutLimitConfigurationMethod())
                         .add(noteAboutSyncNonPaginatedMethod())
                         .build()
                         .toString();
@@ -186,6 +191,7 @@ public class PaginationDocs {
                                                 .build()))
                         .add("As the response is a publisher, it can work well with third party reactive streams implementations "
                              + "like RxJava2.")
+                        .add(noteAboutLimitConfigurationMethod())
                         .add(noteAboutSyncNonPaginatedMethod())
                         .build()
                         .toString();
@@ -236,6 +242,18 @@ public class PaginationDocs {
      */
     private ClassName asyncPaginatedResponseType() {
         return poetExtensions.getResponseClassForPaginatedAsyncOperation(operationModel.getOperationName());
+    }
+
+    private String getPaginatorLimitKeyName() {
+        return paginatorDefinition != null ? paginatorDefinition.getLimitKey() : "";
+    }
+
+    private CodeBlock noteAboutLimitConfigurationMethod() {
+        return CodeBlock.builder()
+                        .add("\n<p><b>Please notice that the configuration of $L won't limit the number of results "
+                             + "you get with the paginator. It only limits the number of results in each page.</b></p>",
+                             getPaginatorLimitKeyName())
+                        .build();
     }
 
     private CodeBlock noteAboutSyncNonPaginatedMethod() {

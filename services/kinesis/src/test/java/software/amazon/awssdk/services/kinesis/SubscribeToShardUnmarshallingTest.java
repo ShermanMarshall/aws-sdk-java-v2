@@ -17,7 +17,7 @@ package software.amazon.awssdk.services.kinesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.utils.FunctionalUtils.invokeSafely;
 
@@ -29,11 +29,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
 import org.reactivestreams.Subscription;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -160,6 +163,39 @@ public class SubscribeToShardUnmarshallingTest {
         assertThat(events).containsOnly(event);
     }
 
+    @Test
+    public void unknownEventType_UnmarshalledCorrectly() throws Throwable {
+        AbortableInputStream content = new MessageWriter()
+            .writeInitialResponse(new byte[0])
+            .writeEvent("ExampleUnknownEventType", "{\"Foo\": \"Bar\"}")
+            .toInputStream();
+
+        stubResponse(SdkHttpFullResponse.builder()
+                                        .statusCode(200)
+                                        .content(content)
+                                        .build());
+
+        AtomicInteger unknownEvents = new AtomicInteger(0);
+        AtomicInteger knownEvents = new AtomicInteger(0);
+
+        client.subscribeToShard(SubscribeToShardRequest.builder().build(),
+                                SubscribeToShardResponseHandler.builder().subscriber(new SubscribeToShardResponseHandler.Visitor() {
+                                    @Override
+                                    public void visitDefault(SubscribeToShardEventStream event) {
+                                        unknownEvents.incrementAndGet();
+                                    }
+
+                                    @Override
+                                    public void visit(SubscribeToShardEvent event) {
+                                        knownEvents.incrementAndGet();
+                                    }
+                                }).build())
+              .get();
+
+        assertThat(unknownEvents.get()).isEqualTo(1);
+        assertThat(knownEvents.get()).isEqualTo(0);
+    }
+
     private List<SubscribeToShardEventStream> subscribeToShard() throws Throwable {
         try {
             List<SubscribeToShardEventStream> events = new ArrayList<>();
@@ -167,9 +203,9 @@ public class SubscribeToShardUnmarshallingTest {
                                     SubscribeToShardResponseHandler.builder()
                                                                    .subscriber(events::add)
                                                                    .build())
-                  .join();
+                  .get(10, TimeUnit.SECONDS);
             return events;
-        } catch (CompletionException e) {
+        } catch (ExecutionException e) {
             throw e.getCause();
         }
     }
@@ -177,7 +213,7 @@ public class SubscribeToShardUnmarshallingTest {
     private void stubResponse(SdkHttpFullResponse response) {
         when(sdkHttpClient.execute(any(AsyncExecuteRequest.class))).thenAnswer((Answer<CompletableFuture<Void>>) invocationOnMock -> {
             CompletableFuture<Void> cf = new CompletableFuture<>();
-            AsyncExecuteRequest req = invocationOnMock.getArgumentAt(0, AsyncExecuteRequest.class);
+            AsyncExecuteRequest req = invocationOnMock.getArgument(0, AsyncExecuteRequest.class);
             SdkAsyncHttpResponseHandler value = req.responseHandler();
             value.onHeaders(response);
             value.onStream(subscriber -> subscriber.onSubscribe(new Subscription() {
@@ -188,9 +224,13 @@ public class SubscribeToShardUnmarshallingTest {
                             byte[] bytes = invokeSafely(() -> IoUtils.toByteArray(c));
                             subscriber.onNext(ByteBuffer.wrap(bytes));
                         });
-                    } finally {
+
                         subscriber.onComplete();
                         cf.complete(null);
+                    } catch (Throwable e) {
+                        subscriber.onError(e);
+                        value.onError(e);
+                        cf.completeExceptionally(e);
                     }
                 }
 

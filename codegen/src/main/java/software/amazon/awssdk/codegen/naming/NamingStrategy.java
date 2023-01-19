@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.codegen.naming;
 
+import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.MemberModel;
 import software.amazon.awssdk.codegen.model.service.Shape;
 
@@ -51,6 +52,16 @@ public interface NamingStrategy {
      * Retrieve the paginators package name that should be used based on the service name.
      */
     String getPaginatorsPackageName(String serviceName);
+
+    /**
+     * Retrieve the waiters package name that should be used based on the service name.
+     */
+    String getWaitersPackageName(String serviceName);
+
+    /**
+     * Retrieve the endpoint rules package name that should be used based on the service name.
+     */
+    String getEndpointRulesPackageName(String serviceName);
 
     /**
      * Retrieve the smote test package name that should be used based on the service name.
@@ -92,13 +103,7 @@ public interface NamingStrategy {
      * @param shapeName Name of structure used to derive Java class name.
      * @return Appropriate name to use for a Java class for an arbitrary (not a request, response, error) structure.
      */
-    String getJavaClassName(String shapeName);
-
-    /**
-     * @param shapeName Name of an authorizer shape used to derive the authorizer name
-     * @return Appropriate name to use for a Java class for an Authorizer
-     */
-    String getAuthorizerClassName(String shapeName);
+    String getShapeClassName(String shapeName);
 
     /**
      * @param memberName Member name to name getter for.
@@ -148,6 +153,14 @@ public interface NamingStrategy {
     String getSdkFieldFieldName(MemberModel memberModel);
 
     /**
+     * Returns the name of the provided member as if it will be included in an enum (as in, when the parent shape is a union
+     * and we need to create an enum with each member name in it).
+     *
+     * @param memberModel Member to generate the union enum type name for.
+     */
+    String getUnionEnumTypeName(MemberModel memberModel);
+
+    /**
      * Names a method that would check for existence of the member in the response.
      *
      * @param memberName The member name to get the method name for.
@@ -155,4 +168,9 @@ public interface NamingStrategy {
      * @return Name of an existence check method.
      */
     String getExistenceCheckMethodName(String memberName, Shape parentShape);
+
+    /**
+     * Verify the customer-visible naming in the provided intermediate model will compile and is idiomatic to Java.
+     */
+    void validateCustomerVisibleNaming(IntermediateModel trimmedModel);
 }

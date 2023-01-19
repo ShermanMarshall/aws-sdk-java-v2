@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.codegen.model.intermediate;
 
+import java.util.Map;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.codegen.model.service.AuthType;
 import software.amazon.awssdk.utils.StringUtils;
@@ -67,6 +68,10 @@ public class Metadata {
 
     private String authPolicyPackageName;
 
+    private String waitersPackageName;
+
+    private String endpointRulesPackageName;
+
     private String serviceAbbreviation;
 
     private String serviceFullName;
@@ -78,6 +83,8 @@ public class Metadata {
     private String contentType;
 
     private String jsonVersion;
+
+    private Map<String, String> awsQueryCompatible;
 
     private String endpointPrefix;
 
@@ -98,6 +105,7 @@ public class Metadata {
     private boolean supportsH2;
 
     private String serviceId;
+
 
     public String getApiVersion() {
         return apiVersion;
@@ -339,6 +347,10 @@ public class Metadata {
         return joinPackageNames(rootPackageName, getClientPackageName());
     }
 
+    public String getFullClientInternalPackageName() {
+        return joinPackageNames(getFullClientPackageName(), "internal");
+    }
+
     public String getClientPackageName() {
         return clientPackageName;
     }
@@ -497,8 +509,17 @@ public class Metadata {
         return this;
     }
 
-    public boolean isIonProtocol() {
-        return protocol == Protocol.ION;
+    public Map<String, String> getAwsQueryCompatible() {
+        return awsQueryCompatible;
+    }
+
+    public void setAwsQueryCompatible(Map<String, String> awsQueryCompatible) {
+        this.awsQueryCompatible = awsQueryCompatible;
+    }
+
+    public Metadata withAwsQueryCompatible(Map<String, String> awsQueryCompatible) {
+        setAwsQueryCompatible(awsQueryCompatible);
+        return this;
     }
 
     public boolean isCborProtocol() {
@@ -507,9 +528,7 @@ public class Metadata {
 
     public boolean isJsonProtocol() {
         return protocol == Protocol.CBOR ||
-               protocol == Protocol.ION ||
                protocol == Protocol.AWS_JSON ||
-               protocol == Protocol.API_GATEWAY ||
                protocol == Protocol.REST_JSON;
     }
 
@@ -529,7 +548,6 @@ public class Metadata {
      */
     public static boolean isNotRestProtocol(String protocol) {
         switch (Protocol.fromValue(protocol)) {
-            case API_GATEWAY:
             case REST_JSON:
             case REST_XML:
                 return false;
@@ -661,5 +679,51 @@ public class Metadata {
     public Metadata withServiceId(String serviceId) {
         setServiceId(serviceId);
         return this;
+    }
+
+    public String getWaitersPackageName() {
+        return waitersPackageName;
+    }
+
+    public void setWaitersPackageName(String waitersPackageName) {
+        this.waitersPackageName = waitersPackageName;
+    }
+
+    public Metadata withWaitersPackageName(String waitersPackageName) {
+        setWaitersPackageName(waitersPackageName);
+        return this;
+    }
+
+    public String getFullWaitersPackageName() {
+        return joinPackageNames(rootPackageName, getWaitersPackageName());
+    }
+
+    public String getFullWaitersInternalPackageName() {
+        return joinPackageNames(getFullWaitersPackageName(), "internal");
+    }
+
+    public void setEndpointRulesPackageName(String endpointRulesPackageName) {
+        this.endpointRulesPackageName = endpointRulesPackageName;
+    }
+
+    public Metadata withEndpointRulesPackageName(String endpointRulesPackageName) {
+        setEndpointRulesPackageName(endpointRulesPackageName);
+        return this;
+    }
+
+    public String getEndpointRulesPackageName() {
+        return endpointRulesPackageName;
+    }
+
+    public String getFullEndpointRulesPackageName() {
+        return joinPackageNames(rootPackageName, getEndpointRulesPackageName());
+    }
+
+    public String getFullInternalEndpointRulesPackageName() {
+        return joinPackageNames(getFullEndpointRulesPackageName(), "internal");
+    }
+
+    public String getFullInternalPackageName() {
+        return joinPackageNames(getFullClientPackageName(), "internal");
     }
 }

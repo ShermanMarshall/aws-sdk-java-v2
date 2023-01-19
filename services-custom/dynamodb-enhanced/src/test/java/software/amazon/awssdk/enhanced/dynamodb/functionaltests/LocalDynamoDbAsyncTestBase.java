@@ -16,8 +16,7 @@
 package software.amazon.awssdk.enhanced.dynamodb.functionaltests;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.*;
 
 import java.util.List;
 import software.amazon.awssdk.core.async.SdkPublisher;
@@ -30,13 +29,27 @@ public class LocalDynamoDbAsyncTestBase extends LocalDynamoDbTestBase {
         return dynamoDbAsyncClient;
     }
 
-    protected static <T> List<T> drainPublisher(SdkPublisher<T> publisher, int expectedNumberOfResults) {
+    public static <T> List<T> drainPublisher(SdkPublisher<T> publisher, int expectedNumberOfResults) {
+        BufferingSubscriber<T> subscriber = new BufferingSubscriber<>();
+        publisher.subscribe(subscriber);
+        subscriber.waitForCompletion(5000L);
+
+        assertThat(subscriber.isCompleted(), is(true));
+        assertThat(subscriber.bufferedError(), is(nullValue()));
+        assertThat(subscriber.bufferedItems().size(), is(expectedNumberOfResults));
+
+        return subscriber.bufferedItems();
+    }
+
+    public static <T> List<T> drainPublisherToError(SdkPublisher<T> publisher,
+                                                    int expectedNumberOfResults,
+                                                    Class<? extends Throwable> expectedError) {
         BufferingSubscriber<T> subscriber = new BufferingSubscriber<>();
         publisher.subscribe(subscriber);
         subscriber.waitForCompletion(1000L);
 
-        assertThat(subscriber.isCompleted(), is(true));
-        assertThat(subscriber.bufferedError(), is(nullValue()));
+        assertThat(subscriber.isCompleted(), is(false));
+        assertThat(subscriber.bufferedError(), instanceOf(expectedError));
         assertThat(subscriber.bufferedItems().size(), is(expectedNumberOfResults));
 
         return subscriber.bufferedItems();

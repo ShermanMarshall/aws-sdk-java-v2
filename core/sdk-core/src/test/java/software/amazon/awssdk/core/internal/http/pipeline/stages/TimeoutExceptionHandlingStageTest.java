@@ -17,7 +17,7 @@ package software.amazon.awssdk.core.internal.http.pipeline.stages;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -27,13 +27,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.core.Response;
 import software.amazon.awssdk.core.SdkRequest;
 import software.amazon.awssdk.core.SdkRequestOverrideConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.http.NoopTestRequest;
 import software.amazon.awssdk.core.internal.http.HttpClientDependencies;
 import software.amazon.awssdk.core.internal.http.RequestExecutionContext;
@@ -86,7 +87,6 @@ public class TimeoutExceptionHandlingStageTest {
     @Test
     public void IOException_bothTimeouts_shouldThrowInterruptedException() throws Exception {
         when(apiCallTimeoutTask.hasExecuted()).thenReturn(true);
-        when(apiCallAttemptTimeoutTask.hasExecuted()).thenReturn(true);
         when(requestPipeline.execute(any(), any())).thenThrow(new IOException());
         verifyExceptionThrown(InterruptedException.class);
     }
@@ -158,11 +158,37 @@ public class TimeoutExceptionHandlingStageTest {
     public void interruptFlagWasSet_causedByApiCallTimeout_shouldThrowInterruptException() throws Exception {
         Thread.currentThread().interrupt();
         when(apiCallTimeoutTask.hasExecuted()).thenReturn(true);
-        when(apiCallAttemptTimeoutTask.hasExecuted()).thenReturn(true);
         when(requestPipeline.execute(any(), any())).thenThrow(new RuntimeException());
         verifyExceptionThrown(InterruptedException.class);
         verifyInterruptStatusPreserved();
     }
+
+    @Test
+    public void apiCallAttemptTimeoutException_causedBySdkClientException_as_apiCallAttemptTimeoutTask_Caused_SdkClientException() throws Exception {
+        when(apiCallTimeoutTask.hasExecuted()).thenReturn(false);
+        when(apiCallAttemptTimeoutTask.hasExecuted()).thenReturn(true);
+        when(requestPipeline.execute(any(), any())).thenThrow(SdkClientException.create(""));
+        verifyExceptionThrown(ApiCallAttemptTimeoutException.class);
+    }
+
+    @Test
+    public void interruptedException_causedByApiCallAttemptTimeoutTask() throws Exception {
+        when(apiCallTimeoutTask.hasExecuted()).thenReturn(true);
+        when(apiCallAttemptTimeoutTask.hasExecuted()).thenReturn(true);
+        when(requestPipeline.execute(any(), any())).thenThrow(SdkClientException.class);
+        verifyExceptionThrown(InterruptedException.class);
+    }
+
+
+    @Test
+    public void abortedException_causedByApiCallAttemptTimeoutTask_shouldNotPropagate() throws Exception {
+        when(apiCallTimeoutTask.hasExecuted()).thenReturn(false);
+        when(apiCallAttemptTimeoutTask.hasExecuted()).thenReturn(true);
+        when(requestPipeline.execute(any(), any())).thenThrow(AbortedException.class);
+        verifyExceptionThrown(ApiCallAttemptTimeoutException.class);
+    }
+
+
 
 
     private void verifyInterruptStatusPreserved() {

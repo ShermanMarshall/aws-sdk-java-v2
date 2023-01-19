@@ -16,16 +16,12 @@
   -->
 
 <!DOCTYPE suppressions PUBLIC
-        "-//Puppy Crawl//DTD Suppressions 1.1//EN"
-        "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
+        "-//Puppy Crawl//DTD Suppressions 1.2//EN"
+        "http://www.puppycrawl.com/dtds/suppressions_1_2.dtd">
 <suppressions>
-    <!-- TODO: Disable these suppressions. -->
-    <suppress checks=".*"
+    <!-- ignore all checks for test classes except for the NoIgnoreAnnotationsCheck -->
+    <suppress checks="^((?!NoIgnoreAnnotationsCheck).)*$"
               files=".*[\\/](test|it)[\\/]java[\\/].+\.java$"/>
-
-    <!-- TODO: Disable these suppressions. -->
-    <suppress checks=".*"
-              files=".(flow)[\\/].+\.java$"/>
 
     <!-- ignore missing annotation checks under test/codegen directory -->
     <suppress checks="MissingSdkAnnotationCheck"
@@ -42,4 +38,15 @@
     <!-- Assumes getter/setter match JSON property -->
     <suppress checks="AbbreviationAsWordInName"
               files=".*[\\/]software[\\/]amazon[\\/]awssdk[\\/]services[\\/]s3[\\/]event[\\/]S3EventNotification.java$"/>
+
+    <!-- Ignore usage of Thread.currentThread().getContextClassLoader for ClassLoaderHelper.!-->
+    <suppress checks="Regexp"
+              files=".*ClassLoaderHelper\.java$"/>
+
+    <!-- Ignore usage of sslContext.newHandler for NettyUtils.!-->
+    <suppress checks="Regexp"
+              files=".*NettyUtils\.java$"/>
+
+    <!-- Allow non-java.base usage in tests -->
+    <suppress checks="software.amazon.awssdk.buildtools.checkstyle.NonJavaBaseModuleCheck" files=".*testutils.*"/>
 </suppressions>

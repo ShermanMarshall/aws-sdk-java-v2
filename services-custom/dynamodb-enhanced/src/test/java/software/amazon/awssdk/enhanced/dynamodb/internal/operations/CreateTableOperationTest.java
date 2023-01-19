@@ -37,9 +37,11 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.core.util.DefaultSdkAutoConstructList;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableMetadata;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItem;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithBinaryKey;
+import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithByteBufferKey;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithIndices;
 import software.amazon.awssdk.enhanced.dynamodb.functionaltests.models.FakeItemWithNumericSort;
 import software.amazon.awssdk.enhanced.dynamodb.model.CreateTableEnhancedRequest;
@@ -60,9 +62,9 @@ import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 public class CreateTableOperationTest {
     private static final String TABLE_NAME = "table-name";
     private static final OperationContext PRIMARY_CONTEXT =
-        OperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
+        DefaultOperationContext.create(TABLE_NAME, TableMetadata.primaryIndexName());
     private static final OperationContext GSI_1_CONTEXT =
-        OperationContext.create(TABLE_NAME, "gsi_1");
+        DefaultOperationContext.create(TABLE_NAME, "gsi_1");
 
     private static MatchedGsi matchesGsi(software.amazon.awssdk.services.dynamodb.model.GlobalSecondaryIndex other) {
         return new MatchedGsi(other);
@@ -384,6 +386,31 @@ public class CreateTableOperationTest {
                                .attributeName("id")
                                .attributeType(ScalarAttributeType.B)
                                .build()));
+    }
+
+    @Test
+    public void generateRequest_withByteBufferKey() {
+        CreateTableOperation<FakeItemWithByteBufferKey> operation = CreateTableOperation.create(CreateTableEnhancedRequest.builder()
+                .build());
+
+        CreateTableRequest request = operation.generateRequest(FakeItemWithByteBufferKey.getTableSchema(),
+                PRIMARY_CONTEXT,
+                null);
+
+        assertThat(request.tableName(), is(TABLE_NAME));
+        assertThat(request.keySchema(), containsInAnyOrder(KeySchemaElement.builder()
+                .attributeName("id")
+                .keyType(HASH)
+                .build()));
+
+        assertThat(request.globalSecondaryIndexes(), is(empty()));
+        assertThat(request.localSecondaryIndexes(), is(empty()));
+
+        assertThat(request.attributeDefinitions(), containsInAnyOrder(
+                AttributeDefinition.builder()
+                        .attributeName("id")
+                        .attributeType(ScalarAttributeType.B)
+                        .build()));
     }
 
     @Test(expected = IllegalArgumentException.class)

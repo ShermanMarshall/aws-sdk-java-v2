@@ -30,12 +30,15 @@ import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
 import software.amazon.awssdk.http.async.SdkHttpResponseHandler;
 import software.amazon.awssdk.http.async.SimpleSubscriber;
+import software.amazon.awssdk.metrics.MetricCollector;
 
 public final class RecordingResponseHandler implements SdkAsyncHttpResponseHandler {
 
     List<SdkHttpResponse> responses = new ArrayList<>();
     private StringBuilder bodyParts = new StringBuilder();
     CompletableFuture<Void> completeFuture = new CompletableFuture<>();
+    CompletableFuture<Void> executionFuture = null;
+    MetricCollector collector = MetricCollector.create("test");
 
     @Override
     public void onHeaders(SdkHttpResponse response) {
@@ -68,7 +71,7 @@ public final class RecordingResponseHandler implements SdkAsyncHttpResponseHandl
 
     }
 
-    String fullResponseAsString() {
+    public String fullResponseAsString() {
         return bodyParts.toString();
     }
 }

@@ -15,15 +15,19 @@
 
 package software.amazon.awssdk.enhanced.dynamodb;
 
+import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.nullAttributeValue;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.utils.Validate;
 
 /**
  * An object that represents a key that can be used to either identify a specific record or form part of a query
@@ -34,11 +38,14 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * The names of the keys themselves are not part of this object.
  */
 @SdkPublicApi
+@ThreadSafe
 public final class Key {
     private final AttributeValue partitionValue;
     private final AttributeValue sortValue;
 
     private Key(Builder builder) {
+        Validate.isTrue(builder.partitionValue != null && !builder.partitionValue.equals(nullAttributeValue()),
+                        "partitionValue should not be null");
         this.partitionValue = builder.partitionValue;
         this.sortValue = builder.sortValue;
     }
@@ -107,6 +114,7 @@ public final class Key {
     /**
      * Builder for {@link Key}
      */
+    @NotThreadSafe
     public static final class Builder {
         private AttributeValue partitionValue;
         private AttributeValue sortValue;

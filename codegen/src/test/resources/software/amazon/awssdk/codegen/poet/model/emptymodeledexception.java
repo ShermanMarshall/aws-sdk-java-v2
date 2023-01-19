@@ -37,7 +37,7 @@ public final class EmptyModeledException extends JsonProtocolTestsException impl
     }
 
     @Override
-    public List<SdkField<?>> sdkFields() {
+    public final List<SdkField<?>> sdkFields() {
         return SDK_FIELDS;
     }
 
@@ -56,6 +56,9 @@ public final class EmptyModeledException extends JsonProtocolTestsException impl
 
         @Override
         Builder cause(Throwable cause);
+
+        @Override
+        Builder writableStackTrace(Boolean writableStackTrace);
     }
 
     static final class BuilderImpl extends JsonProtocolTestsException.BuilderImpl implements Builder {
@@ -97,6 +100,12 @@ public final class EmptyModeledException extends JsonProtocolTestsException impl
         }
 
         @Override
+        public BuilderImpl writableStackTrace(Boolean writableStackTrace) {
+            this.writableStackTrace = writableStackTrace;
+            return this;
+        }
+
+        @Override
         public EmptyModeledException build() {
             return new EmptyModeledException(this);
         }
@@ -107,3 +116,4 @@ public final class EmptyModeledException extends JsonProtocolTestsException impl
         }
     }
 }
+

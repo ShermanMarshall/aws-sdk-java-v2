@@ -18,6 +18,7 @@ package software.amazon.awssdk.arns;
 import java.util.Objects;
 import java.util.Optional;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.utils.StringUtils;
 import software.amazon.awssdk.utils.Validate;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
@@ -31,7 +32,7 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
  * The primary supported Arn format is:
  *
  * <code>
- * arn::&#60;partition&#62;::&#60;service&#62;::&#60;region&#62;::&#60;account&#62;::&#60;resource&#62;
+ * arn:&#60;partition&#62;:&#60;service&#62;:&#60;region&#62;:&#60;account&#62;:&#60;resource&#62;
  * </code>
  *
  * <p>
@@ -106,14 +107,14 @@ public final class Arn implements ToCopyableBuilder<Arn.Builder, Arn> {
      * @return The Region that the resource resides in.
      */
     public Optional<String> region() {
-        return Optional.ofNullable(region);
+        return StringUtils.isEmpty(region) ? Optional.empty() : Optional.of(region);
     }
 
     /**
      * @return The ID of the AWS account that owns the resource, without the hyphens.
      */
     public Optional<String> accountId() {
-        return Optional.ofNullable(accountId);
+        return StringUtils.isEmpty(accountId) ? Optional.empty() : Optional.of(accountId);
     }
 
     /**
@@ -302,6 +303,7 @@ public final class Arn implements ToCopyableBuilder<Arn.Builder, Arn> {
         /**
          * @return an instance of {@link Arn} that is created from the builder
          */
+        @Override
         Arn build();
     }
 

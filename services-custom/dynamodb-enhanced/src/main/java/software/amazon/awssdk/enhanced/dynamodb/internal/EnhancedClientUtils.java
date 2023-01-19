@@ -19,21 +19,27 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
+import java.util.stream.Stream;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClientExtension;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.ReadModification;
-import software.amazon.awssdk.enhanced.dynamodb.internal.operations.OperationContext;
+import software.amazon.awssdk.enhanced.dynamodb.internal.extensions.DefaultDynamoDbExtensionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @SdkInternalApi
 public final class EnhancedClientUtils {
+    private static final Set<Character> SPECIAL_CHARACTERS = Stream.of(
+        '*', '.', '-', '#', '+', ':', '/', '(', ')',
+        '&', '<', '>', '?', '=', '!', '@', '%', '$', '|').collect(Collectors.toSet());
+
     private EnhancedClientUtils() {
 
     }
@@ -47,16 +53,31 @@ public final class EnhancedClientUtils {
      */
     public static String cleanAttributeName(String key) {
         boolean somethingChanged = false;
+
         char[] chars = key.toCharArray();
 
         for (int i = 0; i < chars.length; ++i) {
-            if (chars[i] == '*' || chars[i] == '.' || chars[i] == '-') {
+            if (SPECIAL_CHARACTERS.contains(chars[i])) {
                 chars[i] = '_';
                 somethingChanged = true;
             }
         }
 
         return somethingChanged ? new String(chars) : key;
+    }
+
+    /**
+     * Creates a key token to be used with an ExpressionNames map.
+     */
+    public static String keyRef(String key) {
+        return "#AMZN_MAPPED_" + cleanAttributeName(key);
+    }
+
+    /**
+     * Creates a value token to be used with an ExpressionValues map.
+     */
+    public static String valueRef(String value) {
+        return ":AMZN_MAPPED_" + cleanAttributeName(value);
     }
 
     public static <T> T readAndTransformSingleItem(Map<String, AttributeValue> itemMap,
@@ -68,10 +89,13 @@ public final class EnhancedClientUtils {
         }
 
         if (dynamoDbEnhancedClientExtension != null) {
-            ReadModification readModification = dynamoDbEnhancedClientExtension.afterRead(itemMap,
-                                                                                          operationContext,
-                                                                                          tableSchema.tableMetadata());
-
+            ReadModification readModification = dynamoDbEnhancedClientExtension.afterRead(
+                DefaultDynamoDbExtensionContext.builder()
+                                               .items(itemMap)
+                                               .tableSchema(tableSchema)
+                                               .operationContext(operationContext)
+                                               .tableMetadata(tableSchema.tableMetadata())
+                                               .build());
             if (readModification != null && readModification.transformedItem() != null) {
                 return tableSchema.mapToItem(readModification.transformedItem());
             }
@@ -115,6 +139,24 @@ public final class EnhancedClientUtils {
         Optional<String> sortKeyName = tableSchema.tableMetadata().indexSortKey(indexName);
         AttributeValue partitionKeyValue = tableSchema.attributeValue(item, partitionKeyName);
         Optional<AttributeValue> sortKeyValue = sortKeyName.map(key -> tableSchema.attributeValue(item, key));
+
+        return sortKeyValue.map(
+            attributeValue -> Key.builder()
+                                 .partitionValue(partitionKeyValue)
+                                 .sortValue(attributeValue)
+                                 .build())
+                           .orElseGet(
+                               () -> Key.builder()
+                                        .partitionValue(partitionKeyValue).build());
+    }
+
+    public static Key createKeyFromMap(Map<String, AttributeValue> itemMap,
+                                       TableSchema<?> tableSchema,
+                                       String indexName) {
+        String partitionKeyName = tableSchema.tableMetadata().indexPartitionKey(indexName);
+        Optional<String> sortKeyName = tableSchema.tableMetadata().indexSortKey(indexName);
+        AttributeValue partitionKeyValue = itemMap.get(partitionKeyName);
+        Optional<AttributeValue> sortKeyValue = sortKeyName.map(itemMap::get);
 
         return sortKeyValue.map(
             attributeValue -> Key.builder()

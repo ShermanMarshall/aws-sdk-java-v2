@@ -39,5 +39,25 @@ public final class AwsExecutionAttribute extends SdkExecutionAttribute {
      */
     public static final ExecutionAttribute<String> ENDPOINT_PREFIX = new ExecutionAttribute<>("AwsEndpointPrefix");
 
-    private AwsExecutionAttribute() {}
+    /**
+     * Whether dualstack endpoints were enabled for this request.
+     */
+    public static final ExecutionAttribute<Boolean> DUALSTACK_ENDPOINT_ENABLED =
+        new ExecutionAttribute<>("DualstackEndpointsEnabled");
+
+    /**
+     * Whether fips endpoints were enabled for this request.
+     */
+    public static final ExecutionAttribute<Boolean> FIPS_ENDPOINT_ENABLED =
+        new ExecutionAttribute<>("FipsEndpointsEnabled");
+
+    /**
+     * Whether the client was configured to use the service's global endpoint. This is used as part of endpoint computation by
+     * the endpoint providers.
+     */
+    public static final ExecutionAttribute<Boolean> USE_GLOBAL_ENDPOINT =
+        new ExecutionAttribute<>("UseGlobalEndpoint");
+
+    private AwsExecutionAttribute() {
+    }
 }

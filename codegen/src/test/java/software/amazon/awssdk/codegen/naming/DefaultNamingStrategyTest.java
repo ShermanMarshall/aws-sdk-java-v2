@@ -15,24 +15,31 @@
 
 package software.amazon.awssdk.codegen.naming;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
-
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.codegen.model.config.customization.CustomizationConfig;
+import software.amazon.awssdk.codegen.model.config.customization.UnderscoresInNameBehavior;
 import software.amazon.awssdk.codegen.model.config.customization.ShareModelConfig;
+import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.MemberModel;
+import software.amazon.awssdk.codegen.model.intermediate.Metadata;
+import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
+import software.amazon.awssdk.codegen.model.intermediate.ShapeModel;
 import software.amazon.awssdk.codegen.model.service.Member;
 import software.amazon.awssdk.codegen.model.service.ServiceMetadata;
 import software.amazon.awssdk.codegen.model.service.ServiceModel;
@@ -40,6 +47,7 @@ import software.amazon.awssdk.codegen.model.service.Shape;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DefaultNamingStrategyTest {
+    private CustomizationConfig customizationConfig = CustomizationConfig.create();
 
     private ServiceModel serviceModel = mock(ServiceModel.class);
 
@@ -61,23 +69,10 @@ public class DefaultNamingStrategyTest {
     @Mock
     private ServiceMetadata serviceMetadata;
 
-    private DefaultNamingStrategy strat = new DefaultNamingStrategy(serviceModel, null);
+    private DefaultNamingStrategy strat = new DefaultNamingStrategy(serviceModel, customizationConfig);
 
     @Before
     public void setUp() {
-
-    }
-
-    @Test
-    public void canConvertStringsWithNonAlphasToClassNames() {
-        String anInvalidClassName = "a phrase-With_other.delimiters";
-        assertThat(strat.getJavaClassName(anInvalidClassName)).isEqualTo("APhraseWithOtherDelimiters");
-    }
-
-    @Test
-    public void canConvertAuthorizerStartingWithNumber() {
-        String anInvalidClassName = "35-authorizer-implementation";
-        assertThat(strat.getAuthorizerClassName(anInvalidClassName)).isEqualTo("I35AuthorizerImplementation");
     }
 
     @Test
@@ -144,7 +139,6 @@ public class DefaultNamingStrategyTest {
     @Test
     public void test_GetFluentSetterMethodName_NoEnum_WithList() {
         when(serviceModel.getShapes()).thenReturn(mockShapeMap);
-        when(mockShapeMap.get(eq("MockShape"))).thenReturn(mockShape);
         when(mockShapeMap.get(eq("MockStringShape"))).thenReturn(mockStringShape);
 
         when(mockShape.getEnumValues()).thenReturn(null);
@@ -162,7 +156,6 @@ public class DefaultNamingStrategyTest {
     @Test
     public void test_GetFluentSetterMethodName_WithEnumShape_NoListOrMap() {
         when(serviceModel.getShapes()).thenReturn(mockShapeMap);
-        when(mockShapeMap.get(any())).thenReturn(mockShape);
         when(mockShape.getEnumValues()).thenReturn(new ArrayList<>());
         when(mockShape.getType()).thenReturn("foo");
 
@@ -172,7 +165,6 @@ public class DefaultNamingStrategyTest {
     @Test
     public void test_GetFluentSetterMethodName_WithEnumShape_WithList() {
         when(serviceModel.getShapes()).thenReturn(mockShapeMap);
-        when(mockShapeMap.get(eq("MockShape"))).thenReturn(mockShape);
         when(mockShapeMap.get(eq("MockStringShape"))).thenReturn(mockStringShape);
 
         when(mockShape.getEnumValues()).thenReturn(null);
@@ -185,13 +177,6 @@ public class DefaultNamingStrategyTest {
         when(member.getShape()).thenReturn("MockStringShape");
 
         assertThat(strat.getFluentSetterMethodName("AwesomeMethod", mockParentShape, mockShape)).isEqualTo("awesomeMethodWithStrings");
-    }
-
-    @Test
-    public void test_GetFluentSetterMethodName_NoEum_WithMap() {
-        when(serviceModel.getShapes()).thenReturn(mockShapeMap);
-        when(mockShape.getEnumValues()).thenReturn(new ArrayList<>());
-
     }
 
     @Test
@@ -228,7 +213,7 @@ public class DefaultNamingStrategyTest {
 
 
     @Test
-    public void sharedModel_providingPackageName_shouldUseProvidedPacakgeName() {
+    public void sharedModel_providingPackageName_shouldUseProvidedpackageName() {
         CustomizationConfig config = CustomizationConfig.create();
         ShareModelConfig shareModelConfig = new ShareModelConfig();
         shareModelConfig.setShareModelWith("foo");
@@ -250,6 +235,8 @@ public class DefaultNamingStrategyTest {
 
     @Test
     public void modelNameShouldHavePascalCase() {
+        when(serviceModel.getMetadata()).thenReturn(serviceMetadata);
+        when(serviceMetadata.getServiceId()).thenReturn("UnitTestService");
         assertThat(strat.getRequestClassName("CAPSTest")).isEqualTo("CapsTestRequest");
         assertThat(strat.getExceptionName("CAPSTest")).isEqualTo("CapsTestException");
         assertThat(strat.getResponseClassName("CAPSTest")).isEqualTo("CapsTestResponse");
@@ -262,8 +249,6 @@ public class DefaultNamingStrategyTest {
     public void getServiceName_Uses_ServiceId() {
         when(serviceModel.getMetadata()).thenReturn(serviceMetadata);
         when(serviceMetadata.getServiceId()).thenReturn("Foo");
-        when(serviceMetadata.getServiceAbbreviation()).thenReturn("Abbr");
-        when(serviceMetadata.getServiceFullName()).thenReturn("Foo Service");
 
         assertThat(strat.getServiceName()).isEqualTo("Foo");
     }
@@ -272,8 +257,6 @@ public class DefaultNamingStrategyTest {
     public void getServiceName_ThrowsException_WhenServiceIdIsNull() {
         when(serviceModel.getMetadata()).thenReturn(serviceMetadata);
         when(serviceMetadata.getServiceId()).thenReturn(null);
-        when(serviceMetadata.getServiceAbbreviation()).thenReturn("Abbr");
-        when(serviceMetadata.getServiceFullName()).thenReturn("Foo Service");
 
         strat.getServiceName();
     }
@@ -282,8 +265,6 @@ public class DefaultNamingStrategyTest {
     public void getServiceName_ThrowsException_WhenServiceIdIsEmpty() {
         when(serviceModel.getMetadata()).thenReturn(serviceMetadata);
         when(serviceMetadata.getServiceId()).thenReturn("");
-        when(serviceMetadata.getServiceAbbreviation()).thenReturn("Abbr");
-        when(serviceMetadata.getServiceFullName()).thenReturn("Foo Service");
 
         strat.getServiceName();
     }
@@ -292,8 +273,6 @@ public class DefaultNamingStrategyTest {
     public void getServiceName_ThrowsException_WhenServiceIdHasWhiteSpace() {
         when(serviceModel.getMetadata()).thenReturn(serviceMetadata);
         when(serviceMetadata.getServiceId()).thenReturn("  ");
-        when(serviceMetadata.getServiceAbbreviation()).thenReturn("Abbr");
-        when(serviceMetadata.getServiceFullName()).thenReturn("Foo Service");
 
         strat.getServiceName();
     }
@@ -321,51 +300,64 @@ public class DefaultNamingStrategyTest {
     }
 
     @Test
-    public void getJavaClassName_ReturnsSanitizedName_ClassStartingWithUnderscore() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("_MyClass");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    public void validateDisallowsUnderscoresWithCustomization() {
+        String invalidName = "foo_bar";
+        verifyFailure(i -> i.getMetadata().setAsyncBuilderInterface(invalidName));
+        verifyFailure(i -> i.getMetadata().setSyncBuilderInterface(invalidName));
+        verifyFailure(i -> i.getMetadata().setAsyncInterface(invalidName));
+        verifyFailure(i -> i.getMetadata().setSyncInterface(invalidName));
+        verifyFailure(i -> i.getMetadata().setBaseBuilderInterface(invalidName));
+        verifyFailure(i -> i.getMetadata().setBaseExceptionName(invalidName));
+        verifyFailure(i -> i.getOperations().put(invalidName, opModel(o -> o.setOperationName(invalidName))));
+        verifyFailure(i -> i.getWaiters().put(invalidName, null));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeModel(s -> s.setShapeName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setBeanStyleGetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setBeanStyleSetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setFluentEnumGetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setFluentEnumSetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setFluentGetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setFluentSetterMethodName(invalidName))));
+        verifyFailure(i -> i.getShapes().put(invalidName, shapeWithMember(m -> m.setEnumType(invalidName))));
     }
 
     @Test
-    public void getJavaClassName_ReturnsSanitizedName_ClassStartingWithDoubleUnderscore() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("__MyClass");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    public void validateAllowsUnderscoresWithCustomization() {
+        CustomizationConfig customization =
+            CustomizationConfig.create()
+                               .withUnderscoresInShapeNameBehavior(UnderscoresInNameBehavior.ALLOW);
+        NamingStrategy strategy = new DefaultNamingStrategy(serviceModel, customization);
+
+        Metadata metadata = new Metadata();
+        metadata.setAsyncBuilderInterface("foo_bar");
+
+        IntermediateModel model = new IntermediateModel();
+        model.setMetadata(metadata);
+
+        strategy.validateCustomerVisibleNaming(model);
     }
 
-    @Test
-    public void getJavaClassName_ReturnsSanitizedName_ClassStartingWithDoublePeriods() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("..MyClass");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    private void verifyFailure(Consumer<IntermediateModel> modelModifier) {
+        IntermediateModel model = new IntermediateModel();
+        model.setMetadata(new Metadata());
+        modelModifier.accept(model);
+        assertThatThrownBy(() -> strat.validateCustomerVisibleNaming(model)).isInstanceOf(RuntimeException.class);
     }
 
-    @Test
-    public void getJavaClassName_ReturnsSanitizedName_ClassStartingWithDoubleDashes() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("--MyClass");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    private OperationModel opModel(Consumer<OperationModel> operationModifier) {
+        OperationModel model = new OperationModel();
+        operationModifier.accept(model);
+        return model;
     }
 
-    @Test
-    public void getJavaClassName_ReturnsSanitizedName_DoubleUnderscoresInClass() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("My__Class");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    private ShapeModel shapeModel(Consumer<ShapeModel> shapeModifier) {
+        ShapeModel model = new ShapeModel();
+        shapeModifier.accept(model);
+        return model;
     }
 
-    @Test
-    public void getJavaClassName_ReturnsSanitizedName_DoublePeriodsInClass() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("My..Class");
-        assertThat(javaClassName).isEqualTo("MyClass");
-    }
-
-    @Test
-    public void getJavaClassName_ReturnsSanitizedName_DoubleDashesInClass() {
-        NamingStrategy strategy = new DefaultNamingStrategy(null, null);
-        String javaClassName = strategy.getJavaClassName("My--Class");
-        assertThat(javaClassName).isEqualTo("MyClass");
+    private ShapeModel shapeWithMember(Consumer<MemberModel> memberModifier) {
+        MemberModel model = new MemberModel();
+        memberModifier.accept(model);
+        return shapeModel(s -> s.setMembers(singletonList(model)));
     }
 }

@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.async.SdkPublisher;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
@@ -49,6 +48,11 @@ public class BatchGetItemOperation
 
     public static BatchGetItemOperation create(BatchGetItemEnhancedRequest request) {
         return new BatchGetItemOperation(request);
+    }
+
+    @Override
+    public OperationName operationName() {
+        return OperationName.BATCH_GET_ITEM;
     }
 
     @Override

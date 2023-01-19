@@ -19,11 +19,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.timeout.TimeoutException;
 import java.io.IOException;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.utils.Logger;
+import software.amazon.awssdk.http.nio.netty.internal.utils.NettyClientLogger;
 
 /**
  * Exception Handler for errors on the Http2 streams.
@@ -31,7 +30,7 @@ import software.amazon.awssdk.utils.Logger;
 @ChannelHandler.Sharable
 @SdkInternalApi
 public final class Http2StreamExceptionHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger log = Logger.loggerFor(Http2Stream.class);
+    private static final NettyClientLogger log = NettyClientLogger.getLogger(Http2StreamExceptionHandler.class);
     private static final Http2StreamExceptionHandler INSTANCE = new Http2StreamExceptionHandler();
 
     private Http2StreamExceptionHandler() {
@@ -45,9 +44,10 @@ public final class Http2StreamExceptionHandler extends ChannelInboundHandlerAdap
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         if (isIoError(cause) && ctx.channel().parent() != null) {
             Channel parent = ctx.channel().parent();
-            log.debug(() -> "An I/O error occurred on an Http2 stream, notifying the connection channel " + parent);
-            parent.pipeline().fireExceptionCaught(new Http2StreamIoException("An I/O error occurred on an associated Http2 "
-                                                                             + "stream"));
+            log.debug(parent, () -> "An I/O error occurred on an Http2 stream, notifying the connection channel " + parent);
+            parent.pipeline().fireExceptionCaught(new Http2ConnectionTerminatingException("An I/O error occurred on an "
+                                                                                          + "associated Http2 "
+                                                                                          + "stream " + ctx.channel()));
         }
 
         ctx.fireExceptionCaught(cause);
@@ -55,11 +55,5 @@ public final class Http2StreamExceptionHandler extends ChannelInboundHandlerAdap
 
     private boolean isIoError(Throwable cause) {
         return cause instanceof TimeoutException || cause instanceof IOException;
-    }
-
-    static final class Http2StreamIoException extends IOException {
-        Http2StreamIoException(String message) {
-            super(message);
-        }
     }
 }

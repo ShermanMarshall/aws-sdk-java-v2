@@ -15,14 +15,17 @@
 
 package software.amazon.awssdk.auth.signer;
 
+import java.time.Clock;
 import java.time.Instant;
 import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
+import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
 import software.amazon.awssdk.core.interceptor.ExecutionAttribute;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
 import software.amazon.awssdk.core.signer.Signer;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.regions.RegionScope;
 
 /**
  * AWS-specific signing attributes attached to the execution. This information is available to {@link ExecutionInterceptor}s and
@@ -42,6 +45,12 @@ public final class AwsSignerExecutionAttribute extends SdkExecutionAttribute {
     public static final ExecutionAttribute<Region> SIGNING_REGION = new ExecutionAttribute<>("SigningRegion");
 
     /**
+     * The AWS {@link Region} that is used for signing a request. This is not always same as the region configured on the client
+     * for global services like IAM.
+     */
+    public static final ExecutionAttribute<RegionScope> SIGNING_REGION_SCOPE = new ExecutionAttribute<>("SigningRegionScope");
+
+    /**
      * The signing name of the service to be using in SigV4 signing
      */
     public static final ExecutionAttribute<String> SERVICE_SIGNING_NAME = new ExecutionAttribute<>("ServiceSigningName");
@@ -50,6 +59,19 @@ public final class AwsSignerExecutionAttribute extends SdkExecutionAttribute {
      * The key to specify whether to use double url encoding during signing.
      */
     public static final ExecutionAttribute<Boolean> SIGNER_DOUBLE_URL_ENCODE = new ExecutionAttribute<>("DoubleUrlEncode");
+
+    /**
+     * The key to specify whether to normalize the resource path during signing.
+     */
+    public static final ExecutionAttribute<Boolean> SIGNER_NORMALIZE_PATH =
+        new ExecutionAttribute<>("NormalizePath");
+
+
+    /**
+     * An override clock to use during signing.
+     * @see Aws4SignerParams.Builder#signingClockOverride(Clock)
+     */
+    public static final ExecutionAttribute<Clock> SIGNING_CLOCK = new ExecutionAttribute<>("Clock");
 
     /**
      * The key to specify the expiration time when pre-signing aws requests.

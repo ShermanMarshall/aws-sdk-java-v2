@@ -22,15 +22,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
 import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
-import software.amazon.awssdk.enhanced.dynamodb.TypeToken;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.TypeConvertingVisitor;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeValueType;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -46,28 +46,36 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  *
  * <p>
  * A builder is exposed to allow defining how the collection and element types are created and converted:
+ * <p>
  * <code>
- * AttributeConverter<List<Integer>> listConverter =
- * CollectionAttributeConverter.builder(TypeToken.listOf(Integer.class))
+ * {@literal AttributeConverter<List<Integer>> listConverter =
+ * CollectionAttributeConverter.builder(EnhancedType.listOf(Integer.class))
  * .collectionConstructor(ArrayList::new)
  * .elementConverter(IntegerAttributeConverter.create())
- * .build()
+ * .build()}
  * </code>
  *
  * <p>
  * For frequently-used types, static methods are exposed to reduce the amount of boilerplate involved in creation:
+ * <p>
  * <code>
- * AttributeConverter<List<Integer>> listConverter =
- * CollectionAttributeConverter.listConverter(IntegerAttributeConverter.create());
+ * {@literal AttributeConverter<List<Integer>> listConverter =
+ * CollectionAttributeConverter.listConverter(IntegerAttributeConverter.create());}
+ * </code>
  * <p>
- * AttributeConverter<Collection<Integer>> collectionConverer =
- * CollectionAttributeConverter.collectionConverter(IntegerAttributeConverter.create());
+ * <code>
+ * {@literal AttributeConverter<Collection<Integer>> collectionConverer =
+ * CollectionAttributeConverter.collectionConverter(IntegerAttributeConverter.create());}
+ * </code>
  * <p>
- * AttributeConverter<Set<Integer>> setConverter =
- * CollectionAttributeConverter.setConverter(IntegerAttributeConverter.create());
+ * <code>
+ * {@literal AttributeConverter<Set<Integer>> setConverter =
+ * CollectionAttributeConverter.setConverter(IntegerAttributeConverter.create());}
+ * </code>
  * <p>
- * AttributeConverter<SortedSet<Integer>> sortedSetConverter =
- * CollectionAttributeConverter.sortedSetConverter(IntegerAttributeConverter.create());
+ * <code>
+ * {@literal AttributeConverter<SortedSet<Integer>> sortedSetConverter =
+ * CollectionAttributeConverter.sortedSetConverter(IntegerAttributeConverter.create());}
  * </code>
  *
  * @see MapAttributeConverter
@@ -83,18 +91,18 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
     }
 
     public static <U> ListAttributeConverter<List<U>> create(AttributeConverter<U> elementConverter) {
-        return builder(TypeToken.listOf(elementConverter.type()))
+        return builder(EnhancedType.listOf(elementConverter.type()))
             .collectionConstructor(ArrayList::new)
             .elementConverter(elementConverter)
             .build();
     }
 
-    public static <T extends Collection<U>, U> ListAttributeConverter.Builder<T, U> builder(TypeToken<T> collectionType) {
+    public static <T extends Collection<U>, U> ListAttributeConverter.Builder<T, U> builder(EnhancedType<T> collectionType) {
         return new Builder<>(collectionType);
     }
 
     @Override
-    public TypeToken<T> type() {
+    public EnhancedType<T> type() {
         return delegate.type();
     }
 
@@ -114,7 +122,7 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
     }
 
     private static final class Delegate<T extends Collection<U>, U> implements AttributeConverter<T> {
-        private final TypeToken<T> type;
+        private final EnhancedType<T> type;
         private final Supplier<? extends T> collectionConstructor;
         private final AttributeConverter<U> elementConverter;
 
@@ -125,7 +133,7 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
         }
 
         @Override
-        public TypeToken<T> type() {
+        public EnhancedType<T> type() {
             return type;
         }
 
@@ -136,10 +144,9 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
 
         @Override
         public AttributeValue transformFrom(T input) {
-            return EnhancedAttributeValue.fromListOfAttributeValues(
-                input.stream()
-                     .map(e -> EnhancedAttributeValue.fromAttributeValue(elementConverter.transformFrom(e)))
-                     .collect(toList()))
+            return EnhancedAttributeValue.fromListOfAttributeValues(input.stream()
+                                                                         .map(elementConverter::transformFrom)
+                                                                         .collect(toList()))
                                          .toAttributeValue();
         }
 
@@ -149,31 +156,31 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
                                          .convert(new TypeConvertingVisitor<T>(type.rawClass(), ListAttributeConverter.class) {
                                              @Override
                                              public T convertSetOfStrings(List<String> value) {
-                                                 return convertCollection(value, EnhancedAttributeValue::fromString);
+                                                 return convertCollection(value, v -> AttributeValue.builder().s(v).build());
                                              }
 
                                              @Override
                                              public T convertSetOfNumbers(List<String> value) {
-                                                 return convertCollection(value, EnhancedAttributeValue::fromNumber);
+                                                 return convertCollection(value, v -> AttributeValue.builder().n(v).build());
                                              }
 
                                              @Override
                                              public T convertSetOfBytes(List<SdkBytes> value) {
-                                                 return convertCollection(value, EnhancedAttributeValue::fromBytes);
+                                                 return convertCollection(value, v -> AttributeValue.builder().b(v).build());
                                              }
 
                                              @Override
-                                             public T convertListOfAttributeValues(List<EnhancedAttributeValue> value) {
+                                             public T convertListOfAttributeValues(List<AttributeValue> value) {
                                                  return convertCollection(value, Function.identity());
                                              }
 
                                              private <V> T convertCollection(Collection<V> collection,
-                                                                             Function<V, EnhancedAttributeValue> transformFrom) {
+                                                                             Function<V, AttributeValue> transformFrom) {
                                                  Collection<Object> result = (Collection<Object>) collectionConstructor.get();
 
                                                  collection.stream()
                                                            .map(transformFrom)
-                                                           .map(v -> elementConverter.transformTo(v.toAttributeValue()))
+                                                           .map(elementConverter::transformTo)
                                                            .forEach(result::add);
 
                                                  // This is a safe cast - We know the values we added to the list
@@ -184,12 +191,13 @@ public class ListAttributeConverter<T extends Collection<?>> implements Attribut
         }
     }
 
+    @NotThreadSafe
     public static final class Builder<T extends Collection<U>, U> {
-        private final TypeToken<T> collectionType;
+        private final EnhancedType<T> collectionType;
         private Supplier<? extends T> collectionConstructor;
         private AttributeConverter<U> elementConverter;
 
-        private Builder(TypeToken<T> collectionType) {
+        private Builder(EnhancedType<T> collectionType) {
             this.collectionType = collectionType;
         }
 

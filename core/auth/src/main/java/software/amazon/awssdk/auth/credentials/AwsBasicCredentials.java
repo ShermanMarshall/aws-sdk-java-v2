@@ -49,7 +49,7 @@ public final class AwsBasicCredentials implements AwsCredentials {
     private final String secretAccessKey;
 
     /**
-     * Constructs a new credentials object, with the specified AWS access key, AWS secret key and AWS session token.
+     * Constructs a new credentials object, with the specified AWS access key and AWS secret key.
      *
      * @param accessKeyId The AWS access key, used to identify the user interacting with AWS.
      * @param secretAccessKey The AWS secret access key, used to authenticate the user interacting with AWS.
@@ -69,7 +69,7 @@ public final class AwsBasicCredentials implements AwsCredentials {
     }
 
     /**
-     * Constructs a new credentials object, with the specified AWS access key, AWS secret key and AWS session token.
+     * Constructs a new credentials object, with the specified AWS access key and AWS secret key.
      *
      * @param accessKeyId The AWS access key, used to identify the user interacting with AWS.
      * @param secretAccessKey The AWS secret access key, used to authenticate the user interacting with AWS.
@@ -81,6 +81,7 @@ public final class AwsBasicCredentials implements AwsCredentials {
     /**
      * Retrieve the AWS access key, used to identify the user interacting with AWS.
      */
+    @Override
     public String accessKeyId() {
         return accessKeyId;
     }
@@ -88,6 +89,7 @@ public final class AwsBasicCredentials implements AwsCredentials {
     /**
      * Retrieve the AWS secret access key, used to authenticate the user interacting with AWS.
      */
+    @Override
     public String secretAccessKey() {
         return secretAccessKey;
     }

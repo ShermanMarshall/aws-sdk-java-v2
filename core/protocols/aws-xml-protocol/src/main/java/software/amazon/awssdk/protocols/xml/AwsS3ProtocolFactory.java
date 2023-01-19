@@ -17,7 +17,6 @@ package software.amazon.awssdk.protocols.xml;
 
 import java.util.Optional;
 import java.util.function.Supplier;
-
 import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.awscore.AwsResponse;
 import software.amazon.awssdk.core.Response;
@@ -60,6 +59,7 @@ public final class AwsS3ProtocolFactory extends AwsXmlProtocolFactory {
         private Builder() {
         }
 
+        @Override
         public AwsS3ProtocolFactory build() {
             return new AwsS3ProtocolFactory(this);
         }

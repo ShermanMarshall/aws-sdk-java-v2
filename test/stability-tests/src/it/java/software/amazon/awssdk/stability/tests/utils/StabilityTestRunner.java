@@ -74,7 +74,7 @@ public class StabilityTestRunner {
     private static final int TESTS_TIMEOUT_IN_MINUTES = 60;
     // The peak thread count might be different depending on the machine the tests are currently running on.
     // because of the internal thread pool used in AsynchronousFileChannel
-    private static final int ALLOWED_PEAK_THREAD_COUNT = 60;
+    private static final int ALLOWED_PEAK_THREAD_COUNT = 90;
 
     private ThreadMXBean threadMXBean;
     private IntFunction<CompletableFuture<?>> futureFactory;
@@ -249,10 +249,10 @@ public class StabilityTestRunner {
             log.error(() -> "An exception was thrown ", t);
             if (cause instanceof SdkServiceException) {
                 exceptionCounter.addServiceException();
-            } else if (isIOException(cause)) {
+            } else if (isIOExceptionOrHasIOCause(cause)) {
                 exceptionCounter.addIoException();
             } else if (cause instanceof SdkClientException) {
-                if (isIOException(cause.getCause())) {
+                if (isIOExceptionOrHasIOCause(cause.getCause())) {
                     exceptionCounter.addIoException();
                 } else {
                     exceptionCounter.addClientException();
@@ -264,8 +264,11 @@ public class StabilityTestRunner {
         });
     }
 
-    private static boolean isIOException(Throwable throwable) {
-        return throwable.getClass().isAssignableFrom(IOException.class);
+    private static boolean isIOExceptionOrHasIOCause(Throwable throwable) {
+        if (throwable == null) {
+            return false;
+        }
+        return throwable instanceof IOException || throwable.getCause() instanceof IOException;
     }
 
     private TestResult generateTestResult(int totalRequestNumber, String testName, ExceptionCounter exceptionCounter,

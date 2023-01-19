@@ -21,7 +21,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
@@ -83,7 +83,7 @@ public class TransactWriteItemsOperationTest {
     public void generateRequest_singleTransaction() {
         TransactWriteItemsEnhancedRequest transactGetItemsEnhancedRequest =
             TransactWriteItemsEnhancedRequest.builder()
-                                             .addPutItem(fakeItemMappedTable, FakeItem.class, r -> r.item(fakeItem1))
+                                             .addPutItem(fakeItemMappedTable, fakeItem1)
                                              .build();
 
         TransactWriteItemsOperation operation = TransactWriteItemsOperation.create(transactGetItemsEnhancedRequest);
@@ -93,15 +93,15 @@ public class TransactWriteItemsOperationTest {
                                                                              .build();
 
         assertThat(actualRequest, is(expectedRequest));
-        verifyZeroInteractions(mockDynamoDbEnhancedClientExtension);
+        verifyNoMoreInteractions(mockDynamoDbEnhancedClientExtension);
     }
 
     @Test
     public void generateRequest_multipleTransactions() {
         TransactWriteItemsEnhancedRequest transactGetItemsEnhancedRequest =
             TransactWriteItemsEnhancedRequest.builder()
-                                             .addPutItem(fakeItemMappedTable, FakeItem.class, r -> r.item(fakeItem1))
-                                             .addPutItem(fakeItemMappedTable, FakeItem.class, r -> r.item(fakeItem2))
+                                             .addPutItem(fakeItemMappedTable, fakeItem1)
+                                             .addPutItem(fakeItemMappedTable, fakeItem2)
                                              .build();
 
         TransactWriteItemsOperation operation = TransactWriteItemsOperation.create(transactGetItemsEnhancedRequest);
@@ -112,7 +112,7 @@ public class TransactWriteItemsOperationTest {
                                      .build();
 
         assertThat(actualRequest, is(expectedRequest));
-        verifyZeroInteractions(mockDynamoDbEnhancedClientExtension);
+        verifyNoMoreInteractions(mockDynamoDbEnhancedClientExtension);
     }
 
     @Test
@@ -123,7 +123,7 @@ public class TransactWriteItemsOperationTest {
 
         TransactWriteItemsRequest expectedRequest = TransactWriteItemsRequest.builder().build();
         assertThat(actualRequest, is(expectedRequest));
-        verifyZeroInteractions(mockDynamoDbEnhancedClientExtension);
+        verifyNoMoreInteractions(mockDynamoDbEnhancedClientExtension);
     }
 
     @Test
@@ -141,7 +141,7 @@ public class TransactWriteItemsOperationTest {
 
         assertThat(actualResponse, is(sameInstance(expectedResponse)));
         verify(mockDynamoDbClient).transactWriteItems(request);
-        verifyZeroInteractions(mockDynamoDbEnhancedClientExtension);
+        verifyNoMoreInteractions(mockDynamoDbEnhancedClientExtension);
     }
 
     @Test
@@ -151,7 +151,7 @@ public class TransactWriteItemsOperationTest {
 
         operation.transformResponse(response, mockDynamoDbEnhancedClientExtension);
 
-        verifyZeroInteractions(mockDynamoDbEnhancedClientExtension);
+        verifyNoMoreInteractions(mockDynamoDbEnhancedClientExtension);
     }
 
     private TransactWriteItemsEnhancedRequest emptyRequest() {

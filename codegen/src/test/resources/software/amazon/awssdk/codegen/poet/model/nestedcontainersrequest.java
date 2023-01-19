@@ -34,6 +34,7 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
                                                                             ToCopyableBuilder<NestedContainersRequest.Builder, NestedContainersRequest> {
     private static final SdkField<List<List<String>>> LIST_OF_LIST_OF_STRINGS_FIELD = SdkField
         .<List<List<String>>> builder(MarshallingType.LIST)
+        .memberName("ListOfListOfStrings")
         .getter(getter(NestedContainersRequest::listOfListOfStrings))
         .setter(setter(Builder::listOfListOfStrings))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("ListOfListOfStrings").build(),
@@ -42,20 +43,21 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
                     .memberLocationName(null)
                     .memberFieldInfo(
                         SdkField.<List<String>> builder(MarshallingType.LIST)
-                            .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
-                                                 .locationName("member").build(),
-                                    ListTrait
-                                        .builder()
-                                        .memberLocationName(null)
-                                        .memberFieldInfo(
-                                            SdkField.<String> builder(MarshallingType.STRING)
-                                                .traits(LocationTrait.builder()
-                                                                     .location(MarshallLocation.PAYLOAD)
-                                                                     .locationName("member").build()).build())
-                                        .build()).build()).build()).build();
+                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
+                                                     .locationName("member").build(),
+                                        ListTrait
+                                            .builder()
+                                            .memberLocationName(null)
+                                            .memberFieldInfo(
+                                                SdkField.<String> builder(MarshallingType.STRING)
+                                                        .traits(LocationTrait.builder()
+                                                                             .location(MarshallLocation.PAYLOAD)
+                                                                             .locationName("member").build()).build())
+                                            .build()).build()).build()).build();
 
     private static final SdkField<List<List<List<String>>>> LIST_OF_LIST_OF_LIST_OF_STRINGS_FIELD = SdkField
         .<List<List<List<String>>>> builder(MarshallingType.LIST)
+        .memberName("ListOfListOfListOfStrings")
         .getter(getter(NestedContainersRequest::listOfListOfListOfStrings))
         .setter(setter(Builder::listOfListOfListOfStrings))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("ListOfListOfListOfStrings").build(),
@@ -64,34 +66,35 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
                     .memberLocationName(null)
                     .memberFieldInfo(
                         SdkField.<List<List<String>>> builder(MarshallingType.LIST)
-                            .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
-                                                 .locationName("member").build(),
-                                    ListTrait
-                                        .builder()
-                                        .memberLocationName(null)
-                                        .memberFieldInfo(
-                                            SdkField.<List<String>> builder(MarshallingType.LIST)
-                                                .traits(LocationTrait.builder()
-                                                                     .location(MarshallLocation.PAYLOAD)
-                                                                     .locationName("member").build(),
-                                                        ListTrait
-                                                            .builder()
-                                                            .memberLocationName(null)
-                                                            .memberFieldInfo(
-                                                                SdkField.<String> builder(
-                                                                    MarshallingType.STRING)
-                                                                    .traits(LocationTrait
-                                                                                .builder()
-                                                                                .location(
-                                                                                    MarshallLocation.PAYLOAD)
-                                                                                .locationName(
-                                                                                    "member")
-                                                                                .build())
-                                                                    .build()).build())
-                                                .build()).build()).build()).build()).build();
+                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
+                                                     .locationName("member").build(),
+                                        ListTrait
+                                            .builder()
+                                            .memberLocationName(null)
+                                            .memberFieldInfo(
+                                                SdkField.<List<String>> builder(MarshallingType.LIST)
+                                                        .traits(LocationTrait.builder()
+                                                                             .location(MarshallLocation.PAYLOAD)
+                                                                             .locationName("member").build(),
+                                                                ListTrait
+                                                                    .builder()
+                                                                    .memberLocationName(null)
+                                                                    .memberFieldInfo(
+                                                                        SdkField.<String> builder(
+                                                                                    MarshallingType.STRING)
+                                                                                .traits(LocationTrait
+                                                                                            .builder()
+                                                                                            .location(
+                                                                                                MarshallLocation.PAYLOAD)
+                                                                                            .locationName(
+                                                                                                "member")
+                                                                                            .build())
+                                                                                .build()).build())
+                                                        .build()).build()).build()).build()).build();
 
     private static final SdkField<Map<String, List<List<String>>>> MAP_OF_STRING_TO_LIST_OF_LIST_OF_STRINGS_FIELD = SdkField
         .<Map<String, List<List<String>>>> builder(MarshallingType.MAP)
+        .memberName("MapOfStringToListOfListOfStrings")
         .getter(getter(NestedContainersRequest::mapOfStringToListOfListOfStrings))
         .setter(setter(Builder::mapOfStringToListOfListOfStrings))
         .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD).locationName("MapOfStringToListOfListOfStrings")
@@ -101,31 +104,31 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
                         .valueLocationName("value")
                         .valueFieldInfo(
                             SdkField.<List<List<String>>> builder(MarshallingType.LIST)
-                                .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
-                                                     .locationName("value").build(),
-                                        ListTrait
-                                            .builder()
-                                            .memberLocationName(null)
-                                            .memberFieldInfo(
-                                                SdkField.<List<String>> builder(MarshallingType.LIST)
-                                                    .traits(LocationTrait.builder()
-                                                                         .location(MarshallLocation.PAYLOAD)
-                                                                         .locationName("member").build(),
-                                                            ListTrait
-                                                                .builder()
-                                                                .memberLocationName(null)
-                                                                .memberFieldInfo(
-                                                                    SdkField.<String> builder(
-                                                                        MarshallingType.STRING)
-                                                                        .traits(LocationTrait
-                                                                                    .builder()
-                                                                                    .location(
-                                                                                        MarshallLocation.PAYLOAD)
-                                                                                    .locationName(
-                                                                                        "member")
-                                                                                    .build())
-                                                                        .build()).build())
-                                                    .build()).build()).build()).build()).build();
+                                    .traits(LocationTrait.builder().location(MarshallLocation.PAYLOAD)
+                                                         .locationName("value").build(),
+                                            ListTrait
+                                                .builder()
+                                                .memberLocationName(null)
+                                                .memberFieldInfo(
+                                                    SdkField.<List<String>> builder(MarshallingType.LIST)
+                                                            .traits(LocationTrait.builder()
+                                                                                 .location(MarshallLocation.PAYLOAD)
+                                                                                 .locationName("member").build(),
+                                                                    ListTrait
+                                                                        .builder()
+                                                                        .memberLocationName(null)
+                                                                        .memberFieldInfo(
+                                                                            SdkField.<String> builder(
+                                                                                        MarshallingType.STRING)
+                                                                                    .traits(LocationTrait
+                                                                                                .builder()
+                                                                                                .location(
+                                                                                                    MarshallLocation.PAYLOAD)
+                                                                                                .locationName(
+                                                                                                    "member")
+                                                                                                .build())
+                                                                                    .build()).build())
+                                                            .build()).build()).build()).build()).build();
 
     private static final List<SdkField<?>> SDK_FIELDS = Collections.unmodifiableList(Arrays.asList(LIST_OF_LIST_OF_STRINGS_FIELD,
                                                                                                    LIST_OF_LIST_OF_LIST_OF_STRINGS_FIELD, MAP_OF_STRING_TO_LIST_OF_LIST_OF_STRINGS_FIELD));
@@ -144,11 +147,14 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
     }
 
     /**
-     * Returns true if the ListOfListOfStrings property was specified by the sender (it may be empty), or false if the
-     * sender did not specify the value (it will be empty). For responses returned by the SDK, the sender is the AWS
-     * service.
+     * For responses, this returns true if the service returned a value for the ListOfListOfStrings property. This DOES
+     * NOT check that the value is non-empty (for which, you should check the {@code isEmpty()} method on the property).
+     * This is useful because the SDK will never return a null collection or map, but you may need to differentiate
+     * between the service returning nothing (or null) and the service returning an empty collection or map. For
+     * requests, this returns true if a value for the property was specified in the request builder, and false if a
+     * value was not specified.
      */
-    public boolean hasListOfListOfStrings() {
+    public final boolean hasListOfListOfStrings() {
         return listOfListOfStrings != null && !(listOfListOfStrings instanceof SdkAutoConstructList);
     }
 
@@ -158,21 +164,25 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
      * Attempts to modify the collection returned by this method will result in an UnsupportedOperationException.
      * </p>
      * <p>
-     * You can use {@link #hasListOfListOfStrings()} to see if a value was sent in this field.
+     * This method will never return null. If you would like to know whether the service returned this field (so that
+     * you can differentiate between null and empty), you can use the {@link #hasListOfListOfStrings} method.
      * </p>
      *
      * @return The value of the ListOfListOfStrings property for this object.
      */
-    public List<List<String>> listOfListOfStrings() {
+    public final List<List<String>> listOfListOfStrings() {
         return listOfListOfStrings;
     }
 
     /**
-     * Returns true if the ListOfListOfListOfStrings property was specified by the sender (it may be empty), or false if
-     * the sender did not specify the value (it will be empty). For responses returned by the SDK, the sender is the AWS
-     * service.
+     * For responses, this returns true if the service returned a value for the ListOfListOfListOfStrings property. This
+     * DOES NOT check that the value is non-empty (for which, you should check the {@code isEmpty()} method on the
+     * property). This is useful because the SDK will never return a null collection or map, but you may need to
+     * differentiate between the service returning nothing (or null) and the service returning an empty collection or
+     * map. For requests, this returns true if a value for the property was specified in the request builder, and false
+     * if a value was not specified.
      */
-    public boolean hasListOfListOfListOfStrings() {
+    public final boolean hasListOfListOfListOfStrings() {
         return listOfListOfListOfStrings != null && !(listOfListOfListOfStrings instanceof SdkAutoConstructList);
     }
 
@@ -182,21 +192,25 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
      * Attempts to modify the collection returned by this method will result in an UnsupportedOperationException.
      * </p>
      * <p>
-     * You can use {@link #hasListOfListOfListOfStrings()} to see if a value was sent in this field.
+     * This method will never return null. If you would like to know whether the service returned this field (so that
+     * you can differentiate between null and empty), you can use the {@link #hasListOfListOfListOfStrings} method.
      * </p>
      *
      * @return The value of the ListOfListOfListOfStrings property for this object.
      */
-    public List<List<List<String>>> listOfListOfListOfStrings() {
+    public final List<List<List<String>>> listOfListOfListOfStrings() {
         return listOfListOfListOfStrings;
     }
 
     /**
-     * Returns true if the MapOfStringToListOfListOfStrings property was specified by the sender (it may be empty), or
-     * false if the sender did not specify the value (it will be empty). For responses returned by the SDK, the sender
-     * is the AWS service.
+     * For responses, this returns true if the service returned a value for the MapOfStringToListOfListOfStrings
+     * property. This DOES NOT check that the value is non-empty (for which, you should check the {@code isEmpty()}
+     * method on the property). This is useful because the SDK will never return a null collection or map, but you may
+     * need to differentiate between the service returning nothing (or null) and the service returning an empty
+     * collection or map. For requests, this returns true if a value for the property was specified in the request
+     * builder, and false if a value was not specified.
      */
-    public boolean hasMapOfStringToListOfListOfStrings() {
+    public final boolean hasMapOfStringToListOfListOfStrings() {
         return mapOfStringToListOfListOfStrings != null && !(mapOfStringToListOfListOfStrings instanceof SdkAutoConstructMap);
     }
 
@@ -206,12 +220,14 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
      * Attempts to modify the collection returned by this method will result in an UnsupportedOperationException.
      * </p>
      * <p>
-     * You can use {@link #hasMapOfStringToListOfListOfStrings()} to see if a value was sent in this field.
+     * This method will never return null. If you would like to know whether the service returned this field (so that
+     * you can differentiate between null and empty), you can use the {@link #hasMapOfStringToListOfListOfStrings}
+     * method.
      * </p>
      *
      * @return The value of the MapOfStringToListOfListOfStrings property for this object.
      */
-    public Map<String, List<List<String>>> mapOfStringToListOfListOfStrings() {
+    public final Map<String, List<List<String>>> mapOfStringToListOfListOfStrings() {
         return mapOfStringToListOfListOfStrings;
     }
 
@@ -229,22 +245,23 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         int hashCode = 1;
         hashCode = 31 * hashCode + super.hashCode();
-        hashCode = 31 * hashCode + Objects.hashCode(listOfListOfStrings());
-        hashCode = 31 * hashCode + Objects.hashCode(listOfListOfListOfStrings());
-        hashCode = 31 * hashCode + Objects.hashCode(mapOfStringToListOfListOfStrings());
+        hashCode = 31 * hashCode + Objects.hashCode(hasListOfListOfStrings() ? listOfListOfStrings() : null);
+        hashCode = 31 * hashCode + Objects.hashCode(hasListOfListOfListOfStrings() ? listOfListOfListOfStrings() : null);
+        hashCode = 31 * hashCode
+                   + Objects.hashCode(hasMapOfStringToListOfListOfStrings() ? mapOfStringToListOfListOfStrings() : null);
         return hashCode;
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public final boolean equals(Object obj) {
         return super.equals(obj) && equalsBySdkFields(obj);
     }
 
     @Override
-    public boolean equalsBySdkFields(Object obj) {
+    public final boolean equalsBySdkFields(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -255,8 +272,11 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
             return false;
         }
         NestedContainersRequest other = (NestedContainersRequest) obj;
-        return Objects.equals(listOfListOfStrings(), other.listOfListOfStrings())
+        return hasListOfListOfStrings() == other.hasListOfListOfStrings()
+               && Objects.equals(listOfListOfStrings(), other.listOfListOfStrings())
+               && hasListOfListOfListOfStrings() == other.hasListOfListOfListOfStrings()
                && Objects.equals(listOfListOfListOfStrings(), other.listOfListOfListOfStrings())
+               && hasMapOfStringToListOfListOfStrings() == other.hasMapOfStringToListOfListOfStrings()
                && Objects.equals(mapOfStringToListOfListOfStrings(), other.mapOfStringToListOfListOfStrings());
     }
 
@@ -265,13 +285,16 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
      * redacted from this string using a placeholder value.
      */
     @Override
-    public String toString() {
-        return ToString.builder("NestedContainersRequest").add("ListOfListOfStrings", listOfListOfStrings())
-                       .add("ListOfListOfListOfStrings", listOfListOfListOfStrings())
-                       .add("MapOfStringToListOfListOfStrings", mapOfStringToListOfListOfStrings()).build();
+    public final String toString() {
+        return ToString
+            .builder("NestedContainersRequest")
+            .add("ListOfListOfStrings", hasListOfListOfStrings() ? listOfListOfStrings() : null)
+            .add("ListOfListOfListOfStrings", hasListOfListOfListOfStrings() ? listOfListOfListOfStrings() : null)
+            .add("MapOfStringToListOfListOfStrings",
+                 hasMapOfStringToListOfListOfStrings() ? mapOfStringToListOfListOfStrings() : null).build();
     }
 
-    public <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
+    public final <T> Optional<T> getValueForField(String fieldName, Class<T> clazz) {
         switch (fieldName) {
             case "ListOfListOfStrings":
                 return Optional.ofNullable(clazz.cast(listOfListOfStrings()));
@@ -285,7 +308,7 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
     }
 
     @Override
-    public List<SdkField<?>> sdkFields() {
+    public final List<SdkField<?>> sdkFields() {
         return SDK_FIELDS;
     }
 
@@ -369,7 +392,14 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
         }
 
         public final Collection<? extends Collection<String>> getListOfListOfStrings() {
+            if (listOfListOfStrings instanceof SdkAutoConstructList) {
+                return null;
+            }
             return listOfListOfStrings;
+        }
+
+        public final void setListOfListOfStrings(Collection<? extends Collection<String>> listOfListOfStrings) {
+            this.listOfListOfStrings = ListOfListOfStringsCopier.copy(listOfListOfStrings);
         }
 
         @Override
@@ -385,12 +415,16 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
             return this;
         }
 
-        public final void setListOfListOfStrings(Collection<? extends Collection<String>> listOfListOfStrings) {
-            this.listOfListOfStrings = ListOfListOfStringsCopier.copy(listOfListOfStrings);
+        public final Collection<? extends Collection<? extends Collection<String>>> getListOfListOfListOfStrings() {
+            if (listOfListOfListOfStrings instanceof SdkAutoConstructList) {
+                return null;
+            }
+            return listOfListOfListOfStrings;
         }
 
-        public final Collection<? extends Collection<? extends Collection<String>>> getListOfListOfListOfStrings() {
-            return listOfListOfListOfStrings;
+        public final void setListOfListOfListOfStrings(
+            Collection<? extends Collection<? extends Collection<String>>> listOfListOfListOfStrings) {
+            this.listOfListOfListOfStrings = ListOfListOfListOfStringsCopier.copy(listOfListOfListOfStrings);
         }
 
         @Override
@@ -407,13 +441,16 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
             return this;
         }
 
-        public final void setListOfListOfListOfStrings(
-            Collection<? extends Collection<? extends Collection<String>>> listOfListOfListOfStrings) {
-            this.listOfListOfListOfStrings = ListOfListOfListOfStringsCopier.copy(listOfListOfListOfStrings);
+        public final Map<String, ? extends Collection<? extends Collection<String>>> getMapOfStringToListOfListOfStrings() {
+            if (mapOfStringToListOfListOfStrings instanceof SdkAutoConstructMap) {
+                return null;
+            }
+            return mapOfStringToListOfListOfStrings;
         }
 
-        public final Map<String, ? extends Collection<? extends Collection<String>>> getMapOfStringToListOfListOfStrings() {
-            return mapOfStringToListOfListOfStrings;
+        public final void setMapOfStringToListOfListOfStrings(
+            Map<String, ? extends Collection<? extends Collection<String>>> mapOfStringToListOfListOfStrings) {
+            this.mapOfStringToListOfListOfStrings = MapOfStringToListOfListOfStringsCopier.copy(mapOfStringToListOfListOfStrings);
         }
 
         @Override
@@ -421,11 +458,6 @@ public final class NestedContainersRequest extends JsonProtocolTestsRequest impl
             Map<String, ? extends Collection<? extends Collection<String>>> mapOfStringToListOfListOfStrings) {
             this.mapOfStringToListOfListOfStrings = MapOfStringToListOfListOfStringsCopier.copy(mapOfStringToListOfListOfStrings);
             return this;
-        }
-
-        public final void setMapOfStringToListOfListOfStrings(
-            Map<String, ? extends Collection<? extends Collection<String>>> mapOfStringToListOfListOfStrings) {
-            this.mapOfStringToListOfListOfStrings = MapOfStringToListOfListOfStringsCopier.copy(mapOfStringToListOfListOfStrings);
         }
 
         @Override

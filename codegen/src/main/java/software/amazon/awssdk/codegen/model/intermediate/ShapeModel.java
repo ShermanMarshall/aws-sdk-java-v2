@@ -15,12 +15,12 @@
 
 package software.amazon.awssdk.codegen.model.intermediate;
 
+import static software.amazon.awssdk.codegen.internal.Constant.LF;
 import static software.amazon.awssdk.codegen.internal.Constant.REQUEST_CLASS_SUFFIX;
 import static software.amazon.awssdk.codegen.internal.Constant.RESPONSE_CLASS_SUFFIX;
 import static software.amazon.awssdk.codegen.internal.DocumentationUtils.removeFromEnd;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,11 +33,12 @@ import software.amazon.awssdk.utils.StringUtils;
 
 public class ShapeModel extends DocumentationModel implements HasDeprecation {
 
-    private final String c2jName;
+    private String c2jName;
     // shapeName might be later modified by the customization.
     private String shapeName;
     // the local variable name inside marshaller/unmarshaller implementation
     private boolean deprecated;
+    private String deprecatedMessage;
     private String type;
     private List<String> required;
     private boolean hasPayloadMember;
@@ -60,6 +61,7 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
 
     private String errorCode;
     private Integer httpStatusCode;
+    private boolean fault;
 
     private ShapeCustomizationInfo customization = new ShapeCustomizationInfo();
 
@@ -69,7 +71,14 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
 
     private XmlNamespace xmlNamespace;
 
-    public ShapeModel(@JsonProperty("c2jName") String c2jName) {
+    private boolean document;
+
+    private boolean union;
+
+    public ShapeModel() {
+    }
+
+    public ShapeModel(String c2jName) {
         this.c2jName = c2jName;
     }
 
@@ -90,13 +99,27 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
         this.deprecated = deprecated;
     }
 
+    public String getDeprecatedMessage() {
+        return deprecatedMessage;
+    }
+
+    public void setDeprecatedMessage(String deprecatedMessage) {
+        this.deprecatedMessage = deprecatedMessage;
+    }
+
     public String getC2jName() {
         return c2jName;
+    }
+
+    public void setC2jName(String c2jName) {
+        this.c2jName = c2jName;
     }
 
     public String getType() {
         return type;
     }
+
+
 
     @JsonIgnore
     public void setType(ShapeType shapeType) {
@@ -168,11 +191,17 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
         List<MemberModel> unboundMembers = new ArrayList<>();
         if (members != null) {
             for (MemberModel member : members) {
-                if (member.getHttp().getLocation() == null) {
+                if (member.getHttp().getLocation() == null && !member.getHttp().getIsPayload()) {
                     if (hasPayloadMember) {
+                        // There is an explicit payload, but this unbound
+                        // member isn't it.
+                        // Note: Somewhat unintuitive, explicit payloads don't
+                        // have an explicit location; they're identified by
+                        // the payload HTTP trait being true.
                         throw new IllegalStateException(String.format(
-                                "C2J Shape %s has both an explicit payload member and unbound (no explicit location) members. "
-                                + "This is undefined behavior, verify the correctness of the C2J model", c2jName));
+                                "C2J Shape %s has both an explicit payload member and unbound (no explicit location) member, %s."
+                                + " This is undefined behavior, verify the correctness of the C2J model.",
+                                c2jName, member.getName()));
                     }
                     unboundMembers.add(member);
                 }
@@ -202,8 +231,17 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
     public boolean hasPayloadMembers() {
         return hasPayloadMember ||
                getExplicitEventPayloadMember() != null ||
-               !getUnboundMembers().isEmpty() ||
-               (isEvent() && !getUnboundEventMembers().isEmpty());
+               hasImplicitPayloadMembers();
+
+    }
+
+    public boolean hasImplicitPayloadMembers() {
+        return !getUnboundMembers().isEmpty() ||
+               hasImplicitEventPayloadMembers();
+    }
+
+    public boolean hasImplicitEventPayloadMembers() {
+        return isEvent() && !getUnboundEventMembers().isEmpty();
     }
 
     /**
@@ -420,7 +458,7 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
      * Tries to find the member model associated with the given c2j member name from this shape
      * model. Returns the member model if present else returns null.
      */
-    private MemberModel tryFindMemberModelByC2jName(String memberC2jName, boolean ignoreCase) {
+    public MemberModel tryFindMemberModelByC2jName(String memberC2jName, boolean ignoreCase) {
 
         List<MemberModel> memberModels = getMembers();
         String expectedName = ignoreCase ? StringUtils.lowerCase(memberC2jName)
@@ -490,6 +528,16 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
             default:
                 return c2jName;
         }
+    }
+
+    public String getUnionTypeGetterDocumentation() {
+        return "Retrieve an enum value representing which member of this object is populated. "
+               + LF + LF
+               + "When this class is returned in a service response, this will be {@link Type#UNKNOWN_TO_SDK_VERSION} if the "
+               + "service returned a member that is only known to a newer SDK version."
+               + LF + LF
+               + "When this class is created directly in your code, this will be {@link Type#UNKNOWN_TO_SDK_VERSION} if zero "
+               + "members are set, and {@code null} if more than one member is set.";
     }
 
     @Override
@@ -573,5 +621,31 @@ public class ShapeModel extends DocumentationModel implements HasDeprecation {
 
     public void setXmlNamespace(XmlNamespace xmlNamespace) {
         this.xmlNamespace = xmlNamespace;
+    }
+
+    public boolean isDocument() {
+        return document;
+    }
+
+    public ShapeModel withIsDocument(boolean document) {
+        this.document = document;
+        return this;
+    }
+
+    public boolean isUnion() {
+        return union;
+    }
+
+    public void withIsUnion(boolean union) {
+        this.union = union;
+    }
+
+    public boolean isFault() {
+        return fault;
+    }
+
+    public ShapeModel withIsFault(boolean fault) {
+        this.fault = fault;
+        return this;
     }
 }

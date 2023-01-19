@@ -7,12 +7,20 @@ phases:
 
   build:
     commands:
-      - mvn clean install -T1C
+      - mvn clean install -T1C $MAVEN_OPTIONS
       - JAVA_VERSION=$(java -version 2>&1 | grep -i version | cut -d'"' -f2 | cut -d'.' -f1-1)
       - echo $JAVA_VERSION
+      - echo $MAVEN_OPTIONS
       - |
         if [ "$JAVA_VERSION" -ge "9" ]; then
           cd test/module-path-tests
           mvn package
           mvn exec:exec -P mock-tests
         fi
+    finally:
+      - mkdir -p codebuild-test-reports
+      - find ./ -name 'TEST-*.xml' -type f -exec cp {} codebuild-test-reports/ \;
+reports:
+  UnitTests:
+    files:
+      - 'codebuild-test-reports/**/*'

@@ -21,9 +21,10 @@ import java.net.URI;
 import java.time.Clock;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
+import software.amazon.awssdk.auth.signer.AwsSignerExecutionAttribute;
 import software.amazon.awssdk.auth.signer.params.Aws4PresignerParams;
+import software.amazon.awssdk.awscore.AwsExecutionAttribute;
 import software.amazon.awssdk.awscore.endpoint.DefaultServiceEndpointBuilder;
-import software.amazon.awssdk.awscore.util.AwsHostNameUtils;
 import software.amazon.awssdk.core.Protocol;
 import software.amazon.awssdk.core.SdkRequest;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
@@ -32,6 +33,7 @@ import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.interceptor.Context;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
+import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
@@ -92,7 +94,7 @@ public abstract class RdsPresignInterceptor<T extends RdsRequest> implements Exe
             return request;
         }
 
-        if (request.rawQueryParameters().containsKey(PARAM_PRESIGNED_URL)) {
+        if (request.firstMatchingRawQueryParameter(PARAM_PRESIGNED_URL).isPresent()) {
             return request;
         }
 
@@ -103,16 +105,10 @@ public abstract class RdsPresignInterceptor<T extends RdsRequest> implements Exe
             return request;
         }
 
-        String destinationRegion =
-                AwsHostNameUtils.parseSigningRegion(request.host(), SERVICE_NAME)
-                                .orElseThrow(() -> new IllegalArgumentException("Could not determine region for " +
-                                                                                request.host()))
-                                .id();
+        String destinationRegion = executionAttributes.getAttribute(AwsSignerExecutionAttribute.SIGNING_REGION).id();
 
-        URI endpoint = createEndpoint(sourceRegion, SERVICE_NAME);
-        SdkHttpFullRequest.Builder marshalledRequest = presignableRequest.marshall()
-                                                                         .toBuilder()
-                                                                         .uri(endpoint);
+        URI endpoint = createEndpoint(sourceRegion, SERVICE_NAME, executionAttributes);
+        SdkHttpFullRequest.Builder marshalledRequest = presignableRequest.marshall().toBuilder().uri(endpoint);
 
         SdkHttpFullRequest requestToPresign =
                 marshalledRequest.method(SdkHttpMethod.GET)
@@ -154,7 +150,7 @@ public abstract class RdsPresignInterceptor<T extends RdsRequest> implements Exe
         return signer.presign(request, presignerParams);
     }
 
-    private URI createEndpoint(String regionName, String serviceName) {
+    private URI createEndpoint(String regionName, String serviceName, ExecutionAttributes attributes) {
         Region region = Region.of(regionName);
 
         if (region == null) {
@@ -165,7 +161,11 @@ public abstract class RdsPresignInterceptor<T extends RdsRequest> implements Exe
         }
 
         return new DefaultServiceEndpointBuilder(SERVICE_NAME, Protocol.HTTPS.toString())
-                .withRegion(region)
-                .getServiceEndpoint();
+            .withRegion(region)
+            .withProfileFile(() -> attributes.getAttribute(SdkExecutionAttribute.PROFILE_FILE))
+            .withProfileName(attributes.getAttribute(SdkExecutionAttribute.PROFILE_NAME))
+            .withDualstackEnabled(attributes.getAttribute(AwsExecutionAttribute.DUALSTACK_ENDPOINT_ENABLED))
+            .withFipsEnabled(attributes.getAttribute(AwsExecutionAttribute.FIPS_ENDPOINT_ENABLED))
+            .getServiceEndpoint();
     }
 }

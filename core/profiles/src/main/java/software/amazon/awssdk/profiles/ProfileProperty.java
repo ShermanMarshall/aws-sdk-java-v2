@@ -50,6 +50,11 @@ public final class ProfileProperty {
     public static final String ROLE_SESSION_NAME = "role_session_name";
 
     /**
+     * Property name for specifying how long in seconds to assume the role
+     */
+    public static final String DURATION_SECONDS = "duration_seconds";
+
+    /**
      * Property name for specifying the IAM role external id
      */
     public static final String EXTERNAL_ID = "external_id";
@@ -99,5 +104,43 @@ public final class ProfileProperty {
      */
     public static final String RETRY_MODE = "retry_mode";
 
-    private ProfileProperty() {}
+    /**
+     * The "defaults mode" to be used for clients created using the currently-configured profile. Defaults mode determins how SDK
+     * default configuration should be resolved. See the {@code DefaultsMode} class JavaDoc for more
+     * information.
+     */
+    public static final String DEFAULTS_MODE = "defaults_mode";
+
+    /**
+     * Aws region where the SSO directory for the given 'sso_start_url' is hosted. This is independent of the general 'region'.
+     */
+    public static final String SSO_REGION = "sso_region";
+
+    /**
+     * The corresponding IAM role in the AWS account that temporary AWS credentials will be resolved for.
+     */
+    public static final String SSO_ROLE_NAME = "sso_role_name";
+
+    /**
+     * AWS account ID that temporary AWS credentials will be resolved for.
+     */
+    public static final String SSO_ACCOUNT_ID = "sso_account_id";
+
+    /**
+     * Start url provided by the SSO service via the console. It's the main URL used for login to the SSO directory.
+     * This is also referred to as the "User Portal URL" and can also be used to login to the SSO web interface for AWS
+     * console access.
+     */
+    public static final String SSO_START_URL = "sso_start_url";
+
+    public static final String USE_DUALSTACK_ENDPOINT = "use_dualstack_endpoint";
+
+    public static final String USE_FIPS_ENDPOINT = "use_fips_endpoint";
+
+    public static final String EC2_METADATA_SERVICE_ENDPOINT_MODE = "ec2_metadata_service_endpoint_mode";
+
+    public static final String EC2_METADATA_SERVICE_ENDPOINT = "ec2_metadata_service_endpoint";
+
+    private ProfileProperty() {
+    }
 }

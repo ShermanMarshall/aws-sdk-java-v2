@@ -24,9 +24,7 @@ public enum Protocol {
     REST_JSON("rest-json"),
     CBOR("cbor"),
     QUERY("query"),
-    REST_XML("rest-xml"),
-    API_GATEWAY("api-gateway"),
-    ION("ion");
+    REST_XML("rest-xml");
 
     private String protocol;
 

@@ -19,13 +19,15 @@ import static software.amazon.awssdk.enhanced.dynamodb.internal.EnhancedClientUt
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.MappedTableResource;
+import software.amazon.awssdk.enhanced.dynamodb.internal.operations.DefaultOperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.GetItemOperation;
-import software.amazon.awssdk.enhanced.dynamodb.internal.operations.OperationContext;
 import software.amazon.awssdk.enhanced.dynamodb.internal.operations.TransactableReadOperation;
 import software.amazon.awssdk.services.dynamodb.model.TransactGetItem;
 
@@ -39,6 +41,7 @@ import software.amazon.awssdk.services.dynamodb.model.TransactGetItem;
  * .
  */
 @SdkPublicApi
+@ThreadSafe
 public final class TransactGetItemsEnhancedRequest {
 
     private final List<TransactGetItem> transactGetItems;
@@ -85,6 +88,7 @@ public final class TransactGetItemsEnhancedRequest {
      * <p>
      * A valid builder should contain at least one {@link GetItemEnhancedRequest} added through addGetItem().
      */
+    @NotThreadSafe
     public static final class Builder {
         private List<Supplier<TransactGetItem>> itemSupplierList = new ArrayList<>();
 
@@ -96,30 +100,40 @@ public final class TransactGetItemsEnhancedRequest {
          *
          * @param mappedTableResource the table where the key is located
          * @param request A {@link GetItemEnhancedRequest}
-         * @param <T> the type of modelled objects in the table
          * @return a builder of this type
          */
-        public <T> Builder addGetItem(MappedTableResource<T> mappedTableResource, GetItemEnhancedRequest request) {
+        public Builder addGetItem(MappedTableResource<?> mappedTableResource, GetItemEnhancedRequest request) {
             itemSupplierList.add(() -> generateTransactWriteItem(mappedTableResource, GetItemOperation.create(request)));
             return this;
         }
 
         /**
-         * Adds a primary lookup key and it's associated table to the transaction by accepting a consumer of
-         * {@link GetItemEnhancedRequest.Builder}.
+         * Adds a primary lookup key and it's associated table to the transaction.
          *
          * @param mappedTableResource the table where the key is located
-         * @param requestConsumer a {@link Consumer} of {@link GetItemEnhancedRequest}
+         * @param key the primary key of an item to retrieve as part of the transaction
+         * @return a builder of this type
+         */
+        public Builder addGetItem(MappedTableResource<?> mappedTableResource, Key key) {
+            return addGetItem(mappedTableResource, GetItemEnhancedRequest.builder().key(key).build());
+        }
+
+        /**
+         * Adds a primary lookup key and it's associated table to the transaction.
+         *
+         * @param mappedTableResource the table where the key is located
+         * @param keyItem an item that will have its key fields used to match a record to retrieve from the database
          * @param <T> the type of modelled objects in the table
          * @return a builder of this type
          */
         public <T> Builder addGetItem(MappedTableResource<T> mappedTableResource,
-                                      Consumer<GetItemEnhancedRequest.Builder> requestConsumer) {
-            GetItemEnhancedRequest.Builder builder = GetItemEnhancedRequest.builder();
-            requestConsumer.accept(builder);
-            return addGetItem(mappedTableResource, builder.build());
+                                      T keyItem) {
+            return addGetItem(mappedTableResource, mappedTableResource.keyFrom(keyItem));
         }
 
+        /**
+         * Builds a {@link TransactGetItemsEnhancedRequest} from the values stored in this builder.
+         */
         public TransactGetItemsEnhancedRequest build() {
             return new TransactGetItemsEnhancedRequest(this);
         }
@@ -127,7 +141,7 @@ public final class TransactGetItemsEnhancedRequest {
         private <T> TransactGetItem generateTransactWriteItem(MappedTableResource<T> mappedTableResource,
                                                               TransactableReadOperation<T> generator) {
             return generator.generateTransactGetItem(mappedTableResource.tableSchema(),
-                                                     OperationContext.create(mappedTableResource.tableName()),
+                                                     DefaultOperationContext.create(mappedTableResource.tableName()),
                                                      mappedTableResource.mapperExtension());
         }
     }

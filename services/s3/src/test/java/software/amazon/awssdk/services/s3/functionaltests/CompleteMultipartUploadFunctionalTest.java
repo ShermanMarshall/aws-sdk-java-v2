@@ -22,16 +22,12 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import java.net.URI;
 import java.util.concurrent.CompletionException;
-
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
-
 import org.junit.Rule;
 import org.junit.Test;
-
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -42,16 +38,16 @@ import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 public class CompleteMultipartUploadFunctionalTest {
-    private static final URI HTTP_LOCALHOST_URI = URI.create("http://localhost:8080/");
 
     @Rule
-    public WireMockRule wireMock = new WireMockRule();
+    public WireMockRule wireMock = new WireMockRule(0);
+
 
     private S3ClientBuilder getSyncClientBuilder() {
 
         return S3Client.builder()
                        .region(Region.US_EAST_1)
-                       .endpointOverride(HTTP_LOCALHOST_URI)
+                       .endpointOverride(URI.create("http://localhost:" + wireMock.port()))
                        .credentialsProvider(
                            StaticCredentialsProvider.create(AwsBasicCredentials.create("key", "secret")));
     }
@@ -59,7 +55,7 @@ public class CompleteMultipartUploadFunctionalTest {
     private S3AsyncClientBuilder getAsyncClientBuilder() {
         return S3AsyncClient.builder()
                             .region(Region.US_EAST_1)
-                            .endpointOverride(HTTP_LOCALHOST_URI)
+                            .endpointOverride(URI.create("http://localhost:" + wireMock.port()))
                             .credentialsProvider(
                                 StaticCredentialsProvider.create(AwsBasicCredentials.create("key", "secret")));
 

@@ -16,16 +16,17 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.mapper;
 
 import java.util.Arrays;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeTag;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.AttributeTags;
+import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbAtomicCounter;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.BeanTableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTag;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.StaticAttributeTags;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.BeanTableSchemaAttributeTag;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbUpdateBehavior;
 
 /**
  * Static provider class for core {@link BeanTableSchema} attribute tags. Each of the implemented annotations has a
@@ -38,19 +39,27 @@ public final class BeanTableSchemaAttributeTags {
     private BeanTableSchemaAttributeTags() {
     }
 
-    public static AttributeTag attributeTagFor(DynamoDbPartitionKey annotation) {
-        return AttributeTags.primaryPartitionKey();
+    public static StaticAttributeTag attributeTagFor(DynamoDbPartitionKey annotation) {
+        return StaticAttributeTags.primaryPartitionKey();
     }
 
-    public static AttributeTag attributeTagFor(DynamoDbSortKey annotation) {
-        return AttributeTags.primarySortKey();
+    public static StaticAttributeTag attributeTagFor(DynamoDbSortKey annotation) {
+        return StaticAttributeTags.primarySortKey();
     }
 
-    public static AttributeTag attributeTagFor(DynamoDbSecondaryPartitionKey annotation) {
-        return AttributeTags.secondaryPartitionKey(Arrays.asList(annotation.indexNames()));
+    public static StaticAttributeTag attributeTagFor(DynamoDbSecondaryPartitionKey annotation) {
+        return StaticAttributeTags.secondaryPartitionKey(Arrays.asList(annotation.indexNames()));
     }
 
-    public static AttributeTag attributeTagFor(DynamoDbSecondarySortKey annotation) {
-        return AttributeTags.secondarySortKey(Arrays.asList(annotation.indexNames()));
+    public static StaticAttributeTag attributeTagFor(DynamoDbSecondarySortKey annotation) {
+        return StaticAttributeTags.secondarySortKey(Arrays.asList(annotation.indexNames()));
+    }
+
+    public static StaticAttributeTag attributeTagFor(DynamoDbUpdateBehavior annotation) {
+        return StaticAttributeTags.updateBehavior(annotation.value());
+    }
+
+    public static StaticAttributeTag attributeTagFor(DynamoDbAtomicCounter annotation) {
+        return StaticAttributeTags.atomicCounter(annotation.delta(), annotation.startValue());
     }
 }
