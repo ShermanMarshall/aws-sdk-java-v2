@@ -19,10 +19,8 @@ import java.io.File;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.crt.CrtRuntimeException;
-import software.amazon.awssdk.crt.s3.ResumeToken;
-import software.amazon.awssdk.services.s3.internal.crt.S3MetaRequestPauseObservable;
-import software.amazon.awssdk.transfer.s3.internal.S3ClientType;
+import software.amazon.awssdk.services.s3.multipart.PauseObservable;
+import software.amazon.awssdk.services.s3.multipart.S3ResumeToken;
 import software.amazon.awssdk.transfer.s3.model.CompletedFileUpload;
 import software.amazon.awssdk.transfer.s3.model.FileUpload;
 import software.amazon.awssdk.transfer.s3.model.ResumableFileUpload;
@@ -38,76 +36,56 @@ public final class DefaultFileUpload implements FileUpload {
     private final CompletableFuture<CompletedFileUpload> completionFuture;
     private final TransferProgress progress;
     private final UploadFileRequest request;
-    private final S3MetaRequestPauseObservable observable;
-    private final S3ClientType clientType;
+    private final PauseObservable pauseObservable;
 
     public DefaultFileUpload(CompletableFuture<CompletedFileUpload> completionFuture,
                              TransferProgress progress,
-                             S3MetaRequestPauseObservable observable,
-                             UploadFileRequest request,
-                             S3ClientType clientType) {
+                             PauseObservable pauseObservable,
+                             UploadFileRequest request) {
         this.completionFuture = Validate.paramNotNull(completionFuture, "completionFuture");
         this.progress = Validate.paramNotNull(progress, "progress");
-        this.observable = Validate.paramNotNull(observable, "observable");
         this.request = Validate.paramNotNull(request, "request");
-        this.clientType = Validate.paramNotNull(clientType, "clientType");
+        this.pauseObservable = pauseObservable;
         this.resumableFileUpload = new Lazy<>(this::doPause);
     }
 
     @Override
     public ResumableFileUpload pause() {
+        if (pauseObservable == null) {
+            throw new UnsupportedOperationException("Pausing an upload is not supported in a non CRT-based S3Client that does "
+                                                    + "not have multipart configuration enabled. For upload pause support, pass "
+                                                    + "a CRT-based S3Client or an S3Client with multipart enabled to "
+                                                    + "S3TransferManager.");
+        }
+
         return resumableFileUpload.getValue();
     }
 
     private ResumableFileUpload doPause() {
-        if (clientType != S3ClientType.CRT_BASED) {
-            throw new UnsupportedOperationException("Pausing an upload is not supported in a non CRT-based S3 Client. For "
-                                                    + "upload pause support, pass a CRT-based S3 client to S3TransferManager "
-                                                    + "instead: S3AsyncClient.crtBuilder().build();");
-        }
-
         File sourceFile = request.source().toFile();
+        Instant fileLastModified = Instant.ofEpochMilli(sourceFile.lastModified());
+
+        ResumableFileUpload.Builder resumableFileBuilder = ResumableFileUpload.builder()
+                                                                              .fileLastModified(fileLastModified)
+                                                                              .fileLength(sourceFile.length())
+                                                                              .uploadFileRequest(request);
+
         if (completionFuture.isDone()) {
-            Instant fileLastModified = Instant.ofEpochMilli(sourceFile.lastModified());
-            return ResumableFileUpload.builder()
-                                      .fileLastModified(fileLastModified)
-                                      .fileLength(sourceFile.length())
-                                      .uploadFileRequest(request)
-                                      .build();
+            return resumableFileBuilder.build();
         }
 
+        S3ResumeToken token = pauseObservable.pause();
 
-        Instant fileLastModified = Instant.ofEpochMilli(sourceFile
-                                                            .lastModified());
-        ResumeToken token = null;
-        try {
-            token = observable.pause();
-        } catch (CrtRuntimeException exception) {
-            // CRT throws exception if it is a single part
-            if (!exception.errorName.equals("AWS_ERROR_UNSUPPORTED_OPERATION")) {
-                throw exception;
-            }
-        }
-
-        completionFuture.cancel(true);
         // Upload hasn't started yet, or it's a single object upload
         if (token == null) {
-            return ResumableFileUpload.builder()
-                                      .fileLastModified(fileLastModified)
-                                      .fileLength(sourceFile.length())
-                                      .uploadFileRequest(request)
-                                      .build();
+            return resumableFileBuilder.build();
         }
 
-        return ResumableFileUpload.builder()
-                                  .multipartUploadId(token.getUploadId())
-                                  .totalParts(token.getTotalNumParts())
-                                  .transferredParts(token.getNumPartsCompleted())
-                                  .partSizeInBytes(token.getPartSize())
-                                  .fileLastModified(fileLastModified)
-                                  .fileLength(sourceFile.length())
-                                  .uploadFileRequest(request)
-                                  .build();
+        return resumableFileBuilder.multipartUploadId(token.uploadId())
+                                   .totalParts(token.totalNumParts())
+                                   .transferredParts(token.numPartsCompleted())
+                                   .partSizeInBytes(token.partSize())
+                                   .build();
     }
 
     @Override
@@ -143,10 +121,7 @@ public final class DefaultFileUpload implements FileUpload {
         if (!request.equals(that.request)) {
             return false;
         }
-        if (clientType != that.clientType) {
-            return false;
-        }
-        return observable == that.observable;
+        return pauseObservable == that.pauseObservable;
     }
 
     @Override
@@ -155,8 +130,7 @@ public final class DefaultFileUpload implements FileUpload {
         result = 31 * result + completionFuture.hashCode();
         result = 31 * result + progress.hashCode();
         result = 31 * result + request.hashCode();
-        result = 31 * result + observable.hashCode();
-        result = 31 * result + clientType.hashCode();
+        result = 31 * result + pauseObservable.hashCode();
         return result;
     }
 

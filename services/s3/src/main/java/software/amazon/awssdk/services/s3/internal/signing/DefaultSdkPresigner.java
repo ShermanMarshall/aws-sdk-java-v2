@@ -16,12 +16,15 @@
 package software.amazon.awssdk.services.s3.internal.signing;
 
 import java.net.URI;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.awscore.endpoint.DualstackEnabledProvider;
 import software.amazon.awssdk.awscore.endpoint.FipsEnabledProvider;
 import software.amazon.awssdk.awscore.presigner.SdkPresigner;
+import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity;
+import software.amazon.awssdk.identity.spi.IdentityProvider;
 import software.amazon.awssdk.profiles.ProfileFile;
 import software.amazon.awssdk.profiles.ProfileFileSystemSetting;
 import software.amazon.awssdk.regions.Region;
@@ -30,26 +33,26 @@ import software.amazon.awssdk.utils.IoUtils;
 
 /**
  * The base class implementing the {@link SdkPresigner} interface.
- * <p/>
+ * <p>
  * TODO: This should get moved to aws-core (or split and moved to sdk-core and aws-core) when we support presigning from
  * multiple services.
  * TODO: After moving, this should get marked as an @SdkProtectedApi.
  */
 @SdkInternalApi
 public abstract class DefaultSdkPresigner implements SdkPresigner {
-    private final ProfileFile profileFile;
+    private final Supplier<ProfileFile> profileFile;
     private final String profileName;
     private final Region region;
     private final URI endpointOverride;
-    private final AwsCredentialsProvider credentialsProvider;
+    private final IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider;
     private final Boolean dualstackEnabled;
     private final boolean fipsEnabled;
 
     protected DefaultSdkPresigner(Builder<?> b) {
-        this.profileFile = ProfileFile.defaultProfileFile();
+        this.profileFile = ProfileFile::defaultProfileFile;
         this.profileName = ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow();
         this.region = b.region != null ? b.region : DefaultAwsRegionProviderChain.builder()
-                                                                                 .profileFile(() -> profileFile)
+                                                                                 .profileFile(profileFile)
                                                                                  .profileName(profileName)
                                                                                  .build()
                                                                                  .getRegion();
@@ -61,21 +64,21 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         this.endpointOverride = b.endpointOverride;
         this.dualstackEnabled = b.dualstackEnabled != null ? b.dualstackEnabled
                                                            : DualstackEnabledProvider.builder()
-                                                                                     .profileFile(() -> profileFile)
+                                                                                     .profileFile(profileFile)
                                                                                      .profileName(profileName)
                                                                                      .build()
                                                                                      .isDualstackEnabled()
                                                                                      .orElse(null);
         this.fipsEnabled = b.fipsEnabled != null ? b.fipsEnabled
                                                  : FipsEnabledProvider.builder()
-                                                                      .profileFile(() -> profileFile)
+                                                                      .profileFile(profileFile)
                                                                       .profileName(profileName)
                                                                       .build()
                                                                       .isFipsEnabled()
                                                                       .orElse(false);
     }
 
-    protected ProfileFile profileFile() {
+    protected Supplier<ProfileFile> profileFileSupplier() {
         return profileFile;
     }
 
@@ -87,7 +90,7 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         return region;
     }
 
-    protected AwsCredentialsProvider credentialsProvider() {
+    protected IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider() {
         return credentialsProvider;
     }
 
@@ -115,7 +118,7 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
     public abstract static class Builder<B extends Builder<B>>
         implements SdkPresigner.Builder {
         private Region region;
-        private AwsCredentialsProvider credentialsProvider;
+        private IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider;
         private Boolean dualstackEnabled;
         private Boolean fipsEnabled;
         private URI endpointOverride;
@@ -131,6 +134,11 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
 
         @Override
         public B credentialsProvider(AwsCredentialsProvider credentialsProvider) {
+            return credentialsProvider((IdentityProvider<? extends AwsCredentialsIdentity>) credentialsProvider);
+        }
+
+        @Override
+        public B credentialsProvider(IdentityProvider<? extends AwsCredentialsIdentity> credentialsProvider) {
             this.credentialsProvider = credentialsProvider;
             return thisBuilder();
         }

@@ -192,6 +192,7 @@ public abstract class BaseClientHandler {
     protected <InputT extends SdkRequest, OutputT extends SdkResponse> ExecutionContext
         invokeInterceptorsAndCreateExecutionContext(
         ClientExecutionParams<InputT, OutputT> params) {
+        SdkClientConfiguration clientConfiguration = resolveRequestConfiguration(params);
         SdkRequest originalRequest = params.getInput();
 
         ExecutionAttributes executionAttributes = params.executionAttributes();
@@ -200,7 +201,11 @@ public abstract class BaseClientHandler {
             .putAttribute(SdkExecutionAttribute.SERVICE_CONFIG,
                           clientConfiguration.option(SdkClientOption.SERVICE_CONFIGURATION))
             .putAttribute(SdkExecutionAttribute.SERVICE_NAME, clientConfiguration.option(SdkClientOption.SERVICE_NAME))
-            .putAttribute(SdkExecutionAttribute.PROFILE_FILE, clientConfiguration.option(SdkClientOption.PROFILE_FILE))
+            .putAttribute(SdkExecutionAttribute.PROFILE_FILE,
+                          clientConfiguration.option(SdkClientOption.PROFILE_FILE_SUPPLIER) != null ?
+                          clientConfiguration.option(SdkClientOption.PROFILE_FILE_SUPPLIER).get() : null)
+            .putAttribute(SdkExecutionAttribute.PROFILE_FILE_SUPPLIER,
+                          clientConfiguration.option(SdkClientOption.PROFILE_FILE_SUPPLIER))
             .putAttribute(SdkExecutionAttribute.PROFILE_NAME, clientConfiguration.option(SdkClientOption.PROFILE_NAME));
 
         ExecutionInterceptorChain interceptorChain =
@@ -241,6 +246,14 @@ public abstract class BaseClientHandler {
         if (!"https".equals(endpoint.getScheme())) {
             throw SdkClientException.create("Cannot use bearer token signer with a plaintext HTTP endpoint: " + endpoint);
         }
+    }
+
+    protected SdkClientConfiguration resolveRequestConfiguration(ClientExecutionParams<?, ?> params) {
+        SdkClientConfiguration config =  params.requestConfiguration();
+        if (config != null) {
+            return config;
+        }
+        return clientConfiguration;
     }
 
     /**

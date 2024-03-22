@@ -19,9 +19,9 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.WildcardTypeName;
 import javax.lang.model.element.Modifier;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.auth.token.credentials.SdkTokenProvider;
 import software.amazon.awssdk.awscore.client.config.AwsClientOption;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
@@ -30,6 +30,8 @@ import software.amazon.awssdk.codegen.poet.rules.EndpointRulesSpecUtils;
 import software.amazon.awssdk.codegen.utils.AuthUtils;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientOption;
+import software.amazon.awssdk.identity.spi.IdentityProvider;
+import software.amazon.awssdk.identity.spi.TokenIdentity;
 
 public class SyncClientBuilderClass implements ClassSpec {
     private final IntermediateModel model;
@@ -54,12 +56,12 @@ public class SyncClientBuilderClass implements ClassSpec {
     @Override
     public TypeSpec poetSpec() {
         TypeSpec.Builder builder =
-                PoetUtils.createClassBuilder(builderClassName)
-                         .addAnnotation(SdkInternalApi.class)
-                         .addModifiers(Modifier.FINAL)
-                         .superclass(ParameterizedTypeName.get(builderBaseClassName, builderInterfaceName, clientInterfaceName))
-                         .addSuperinterface(builderInterfaceName)
-                         .addJavadoc("Internal implementation of {@link $T}.", builderInterfaceName);
+            PoetUtils.createClassBuilder(builderClassName)
+                     .addAnnotation(SdkInternalApi.class)
+                     .addModifiers(Modifier.FINAL)
+                     .superclass(ParameterizedTypeName.get(builderBaseClassName, builderInterfaceName, clientInterfaceName))
+                     .addSuperinterface(builderInterfaceName)
+                     .addJavadoc("Internal implementation of {@link $T}.", builderInterfaceName);
 
         if (model.getEndpointOperation().isPresent()) {
             builder.addMethod(endpointDiscoveryEnabled());
@@ -75,7 +77,9 @@ public class SyncClientBuilderClass implements ClassSpec {
             builder.addMethod(tokenProviderMethodImpl());
         }
 
-        return builder.addMethod(buildClientMethod()).build();
+        builder.addMethod(buildClientMethod());
+
+        return builder.build();
     }
 
     private MethodSpec endpointDiscoveryEnabled() {
@@ -115,23 +119,33 @@ public class SyncClientBuilderClass implements ClassSpec {
 
 
     private MethodSpec buildClientMethod() {
-        return MethodSpec.methodBuilder("buildClient")
-                             .addAnnotation(Override.class)
-                             .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
-                             .returns(clientInterfaceName)
-                             .addStatement("$T clientConfiguration = super.syncClientConfiguration()",
-                                           SdkClientConfiguration.class)
-                             .addStatement("this.validateClientOptions(clientConfiguration)")
-                             .addCode("return new $T(clientConfiguration);", clientClassName)
-                             .build();
+        MethodSpec.Builder builder = MethodSpec.methodBuilder("buildClient")
+                                               .addAnnotation(Override.class)
+                                               .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+                                               .returns(clientInterfaceName)
+                                               .addStatement("$T clientConfiguration = super.syncClientConfiguration()",
+                                                             SdkClientConfiguration.class)
+                                               .addStatement("this.validateClientOptions(clientConfiguration)");
+
+        builder.addStatement("$1T client = new $2T(clientConfiguration)",
+                             clientInterfaceName, clientClassName);
+        if (model.syncClientDecoratorClassName().isPresent()) {
+            builder.addStatement("return new $T().decorate(client, clientConfiguration)",
+                                 PoetUtils.classNameFromFqcn(model.syncClientDecoratorClassName().get()));
+        } else {
+            builder.addStatement("return client");
+        }
+        return builder.build();
     }
 
     private MethodSpec tokenProviderMethodImpl() {
+        ParameterizedTypeName tokenProviderTypeName = ParameterizedTypeName.get(ClassName.get(IdentityProvider.class),
+                                                                                WildcardTypeName.subtypeOf(TokenIdentity.class));
         return MethodSpec.methodBuilder("tokenProvider").addModifiers(Modifier.PUBLIC)
                          .addAnnotation(Override.class)
-                         .addParameter(SdkTokenProvider.class, "tokenProvider")
+                         .addParameter(tokenProviderTypeName, "tokenProvider")
                          .returns(builderClassName)
-                         .addStatement("clientConfiguration.option($T.TOKEN_PROVIDER, tokenProvider)",
+                         .addStatement("clientConfiguration.option($T.TOKEN_IDENTITY_PROVIDER, tokenProvider)",
                                        AwsClientOption.class)
                          .addStatement("return this")
                          .build();

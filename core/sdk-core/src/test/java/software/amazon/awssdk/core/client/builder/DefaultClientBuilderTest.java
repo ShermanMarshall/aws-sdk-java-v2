@@ -35,10 +35,13 @@ import static software.amazon.awssdk.core.client.config.SdkClientOption.EXECUTIO
 import static software.amazon.awssdk.core.client.config.SdkClientOption.EXECUTION_INTERCEPTORS;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.METRIC_PUBLISHERS;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_FILE;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_FILE_SUPPLIER;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.PROFILE_NAME;
 import static software.amazon.awssdk.core.client.config.SdkClientOption.RETRY_POLICY;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.SCHEDULED_EXECUTOR_SERVICE;
 import static software.amazon.awssdk.core.internal.SdkInternalTestAdvancedClientOption.ENDPOINT_OVERRIDDEN_OVERRIDE;
 
+import com.google.common.collect.ImmutableSet;
 import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
@@ -51,20 +54,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Supplier;
 import org.assertj.core.api.Assertions;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption;
-import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
+import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.interceptor.ExecutionAttribute;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
-import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.core.signer.NoOpSigner;
 import software.amazon.awssdk.core.signer.Signer;
@@ -130,7 +137,9 @@ public class DefaultClientBuilderTest {
                                              .content(new StringInputStream(""))
                                              .type(ProfileFile.Type.CONFIGURATION)
                                              .build();
+        Supplier<ProfileFile> profileFileSupplier = () -> profileFile;
         String profileName = "name";
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
 
         ClientOverrideConfiguration overrideConfig = ClientOverrideConfiguration.builder()
             .executionInterceptors(interceptors)
@@ -142,11 +151,12 @@ public class DefaultClientBuilderTest {
             .apiCallTimeout(apiCallTimeout)
             .apiCallAttemptTimeout(apiCallAttemptTimeout)
             .putAdvancedOption(DISABLE_HOST_PREFIX_INJECTION, Boolean.TRUE)
-            .defaultProfileFile(profileFile)
+            .defaultProfileFileSupplier(profileFileSupplier)
             .defaultProfileName(profileName)
             .metricPublishers(metricPublishers)
             .executionAttributes(executionAttributes)
             .putAdvancedOption(ENDPOINT_OVERRIDDEN_OVERRIDE, Boolean.TRUE)
+            .scheduledExecutorService(scheduledExecutorService)
             .build();
 
         TestClientBuilder builder = testClientBuilder().overrideConfiguration(overrideConfig);
@@ -160,11 +170,17 @@ public class DefaultClientBuilderTest {
         assertThat(builderOverrideConfig.apiCallTimeout()).isEqualTo(Optional.of(apiCallTimeout));
         assertThat(builderOverrideConfig.apiCallAttemptTimeout()).isEqualTo(Optional.of(apiCallAttemptTimeout));
         assertThat(builderOverrideConfig.advancedOption(DISABLE_HOST_PREFIX_INJECTION)).isEqualTo(Optional.of(Boolean.TRUE));
+        assertThat(builderOverrideConfig.defaultProfileFileSupplier()).hasValue(profileFileSupplier);
         assertThat(builderOverrideConfig.defaultProfileFile()).isEqualTo(Optional.of(profileFile));
         assertThat(builderOverrideConfig.defaultProfileName()).isEqualTo(Optional.of(profileName));
         assertThat(builderOverrideConfig.metricPublishers()).isEqualTo(metricPublishers);
         assertThat(builderOverrideConfig.executionAttributes().getAttributes()).isEqualTo(executionAttributes.getAttributes());
         assertThat(builderOverrideConfig.advancedOption(ENDPOINT_OVERRIDDEN_OVERRIDE)).isEqualTo(Optional.of(Boolean.TRUE));
+
+        Runnable runnable = () -> {
+        };
+        builderOverrideConfig.scheduledExecutorService().get().submit(runnable);
+        verify(scheduledExecutorService).submit(runnable);
     }
 
     @Test
@@ -183,11 +199,13 @@ public class DefaultClientBuilderTest {
         assertThat(builderOverrideConfig.apiCallTimeout()).isEmpty();
         assertThat(builderOverrideConfig.apiCallAttemptTimeout()).isEmpty();
         assertThat(builderOverrideConfig.advancedOption(DISABLE_HOST_PREFIX_INJECTION)).isEmpty();
+        assertThat(builderOverrideConfig.defaultProfileFileSupplier()).isEmpty();
         assertThat(builderOverrideConfig.defaultProfileFile()).isEmpty();
         assertThat(builderOverrideConfig.defaultProfileName()).isEmpty();
         assertThat(builderOverrideConfig.metricPublishers()).isEmpty();
         assertThat(builderOverrideConfig.executionAttributes().getAttributes()).isEmpty();
         assertThat(builderOverrideConfig.advancedOption(ENDPOINT_OVERRIDDEN_OVERRIDE)).isEmpty();
+        assertThat(builderOverrideConfig.scheduledExecutorService()).isEmpty();
     }
 
     @Test
@@ -197,6 +215,7 @@ public class DefaultClientBuilderTest {
         interceptors.add(interceptor);
 
         RetryPolicy retryPolicy = RetryPolicy.builder().build();
+        ScheduledExecutorService scheduledExecutorService = Mockito.spy(Executors.newScheduledThreadPool(1));
 
         Map<String, List<String>> headers = new HashMap<>();
         List<String> headerValues = new ArrayList<>();
@@ -246,6 +265,7 @@ public class DefaultClientBuilderTest {
             .metricPublishers(metricPublishers)
             .executionAttributes(executionAttributes)
             .putAdvancedOption(ENDPOINT_OVERRIDDEN_OVERRIDE, Boolean.TRUE)
+            .scheduledExecutorService(scheduledExecutorService)
             .build();
 
         SdkClientConfiguration config =
@@ -261,10 +281,18 @@ public class DefaultClientBuilderTest {
         assertThat(config.option(API_CALL_ATTEMPT_TIMEOUT)).isEqualTo(apiCallAttemptTimeout);
         assertThat(config.option(DISABLE_HOST_PREFIX_INJECTION)).isEqualTo(Boolean.TRUE);
         assertThat(config.option(PROFILE_FILE)).isEqualTo(profileFile);
+        assertThat(config.option(PROFILE_FILE_SUPPLIER).get()).isEqualTo(profileFile);
         assertThat(config.option(PROFILE_NAME)).isEqualTo(profileName);
         assertThat(config.option(METRIC_PUBLISHERS)).contains(metricPublisher);
         assertThat(config.option(EXECUTION_ATTRIBUTES).getAttribute(execAttribute)).isEqualTo("value");
         assertThat(config.option(ENDPOINT_OVERRIDDEN)).isEqualTo(Boolean.TRUE);
+
+        // Ensure that the SDK won't close the scheduled executor service we provided.
+        config.close();
+        config.option(SCHEDULED_EXECUTOR_SERVICE).shutdownNow();
+        config.option(SCHEDULED_EXECUTOR_SERVICE).shutdown();
+        Mockito.verify(scheduledExecutorService, never()).shutdown();
+        Mockito.verify(scheduledExecutorService, never()).shutdownNow();
     }
 
     @Test
@@ -352,6 +380,9 @@ public class DefaultClientBuilderTest {
 
     @Test
     public void clientBuilderFieldsHaveBeanEquivalents() throws Exception {
+        // Mutating properties might not have bean equivalents. This is probably fine, since very few customers require
+        // bean-equivalent methods and it's not clear what they'd expect them to be named anyway. Ignore these methods for now.
+        Set<String> NON_BEAN_EQUIVALENT_METHODS = ImmutableSet.of("addPlugin", "plugins", "putAuthScheme");
         SdkClientBuilder<TestClientBuilder, TestClient> builder = testClientBuilder();
 
         BeanInfo beanInfo = Introspector.getBeanInfo(builder.getClass());
@@ -360,17 +391,32 @@ public class DefaultClientBuilderTest {
         Arrays.stream(clientBuilderMethods).filter(m -> !m.isSynthetic()).forEach(builderMethod -> {
             String propertyName = builderMethod.getName();
 
+            if (NON_BEAN_EQUIVALENT_METHODS.contains(propertyName)) {
+                return;
+            }
+
             Optional<PropertyDescriptor> propertyForMethod =
-                    Arrays.stream(beanInfo.getPropertyDescriptors())
-                          .filter(property -> property.getName().equals(propertyName))
-                          .findFirst();
+                Arrays.stream(beanInfo.getPropertyDescriptors())
+                      .filter(property -> property.getName().equals(propertyName))
+                      .findFirst();
 
             assertThat(propertyForMethod).as(propertyName + " property").hasValueSatisfying(property -> {
                 assertThat(property.getReadMethod()).as(propertyName + " getter").isNull();
                 assertThat(property.getWriteMethod()).as(propertyName + " setter").isNotNull();
             });
         });
+    }
 
+    @Test
+    public void defaultProfileFileSupplier_isStaticOrHasIdentityCaching() {
+        SdkClientConfiguration config =
+            testClientBuilder().build().clientConfiguration;
+
+        Supplier<ProfileFile> defaultProfileFileSupplier = config.option(PROFILE_FILE_SUPPLIER);
+        ProfileFile firstGet = defaultProfileFileSupplier.get();
+        ProfileFile secondGet = defaultProfileFileSupplier.get();
+
+        assertThat(secondGet).isSameAs(firstGet);
     }
 
     private SdkDefaultClientBuilder<TestClientBuilder, TestClient> testClientBuilder() {

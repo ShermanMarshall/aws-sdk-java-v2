@@ -32,12 +32,14 @@ public final class DefaultCustomizationProcessor {
                 new RenameShapesProcessor(config.getRenameShapes()),
                 new ShapeModifiersProcessor(config.getShapeModifiers()),
                 new ShapeSubstitutionsProcessor(config.getShapeSubstitutions()),
+                new CustomSdkShapesProcessor(config.getCustomSdkShapes()),
                 new OperationModifiersProcessor(config.getOperationModifiers()),
                 new RemoveExceptionMessagePropertyProcessor(),
                 new UseLegacyEventGenerationSchemeProcessor(),
                 new NewAndLegacyEventStreamProcessor(),
                 new S3RemoveBucketFromUriProcessor(),
-                new S3ControlRemoveAccountIdHostPrefixProcessor()
+                new S3ControlRemoveAccountIdHostPrefixProcessor(),
+                new ExplicitStringPayloadQueryProtocolProcessor()
                 );
     }
 }

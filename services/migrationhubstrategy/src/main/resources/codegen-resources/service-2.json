@@ -183,6 +183,23 @@
       ],
       "documentation":"<p> Retrieves recommended strategies and tools for the specified server. </p>"
     },
+    "ListAnalyzableServers":{
+      "name":"ListAnalyzableServers",
+      "http":{
+        "method":"POST",
+        "requestUri":"/list-analyzable-servers",
+        "responseCode":200
+      },
+      "input":{"shape":"ListAnalyzableServersRequest"},
+      "output":{"shape":"ListAnalyzableServersResponse"},
+      "errors":[
+        {"shape":"AccessDeniedException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"ValidationException"},
+        {"shape":"InternalServerException"}
+      ],
+      "documentation":"<p>Retrieves a list of all the servers fetched from customer vCenter using Strategy Recommendation Collector.</p>"
+    },
     "ListApplicationComponents":{
       "name":"ListApplicationComponents",
       "http":{
@@ -381,12 +398,104 @@
       "members":{
         "message":{"shape":"String"}
       },
-      "documentation":"<p> The AWS user account does not have permission to perform the action. Check the AWS Identity and Access Management (IAM) policy associated with this account.</p>",
+      "documentation":"<p> The user does not have permission to perform the action. Check the AWS Identity and Access Management (IAM) policy associated with this user.</p>",
       "error":{
         "httpStatusCode":403,
         "senderFault":true
       },
       "exception":true
+    },
+    "AnalysisStatusUnion":{
+      "type":"structure",
+      "members":{
+        "runtimeAnalysisStatus":{
+          "shape":"RuntimeAnalysisStatus",
+          "documentation":"<p>The status of the analysis.</p>"
+        },
+        "srcCodeOrDbAnalysisStatus":{
+          "shape":"SrcCodeOrDbAnalysisStatus",
+          "documentation":"<p>The status of the source code or database analysis.</p>"
+        }
+      },
+      "documentation":"<p>A combination of existing analysis statuses.</p>",
+      "union":true
+    },
+    "AnalysisType":{
+      "type":"string",
+      "enum":[
+        "SOURCE_CODE_ANALYSIS",
+        "DATABASE_ANALYSIS",
+        "RUNTIME_ANALYSIS",
+        "BINARY_ANALYSIS"
+      ]
+    },
+    "AnalyzableServerSummary":{
+      "type":"structure",
+      "members":{
+        "hostname":{
+          "shape":"String",
+          "documentation":"<p>The host name of the analyzable server.</p>"
+        },
+        "ipAddress":{
+          "shape":"String",
+          "documentation":"<p>The ip address of the analyzable server.</p>"
+        },
+        "source":{
+          "shape":"String",
+          "documentation":"<p>The data source of the analyzable server.</p>"
+        },
+        "vmId":{
+          "shape":"String",
+          "documentation":"<p>The virtual machine id of the analyzable server.</p>"
+        }
+      },
+      "documentation":"<p>Summary information about an analyzable server.</p>"
+    },
+    "AnalyzableServerSummaryList":{
+      "type":"list",
+      "member":{"shape":"AnalyzableServerSummary"}
+    },
+    "AnalyzerNameUnion":{
+      "type":"structure",
+      "members":{
+        "binaryAnalyzerName":{
+          "shape":"BinaryAnalyzerName",
+          "documentation":"<p>The binary analyzer names.</p>"
+        },
+        "runTimeAnalyzerName":{
+          "shape":"RunTimeAnalyzerName",
+          "documentation":"<p>The assessment analyzer names.</p>"
+        },
+        "sourceCodeAnalyzerName":{
+          "shape":"SourceCodeAnalyzerName",
+          "documentation":"<p>The source code analyzer names.</p>"
+        }
+      },
+      "documentation":"<p>The combination of the existing analyzers.</p>",
+      "union":true
+    },
+    "AntipatternReportResult":{
+      "type":"structure",
+      "members":{
+        "analyzerName":{
+          "shape":"AnalyzerNameUnion",
+          "documentation":"<p>The analyzer name.</p>"
+        },
+        "antiPatternReportS3Object":{"shape":"S3Object"},
+        "antipatternReportStatus":{
+          "shape":"AntipatternReportStatus",
+          "documentation":"<p>The status of the anti-pattern report generation.</p>"
+        },
+        "antipatternReportStatusMessage":{
+          "shape":"StatusMessage",
+          "documentation":"<p>The status message for the anti-pattern.</p>"
+        }
+      },
+      "documentation":"<p>The anti-pattern report result.</p>"
+    },
+    "AntipatternReportResultList":{
+      "type":"list",
+      "member":{"shape":"AntipatternReportResult"}
     },
     "AntipatternReportStatus":{
       "type":"string",
@@ -545,6 +654,10 @@
           "shape":"ResourceSubType",
           "documentation":"<p> The application component subtype.</p>"
         },
+        "resultList":{
+          "shape":"ResultList",
+          "documentation":"<p>A list of the analysis results.</p>"
+        },
         "runtimeStatus":{
           "shape":"RuntimeAnalysisStatus",
           "documentation":"<p>The status of the application unit.</p>"
@@ -641,6 +754,14 @@
         }
       },
       "documentation":"<p> Application preferences that you specify. </p>"
+    },
+    "AssessmentDataSourceType":{
+      "type":"string",
+      "enum":[
+        "StrategyRecommendationsApplicationDataCollector",
+        "ManualImport",
+        "ApplicationDiscoveryService"
+      ]
     },
     "AssessmentStatus":{
       "type":"string",
@@ -800,6 +921,13 @@
       "member":{"shape":"AwsManagedTargetDestination"},
       "max":1,
       "min":1
+    },
+    "BinaryAnalyzerName":{
+      "type":"string",
+      "enum":[
+        "DLL_ANALYZER",
+        "BYTECODE_ANALYZER"
+      ]
     },
     "Boolean":{
       "type":"boolean",
@@ -972,7 +1100,9 @@
       "type":"string",
       "enum":[
         "ApplicationDiscoveryService",
-        "MPA"
+        "MPA",
+        "Import",
+        "StrategyRecommendationsApplicationDataCollector"
       ]
     },
     "DatabaseConfigDetail":{
@@ -1341,7 +1471,10 @@
     },
     "GroupName":{
       "type":"string",
-      "enum":["ExternalId"]
+      "enum":[
+        "ExternalId",
+        "ExternalSourceType"
+      ]
     },
     "Heterogeneous":{
       "type":"structure",
@@ -1512,6 +1645,38 @@
       "error":{"httpStatusCode":500},
       "exception":true,
       "fault":true
+    },
+    "ListAnalyzableServersRequest":{
+      "type":"structure",
+      "members":{
+        "maxResults":{
+          "shape":"MaxResult",
+          "documentation":"<p>The maximum number of items to include in the response. The maximum value is 100.</p>"
+        },
+        "nextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token from a previous call that you use to retrieve the next set of results. For example, if a previous call to this action returned 100 items, but you set maxResults to 10. You'll receive a set of 10 results along with a token. You then use the returned token to retrieve the next set of 10.</p>"
+        },
+        "sort":{
+          "shape":"SortOrder",
+          "documentation":"<p>Specifies whether to sort by ascending (ASC) or descending (DESC) order.</p>"
+        }
+      },
+      "documentation":"<p>Represents input for ListAnalyzableServers operation.</p>"
+    },
+    "ListAnalyzableServersResponse":{
+      "type":"structure",
+      "members":{
+        "analyzableServers":{
+          "shape":"AnalyzableServerSummaryList",
+          "documentation":"<p>The list of analyzable servers with summary information about each server.</p>"
+        },
+        "nextToken":{
+          "shape":"NextToken",
+          "documentation":"<p>The token you use to retrieve the next set of results, or null if there are no more results.</p>"
+        }
+      },
+      "documentation":"<p>Represents output for ListAnalyzableServers operation.</p>"
     },
     "ListAntipatternSeveritySummary":{
       "type":"list",
@@ -2013,6 +2178,42 @@
         "DatabaseProcess"
       ]
     },
+    "Result":{
+      "type":"structure",
+      "members":{
+        "analysisStatus":{
+          "shape":"AnalysisStatusUnion",
+          "documentation":"<p>The error in server analysis.</p>"
+        },
+        "analysisType":{
+          "shape":"AnalysisType",
+          "documentation":"<p>The error in server analysis.</p>"
+        },
+        "antipatternReportResultList":{
+          "shape":"AntipatternReportResultList",
+          "documentation":"<p>The error in server analysis.</p>"
+        },
+        "statusMessage":{
+          "shape":"StatusMessage",
+          "documentation":"<p>The error in server analysis.</p>"
+        }
+      },
+      "documentation":"<p>The error in server analysis.</p>"
+    },
+    "ResultList":{
+      "type":"list",
+      "member":{"shape":"Result"}
+    },
+    "RunTimeAnalyzerName":{
+      "type":"string",
+      "enum":[
+        "A2C_ANALYZER",
+        "REHOST_ANALYZER",
+        "EMP_PA_ANALYZER",
+        "DATABASE_ANALYZER",
+        "SCT_ANALYZER"
+      ]
+    },
     "RunTimeAssessmentStatus":{
       "type":"string",
       "enum":[
@@ -2327,6 +2528,15 @@
       },
       "documentation":"<p> Object containing source code information that is linked to an application component. </p>"
     },
+    "SourceCodeAnalyzerName":{
+      "type":"string",
+      "enum":[
+        "CSHARP_ANALYZER",
+        "JAVA_ANALYZER",
+        "BYTECODE_ANALYZER",
+        "PORTING_ASSISTANT"
+      ]
+    },
     "SourceCodeList":{
       "type":"list",
       "member":{"shape":"SourceCode"}
@@ -2378,6 +2588,10 @@
     "StartAssessmentRequest":{
       "type":"structure",
       "members":{
+        "assessmentDataSourceType":{
+          "shape":"AssessmentDataSourceType",
+          "documentation":"<p>The data source type of an assessment to be started.</p>"
+        },
         "assessmentTargets":{
           "shape":"AssessmentTargets",
           "documentation":"<p>List of criteria for assessment.</p>"
@@ -2830,5 +3044,5 @@
       "pattern":".*\\S.*"
     }
   },
-  "documentation":"<p><fullname>Migration Hub Strategy Recommendations</fullname></p> <pre><code> &lt;p&gt;This API reference provides descriptions, syntax, and other details about each of the actions and data types for Migration Hub Strategy Recommendations (Strategy Recommendations). The topic for each action shows the API request parameters and the response. Alternatively, you can use one of the AWS SDKs to access an API that is tailored to the programming language or platform that you're using. For more information, see &lt;a href=&quot;http://aws.amazon.com/tools/#SDKs&quot;&gt;AWS SDKs&lt;/a&gt;.&lt;/p&gt; </code></pre>"
+  "documentation":"<p><fullname>Migration Hub Strategy Recommendations</fullname> <p>This API reference provides descriptions, syntax, and other details about each of the actions and data types for Migration Hub Strategy Recommendations (Strategy Recommendations). The topic for each action shows the API request parameters and the response. Alternatively, you can use one of the AWS SDKs to access an API that is tailored to the programming language or platform that you're using. For more information, see <a href=\"http://aws.amazon.com/tools/#SDKs\">AWS SDKs</a>.</p></p>"
 }

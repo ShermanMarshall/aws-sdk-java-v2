@@ -15,22 +15,24 @@
 
 package software.amazon.awssdk.http.crt;
 
-import software.amazon.awssdk.annotations.SdkPreviewApi;
 import software.amazon.awssdk.annotations.SdkPublicApi;
-import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
+import software.amazon.awssdk.http.SdkHttpService;
 import software.amazon.awssdk.http.async.SdkAsyncHttpService;
 
 /**
  * Service binding for the AWS common runtime HTTP client implementation. Allows SDK to pick this up automatically from the
  * classpath.
  *
- * <b>NOTE:</b> This is a Preview API and is subject to change so it should not be used in production.
  */
 @SdkPublicApi
-@SdkPreviewApi
-public class AwsCrtSdkHttpService implements SdkAsyncHttpService {
+public class AwsCrtSdkHttpService implements SdkAsyncHttpService, SdkHttpService {
     @Override
-    public SdkAsyncHttpClient.Builder createAsyncHttpClientFactory() {
+    public AwsCrtAsyncHttpClient.Builder createAsyncHttpClientFactory() {
         return AwsCrtAsyncHttpClient.builder();
+    }
+
+    @Override
+    public AwsCrtHttpClient.Builder createHttpClientBuilder() {
+        return AwsCrtHttpClient.builder();
     }
 }

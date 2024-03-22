@@ -15,17 +15,24 @@
 
 package software.amazon.awssdk.services.s3;
 
+import java.util.Optional;
+import java.util.function.Supplier;
 import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.ServiceConfiguration;
 import software.amazon.awssdk.profiles.ProfileFile;
+import software.amazon.awssdk.profiles.ProfileFileSupplier;
 import software.amazon.awssdk.profiles.ProfileFileSystemSetting;
 import software.amazon.awssdk.services.s3.internal.FieldWithDefault;
 import software.amazon.awssdk.services.s3.internal.settingproviders.DisableMultiRegionProviderChain;
 import software.amazon.awssdk.services.s3.internal.settingproviders.UseArnRegionProviderChain;
+import software.amazon.awssdk.services.s3.model.ChecksumAlgorithm;
+import software.amazon.awssdk.services.s3.model.ChecksumMode;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketAccelerateConfigurationRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
@@ -66,23 +73,23 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
     private final FieldWithDefault<Boolean> dualstackEnabled;
     private final FieldWithDefault<Boolean> checksumValidationEnabled;
     private final FieldWithDefault<Boolean> chunkedEncodingEnabled;
-    private final FieldWithDefault<Boolean> useArnRegionEnabled;
-    private final FieldWithDefault<Boolean> multiRegionEnabled;
-    private final FieldWithDefault<ProfileFile> profileFile;
+    private final Boolean useArnRegionEnabled;
+    private final Boolean multiRegionEnabled;
+    private final FieldWithDefault<Supplier<ProfileFile>> profileFile;
     private final FieldWithDefault<String> profileName;
 
     private S3Configuration(DefaultS3ServiceConfigurationBuilder builder) {
         this.dualstackEnabled = FieldWithDefault.create(builder.dualstackEnabled, DEFAULT_DUALSTACK_ENABLED);
         this.accelerateModeEnabled = FieldWithDefault.create(builder.accelerateModeEnabled, DEFAULT_ACCELERATE_MODE_ENABLED);
         this.pathStyleAccessEnabled = FieldWithDefault.create(builder.pathStyleAccessEnabled, DEFAULT_PATH_STYLE_ACCESS_ENABLED);
-        this.checksumValidationEnabled =  FieldWithDefault.create(builder.checksumValidationEnabled,
+        this.checksumValidationEnabled = FieldWithDefault.create(builder.checksumValidationEnabled,
                                                                  DEFAULT_CHECKSUM_VALIDATION_ENABLED);
         this.chunkedEncodingEnabled = FieldWithDefault.create(builder.chunkedEncodingEnabled, DEFAULT_CHUNKED_ENCODING_ENABLED);
-        this.profileFile = FieldWithDefault.createLazy(builder.profileFile, ProfileFile::defaultProfileFile);
+        this.profileFile = FieldWithDefault.create(builder.profileFile, ProfileFile::defaultProfileFile);
         this.profileName = FieldWithDefault.create(builder.profileName,
                                                    ProfileFileSystemSetting.AWS_PROFILE.getStringValueOrThrow());
-        this.useArnRegionEnabled = FieldWithDefault.createLazy(builder.useArnRegionEnabled, this::resolveUseArnRegionEnabled);
-        this.multiRegionEnabled = FieldWithDefault.createLazy(builder.multiRegionEnabled, this::resolveMultiRegionEnabled);
+        this.useArnRegionEnabled = builder.useArnRegionEnabled;
+        this.multiRegionEnabled = builder.multiRegionEnabled;
 
         if (accelerateModeEnabled() && pathStyleAccessEnabled()) {
             throw new IllegalArgumentException("Accelerate mode cannot be used with path style addressing");
@@ -164,6 +171,31 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
         return dualstackEnabled.value();
     }
 
+    /**
+     * Returns whether MD5 trailing checksum validation is enabled. This is enabled by default.
+     *
+     * <p>
+     * The recommended approach is to specify a {@link ChecksumAlgorithm} on the {@link PutObjectRequest} and enable
+     * {@link ChecksumMode} on the {@link GetObjectRequest}. In that case, validation will be performed for the specified
+     * flexible checksum, and validation will not be performed for MD5 checksum.
+     *
+     * <p>
+     * For {@link PutObjectRequest}, MD5 trailing checksum validation will be performed if:
+     * <ul>
+     *     <li>Checksum validation is not disabled</li>
+     *     <li>Server-side encryption is not used</li>
+     *     <li>Flexible checksum {@link ChecksumAlgorithm} is not specified</li>
+     * </ul>
+     *
+     * For {@link GetObjectRequest}, MD5 trailing checksum validation will be performed if:
+     * <ul>
+     *     <li>Checksum validation is not disabled</li>
+     *     <li>{@link ChecksumMode} is disabled (default)</li>
+     *     <li>Regular S3 is used (non-S3Express)</li>
+     * </ul>
+     *
+     * @return True if trailing checksum validation is enabled
+     */
     public boolean checksumValidationEnabled() {
         return checksumValidationEnabled.value();
     }
@@ -189,7 +221,8 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
      * @return True if a different region in the ARN can be used.
      */
     public boolean useArnRegionEnabled() {
-        return useArnRegionEnabled.value();
+        return Optional.ofNullable(useArnRegionEnabled)
+                       .orElseGet(this::resolveUseArnRegionEnabled);
     }
 
     /**
@@ -198,19 +231,20 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
      * @return True if multi-region ARNs is enabled.
      */
     public boolean multiRegionEnabled() {
-        return multiRegionEnabled.value();
+        return Optional.ofNullable(multiRegionEnabled)
+                       .orElseGet(this::resolveMultiRegionEnabled);
     }
 
     @Override
     public Builder toBuilder() {
         return builder()
                 .dualstackEnabled(dualstackEnabled.valueOrNullIfDefault())
-                .multiRegionEnabled(multiRegionEnabled.valueOrNullIfDefault())
+                .multiRegionEnabled(multiRegionEnabled)
                 .accelerateModeEnabled(accelerateModeEnabled.valueOrNullIfDefault())
                 .pathStyleAccessEnabled(pathStyleAccessEnabled.valueOrNullIfDefault())
                 .checksumValidationEnabled(checksumValidationEnabled.valueOrNullIfDefault())
                 .chunkedEncodingEnabled(chunkedEncodingEnabled.valueOrNullIfDefault())
-                .useArnRegionEnabled(useArnRegionEnabled.valueOrNullIfDefault())
+                .useArnRegionEnabled(useArnRegionEnabled)
                 .profileFile(profileFile.valueOrNullIfDefault())
                 .profileName(profileName.valueOrNullIfDefault());
     }
@@ -237,7 +271,7 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
         Boolean accelerateModeEnabled();
 
         /**
-         * Option to enable using the accelerate enedpoint when accessing S3. Accelerate
+         * Option to enable using the accelerate endpoint when accessing S3. Accelerate
          * endpoints allow faster transfer of objects by using Amazon CloudFront's
          * globally distributed edge locations.
          *
@@ -268,11 +302,27 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
         Boolean checksumValidationEnabled();
 
         /**
-         * Option to disable doing a validation of the checksum of an object stored in S3.
+         * Option to disable MD5 trailing checksum validation of an object stored in S3. This is enabled by default.
          *
          * <p>
-         * Checksum validation is enabled by default.
-         * </p>
+         * The recommended approach is to specify a {@link ChecksumAlgorithm} on the {@link PutObjectRequest} and enable
+         * {@link ChecksumMode} on the {@link GetObjectRequest}. In that case, validation will be performed for the specified
+         * flexible checksum, and validation will not be performed for MD5 checksum.
+         *
+         * <p>
+         * For {@link PutObjectRequest}, MD5 trailing checksum validation will be performed if:
+         * <ul>
+         *     <li>Checksum validation is not disabled</li>
+         *     <li>Server-side encryption is not used</li>
+         *     <li>Flexible checksum algorithm is not specified</li>
+         * </ul>
+         *
+         * For {@link GetObjectRequest}, MD5 trailing checksum validation will be performed if:
+         * <ul>
+         *     <li>Checksum validation is not disabled</li>
+         *     <li>{@link ChecksumMode} is disabled (default)</li>
+         *     <li>Regular S3 is used (non-S3Express)</li>
+         * </ul>
          *
          * @see S3Configuration#checksumValidationEnabled().
          */
@@ -325,6 +375,19 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
          */
         Builder profileFile(ProfileFile profileFile);
 
+        Supplier<ProfileFile> profileFileSupplier();
+
+        /**
+         * The supplier of profile file instances that should be consulted to determine the default value of
+         * {@link #useArnRegionEnabled(Boolean)} or {@link #multiRegionEnabled(Boolean)}.
+         * This is not used, if those parameters are configured on the builder.
+         *
+         * <p>
+         * By default, the {@link ProfileFile#defaultProfileFile()} is used.
+         * </p>
+         */
+        Builder profileFile(Supplier<ProfileFile> profileFile);
+
         String profileName();
 
         /**
@@ -347,7 +410,7 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
         private Boolean chunkedEncodingEnabled;
         private Boolean useArnRegionEnabled;
         private Boolean multiRegionEnabled;
-        private ProfileFile profileFile;
+        private Supplier<ProfileFile> profileFile;
         private String profileName;
 
         @Override
@@ -449,11 +512,25 @@ public final class S3Configuration implements ServiceConfiguration, ToCopyableBu
 
         @Override
         public ProfileFile profileFile() {
-            return profileFile;
+            return Optional.ofNullable(profileFile)
+                .map(Supplier::get)
+                .orElse(null);
         }
 
         @Override
         public Builder profileFile(ProfileFile profileFile) {
+            return profileFile(Optional.ofNullable(profileFile)
+                                       .map(ProfileFileSupplier::fixedProfileFile)
+                                       .orElse(null));
+        }
+
+        @Override
+        public Supplier<ProfileFile> profileFileSupplier() {
+            return profileFile;
+        }
+
+        @Override
+        public Builder profileFile(Supplier<ProfileFile> profileFile) {
             this.profileFile = profileFile;
             return this;
         }

@@ -83,6 +83,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
     private final ProxyConfiguration proxyConfiguration;
     private final BootstrapProvider bootstrapProvider;
     private final SslContextProvider sslContextProvider;
+    private final Boolean useNonBlockingDnsResolver;
 
     private AwaitCloseChannelPoolMap(Builder builder, Function<Builder, BootstrapProvider> createBootStrapProvider) {
         this.configuration = builder.configuration;
@@ -94,6 +95,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
         this.proxyConfiguration = builder.proxyConfiguration;
         this.bootstrapProvider = createBootStrapProvider.apply(builder);
         this.sslContextProvider = new SslContextProvider(configuration, protocol, sslProvider);
+        this.useNonBlockingDnsResolver = builder.useNonBlockingDnsResolver;
     }
 
     private AwaitCloseChannelPoolMap(Builder builder) {
@@ -179,12 +181,12 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
     private Bootstrap createBootstrap(URI poolKey) {
         String host = bootstrapHost(poolKey);
         int port = bootstrapPort(poolKey);
-        return bootstrapProvider.createBootstrap(host, port);
+        return bootstrapProvider.createBootstrap(host, port, useNonBlockingDnsResolver);
     }
 
 
     private boolean shouldUseProxyForHost(URI remoteAddr) {
-        if (proxyConfiguration == null) {
+        if (proxyConfiguration == null || proxyConfiguration.host() == null) {
             return false;
         }
 
@@ -237,12 +239,19 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
                                                                    configuration.maxConnections(),
                                                                    configuration);
 
+
         sdkChannelPool = new ListenerInvokingChannelPool(bootstrap.config().group(), sdkChannelPool, Arrays.asList(
+            // Add a listener that disables auto reads on acquired connections.
+            AutoReadDisableChannelPoolListener.create(),
+
             // Add a listener that ensures acquired channels are marked IN_USE and thus not eligible for certain idle timeouts.
             InUseTrackingChannelPoolListener.create(),
 
             // Add a listener that removes request-specific handlers with each request.
-            HandlerRemovingChannelPoolListener.create()
+            HandlerRemovingChannelPoolListener.create(),
+
+            // Add a listener that enables auto reads on released connections.
+            AutoReadEnableChannelPoolListener.create()
         ));
 
         // Wrap the channel pool such that an individual channel can only be released to the underlying pool once.
@@ -278,6 +287,7 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
         private Duration healthCheckPingPeriod;
         private SslProvider sslProvider;
         private ProxyConfiguration proxyConfiguration;
+        private Boolean useNonBlockingDnsResolver;
 
         private Builder() {
         }
@@ -324,6 +334,11 @@ public final class AwaitCloseChannelPoolMap extends SdkChannelPoolMap<URI, Simpl
 
         public Builder proxyConfiguration(ProxyConfiguration proxyConfiguration) {
             this.proxyConfiguration = proxyConfiguration;
+            return this;
+        }
+
+        public Builder useNonBlockingDnsResolver(Boolean useNonBlockingDnsResolver) {
+            this.useNonBlockingDnsResolver = useNonBlockingDnsResolver;
             return this;
         }
 

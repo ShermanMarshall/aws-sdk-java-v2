@@ -19,12 +19,15 @@ import static software.amazon.awssdk.core.internal.util.MetricUtils.collectHttpM
 import static software.amazon.awssdk.core.internal.util.MetricUtils.createAttemptMetricsCollector;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.core.Response;
+import software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttribute;
 import software.amazon.awssdk.core.internal.http.RequestExecutionContext;
 import software.amazon.awssdk.core.internal.http.pipeline.RequestPipeline;
 import software.amazon.awssdk.core.internal.http.pipeline.RequestToResponsePipeline;
 import software.amazon.awssdk.core.internal.http.pipeline.stages.utils.RetryableStageHelper;
+import software.amazon.awssdk.core.internal.metrics.SdkErrorType;
 import software.amazon.awssdk.core.metrics.CoreMetric;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.metrics.MetricCollector;
@@ -47,11 +50,23 @@ public final class ApiCallAttemptMetricCollectionStage<OutputT> implements Reque
         context.attemptMetricCollector(apiCallAttemptMetrics);
         reportBackoffDelay(context);
 
-        Response<OutputT> response = wrapped.execute(input, context);
+        resetBytesRead(context);
+        try {
+            Response<OutputT> response = wrapped.execute(input, context);
+            collectHttpMetrics(apiCallAttemptMetrics, response.httpResponse());
 
-        collectHttpMetrics(apiCallAttemptMetrics, response.httpResponse());
+            if (!Boolean.TRUE.equals(response.isSuccess()) && response.exception() != null) {
+                reportErrorType(context, response.exception());
+            }
+            return response;
+        } catch (Exception e) {
+            reportErrorType(context, e);
+            throw e;
+        }
+    }
 
-        return response;
+    private void resetBytesRead(RequestExecutionContext context) {
+        context.executionAttributes().putAttribute(SdkInternalExecutionAttribute.RESPONSE_BYTES_READ, new AtomicLong(0));
     }
 
     private void reportBackoffDelay(RequestExecutionContext context) {
@@ -59,5 +74,9 @@ public final class ApiCallAttemptMetricCollectionStage<OutputT> implements Reque
         if (lastBackoffDelay != null) {
             context.attemptMetricCollector().reportMetric(CoreMetric.BACKOFF_DELAY_DURATION, lastBackoffDelay);
         }
+    }
+
+    private void reportErrorType(RequestExecutionContext context, Exception e) {
+        context.attemptMetricCollector().reportMetric(CoreMetric.ERROR_TYPE, SdkErrorType.fromException(e).toString());
     }
 }

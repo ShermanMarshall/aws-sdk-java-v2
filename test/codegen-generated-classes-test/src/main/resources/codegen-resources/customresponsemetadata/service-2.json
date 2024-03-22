@@ -111,6 +111,15 @@
       "input":{"shape":"OperationWithExplicitPayloadBlobInput"},
       "output":{"shape":"OperationWithExplicitPayloadBlobInput"}
     },
+    "OperationWithExplicitPayloadString":{
+      "name":"OperationWithExplicitPayloadString",
+      "http":{
+        "method":"POST",
+        "requestUri":"/2016-03-11/operationWithExplicitPayloadString"
+      },
+      "input":{"shape":"OperationWithExplicitPayloadStringInput"},
+      "output":{"shape":"OperationWithExplicitPayloadStringInput"}
+    },
     "OperationWithExplicitPayloadStructure":{
       "name":"OperationWithExplicitPayloadStructure",
       "http":{
@@ -276,6 +285,31 @@
         "requestChecksumRequired": true,
         "requestAlgorithmMember": "ChecksumAlgorithm"
       }
+    },
+    "PutOperationWithRequestCompression":{
+      "name":"PutOperationWithRequestCompression",
+      "http":{
+        "method":"PUT",
+        "requestUri":"/"
+      },
+      "input":{"shape":"RequestCompressionStructure"},
+      "output":{"shape":"RequestCompressionStructure"},
+      "requestcompression": {
+        "encodings": ["gzip"]
+      }
+    },
+    "PutOperationWithStreamingRequestCompression":{
+      "name":"PutOperationWithStreamingRequestCompression",
+      "http":{
+        "method":"PUT",
+        "requestUri":"/"
+      },
+      "input":{"shape":"RequestCompressionStructureWithStreaming"},
+      "output":{"shape":"RequestCompressionStructureWithStreaming"},
+      "requestcompression": {
+        "encodings": ["gzip"]
+      },
+      "authtype":"v4-unsigned-body"
     },
     "GetOperationWithChecksum":{
       "name":"GetOperationWithChecksum",
@@ -672,6 +706,13 @@
       },
       "payload":"PayloadMember"
     },
+    "OperationWithExplicitPayloadStringInput":{
+      "type":"structure",
+      "members":{
+        "PayloadMember":{"shape":"String"}
+      },
+      "payload":"PayloadMember"
+    },
     "OperationWithExplicitPayloadStructureInput":{
       "type":"structure",
       "members":{
@@ -907,6 +948,11 @@
           "location":"header",
           "locationName":"x-amz-checksum-mode"
         },
+        "ContentEncoding":{
+          "shape":"String",
+          "location":"header",
+          "locationName":"Content-Encoding"
+        },
         "ChecksumAlgorithm":{
           "shape":"ChecksumAlgorithm",
           "location":"header",
@@ -924,6 +970,11 @@
           "shape":"ChecksumMode",
           "location":"header",
           "locationName":"x-amz-checksum-mode"
+        },
+        "ContentEncoding":{
+          "shape":"String",
+          "location":"header",
+          "locationName":"Content-Encoding"
         },
         "ChecksumAlgorithm":{
           "shape":"ChecksumAlgorithm",
@@ -997,6 +1048,28 @@
         }
       },
       "payload":"NestedQueryParameterOperation"
+    },
+    "RequestCompressionStructure":{
+      "type":"structure",
+      "members":{
+        "Body":{
+          "shape":"Body",
+          "documentation":"<p>Object data.</p>",
+          "streaming":false
+        }
+      },
+      "payload":"Body"
+    },
+    "RequestCompressionStructureWithStreaming":{
+      "type":"structure",
+      "members":{
+        "Body":{
+          "shape":"Body",
+          "documentation":"<p>Object data.</p>",
+          "streaming":true
+        }
+      },
+      "payload":"Body"
     }
   }
 }

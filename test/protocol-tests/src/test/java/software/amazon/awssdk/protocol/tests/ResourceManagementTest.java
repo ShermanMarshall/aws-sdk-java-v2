@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.core.client.config.SdkAdvancedAsyncClientOption.FUTURE_COMPLETION_EXECUTOR;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.http.SdkHttpClient;
@@ -81,6 +83,19 @@ public class ResourceManagementTest {
 
         verify(executor, never()).shutdown();
         verify(executor, never()).shutdownNow();
+    }
+
+    @Test
+    public void scheduledExecutorFromBuilderNotShutdown() {
+        ScheduledExecutorService scheduledExecutorService = mock(ScheduledExecutorService.class);
+        // Java 19+ implements AutoCloseable for ExecutorService, and the default method is to loop until isTerminated
+        // returns true...
+        when(scheduledExecutorService.isTerminated()).thenReturn(true);
+
+        asyncClientBuilder().overrideConfiguration(c -> c.scheduledExecutorService(scheduledExecutorService)).build().close();
+
+        verify(scheduledExecutorService, never()).shutdown();
+        verify(scheduledExecutorService, never()).shutdownNow();
     }
 
     public ProtocolRestJsonClientBuilder syncClientBuilder() {

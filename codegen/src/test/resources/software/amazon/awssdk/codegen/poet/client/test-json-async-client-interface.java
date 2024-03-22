@@ -7,7 +7,7 @@ import org.reactivestreams.Publisher;
 import software.amazon.awssdk.annotations.Generated;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.core.SdkClient;
+import software.amazon.awssdk.awscore.AwsClient;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.builder.Builder;
@@ -34,6 +34,8 @@ import software.amazon.awssdk.services.json.model.InputEventStream;
 import software.amazon.awssdk.services.json.model.InputEventStreamTwo;
 import software.amazon.awssdk.services.json.model.OperationWithChecksumRequiredRequest;
 import software.amazon.awssdk.services.json.model.OperationWithChecksumRequiredResponse;
+import software.amazon.awssdk.services.json.model.OperationWithRequestCompressionRequest;
+import software.amazon.awssdk.services.json.model.OperationWithRequestCompressionResponse;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyResponse;
 import software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest;
@@ -58,7 +60,7 @@ import software.amazon.awssdk.services.json.paginators.PaginatedOperationWithout
 @Generated("software.amazon.awssdk:codegen")
 @SdkPublicApi
 @ThreadSafe
-public interface JsonAsyncClient extends SdkClient {
+public interface JsonAsyncClient extends AwsClient {
     String SERVICE_NAME = "json-service";
 
     /**
@@ -68,19 +70,10 @@ public interface JsonAsyncClient extends SdkClient {
     String SERVICE_METADATA_ID = "json-service-endpoint";
 
     /**
-     * Create a {@link JsonAsyncClient} with the region loaded from the
-     * {@link software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain} and credentials loaded from the
-     * {@link software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider}.
+     * Creates an instance of {@link JsonUtilities} object with the configuration set on this client.
      */
-    static JsonAsyncClient create() {
-        return builder().build();
-    }
-
-    /**
-     * Create a builder that can be used to configure and create a {@link JsonAsyncClient}.
-     */
-    static JsonAsyncClientBuilder builder() {
-        return new DefaultJsonAsyncClientBuilder();
+    default JsonUtilities utilities() {
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -124,7 +117,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param aPostOperationRequest
-     *        A {@link Consumer} that will call methods on {@link APostOperationRequest.Builder} to create a request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.APostOperationRequest.Builder} to create a request.
      * @return A Java Future containing the result of the APostOperation operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
      *         exceptions.
@@ -188,7 +182,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param aPostOperationWithOutputRequest
-     *        A {@link Consumer} that will call methods on {@link APostOperationWithOutputRequest.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.APostOperationWithOutputRequest.Builder} to create a
      *        request.
      * @return A Java Future containing the result of the APostOperationWithOutput operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -245,8 +240,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param bearerAuthOperationRequest
-     *        A {@link Consumer} that will call methods on {@link BearerAuthOperationRequest.Builder} to create a
-     *        request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.BearerAuthOperationRequest.Builder} to create a request.
      * @return A Java Future containing the result of the BearerAuthOperation operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
      *         exceptions.
@@ -299,7 +294,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param eventStreamOperationRequest
-     *        A {@link Consumer} that will call methods on {@link EventStreamOperationRequest.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.EventStreamOperationRequest.Builder} to create a
      *        request.
      * @return A Java Future containing the result of the EventStreamOperation operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -357,7 +353,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param eventStreamOperationWithOnlyInputRequest
-     *        A {@link Consumer} that will call methods on {@link EventStreamOperationWithOnlyInputRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.EventStreamOperationWithOnlyInputRequest.Builder} to
      *        create a request.
      * @return A Java Future containing the result of the EventStreamOperationWithOnlyInput operation returned by the
      *         service.<br/>
@@ -417,7 +414,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param eventStreamOperationWithOnlyOutputRequest
-     *        A {@link Consumer} that will call methods on {@link EventStreamOperationWithOnlyOutputRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.EventStreamOperationWithOnlyOutputRequest.Builder} to
      *        create a request.
      * @return A Java Future containing the result of the EventStreamOperationWithOnlyOutput operation returned by the
      *         service.<br/>
@@ -475,7 +473,9 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param getOperationWithChecksumRequest
-     *        A {@link Consumer} that will call methods on {@link ChecksumStructure.Builder} to create a request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.GetOperationWithChecksumRequest.Builder} to create a
+     *        request.
      * @return A Java Future containing the result of the GetOperationWithChecksum operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
      *         exceptions.
@@ -536,7 +536,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param getWithoutRequiredMembersRequest
-     *        A {@link Consumer} that will call methods on {@link GetWithoutRequiredMembersRequest.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.GetWithoutRequiredMembersRequest.Builder} to create a
      *        request.
      * @return A Java Future containing the result of the GetWithoutRequiredMembers operation returned by the service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -594,8 +595,9 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param operationWithChecksumRequiredRequest
-     *        A {@link Consumer} that will call methods on {@link OperationWithChecksumRequiredRequest.Builder} to
-     *        create a request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.OperationWithChecksumRequiredRequest.Builder} to create
+     *        a request.
      * @return A Java Future containing the result of the OperationWithChecksumRequired operation returned by the
      *         service.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -616,6 +618,64 @@ public interface JsonAsyncClient extends SdkClient {
         Consumer<OperationWithChecksumRequiredRequest.Builder> operationWithChecksumRequiredRequest) {
         return operationWithChecksumRequired(OperationWithChecksumRequiredRequest.builder()
                                                                                  .applyMutation(operationWithChecksumRequiredRequest).build());
+    }
+
+    /**
+     * Invokes the OperationWithRequestCompression operation asynchronously.
+     *
+     * @param operationWithRequestCompressionRequest
+     * @return A Java Future containing the result of the OperationWithRequestCompression operation returned by the
+     *         service.<br/>
+     *         The CompletableFuture returned by this method can be completed exceptionally with the following
+     *         exceptions.
+     *         <ul>
+     *         <li>SdkException Base class for all exceptions that can be thrown by the SDK (both service and client).
+     *         Can be used for catch all scenarios.</li>
+     *         <li>SdkClientException If any client side error occurs such as an IO related failure, failure to get
+     *         credentials, etc.</li>
+     *         <li>JsonException Base class for all service exceptions. Unknown exceptions will be thrown as an instance
+     *         of this type.</li>
+     *         </ul>
+     * @sample JsonAsyncClient.OperationWithRequestCompression
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/OperationWithRequestCompression"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default CompletableFuture<OperationWithRequestCompressionResponse> operationWithRequestCompression(
+        OperationWithRequestCompressionRequest operationWithRequestCompressionRequest) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invokes the OperationWithRequestCompression operation asynchronously.<br/>
+     * <p>
+     * This is a convenience which creates an instance of the {@link OperationWithRequestCompressionRequest.Builder}
+     * avoiding the need to create one manually via {@link OperationWithRequestCompressionRequest#builder()}
+     * </p>
+     *
+     * @param operationWithRequestCompressionRequest
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.OperationWithRequestCompressionRequest.Builder} to
+     *        create a request.
+     * @return A Java Future containing the result of the OperationWithRequestCompression operation returned by the
+     *         service.<br/>
+     *         The CompletableFuture returned by this method can be completed exceptionally with the following
+     *         exceptions.
+     *         <ul>
+     *         <li>SdkException Base class for all exceptions that can be thrown by the SDK (both service and client).
+     *         Can be used for catch all scenarios.</li>
+     *         <li>SdkClientException If any client side error occurs such as an IO related failure, failure to get
+     *         credentials, etc.</li>
+     *         <li>JsonException Base class for all service exceptions. Unknown exceptions will be thrown as an instance
+     *         of this type.</li>
+     *         </ul>
+     * @sample JsonAsyncClient.OperationWithRequestCompression
+     * @see <a href="https://docs.aws.amazon.com/goto/WebAPI/json-service-2010-05-08/OperationWithRequestCompression"
+     *      target="_top">AWS API Documentation</a>
+     */
+    default CompletableFuture<OperationWithRequestCompressionResponse> operationWithRequestCompression(
+        Consumer<OperationWithRequestCompressionRequest.Builder> operationWithRequestCompressionRequest) {
+        return operationWithRequestCompression(OperationWithRequestCompressionRequest.builder()
+                                                                                     .applyMutation(operationWithRequestCompressionRequest).build());
     }
 
     /**
@@ -651,7 +711,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param paginatedOperationWithResultKeyRequest
-     *        A {@link Consumer} that will call methods on {@link PaginatedOperationWithResultKeyRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest.Builder} to
      *        create a request.
      * @return A Java Future containing the result of the PaginatedOperationWithResultKey operation returned by the
      *         service.<br/>
@@ -699,7 +760,6 @@ public interface JsonAsyncClient extends SdkClient {
     }
 
     /**
-     * Some paginated operation with result_key in paginators.json file<br/>
      * <p>
      * This is a variant of
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
@@ -774,7 +834,6 @@ public interface JsonAsyncClient extends SdkClient {
     }
 
     /**
-     * Some paginated operation with result_key in paginators.json file<br/>
      * <p>
      * This is a variant of
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
@@ -847,11 +906,10 @@ public interface JsonAsyncClient extends SdkClient {
      */
     default PaginatedOperationWithResultKeyPublisher paginatedOperationWithResultKeyPaginator(
         PaginatedOperationWithResultKeyRequest paginatedOperationWithResultKeyRequest) {
-        throw new UnsupportedOperationException();
+        return new PaginatedOperationWithResultKeyPublisher(this, paginatedOperationWithResultKeyRequest);
     }
 
     /**
-     * Some paginated operation with result_key in paginators.json file<br/>
      * <p>
      * This is a variant of
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
@@ -905,13 +963,15 @@ public interface JsonAsyncClient extends SdkClient {
      * {@link #paginatedOperationWithResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest)}
      * operation.</b>
      * </p>
+     * <br/>
      * <p>
      * This is a convenience which creates an instance of the {@link PaginatedOperationWithResultKeyRequest.Builder}
      * avoiding the need to create one manually via {@link PaginatedOperationWithResultKeyRequest#builder()}
      * </p>
      *
      * @param paginatedOperationWithResultKeyRequest
-     *        A {@link Consumer} that will call methods on {@link PaginatedOperationWithResultKeyRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PaginatedOperationWithResultKeyRequest.Builder} to
      *        create a request.
      * @return A custom publisher that can be subscribed to request a stream of response pages.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -967,7 +1027,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param paginatedOperationWithoutResultKeyRequest
-     *        A {@link Consumer} that will call methods on {@link PaginatedOperationWithoutResultKeyRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest.Builder} to
      *        create a request.
      * @return A Java Future containing the result of the PaginatedOperationWithoutResultKey operation returned by the
      *         service.<br/>
@@ -992,7 +1053,6 @@ public interface JsonAsyncClient extends SdkClient {
     }
 
     /**
-     * Some paginated operation without result_key in paginators.json file<br/>
      * <p>
      * This is a variant of
      * {@link #paginatedOperationWithoutResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest)}
@@ -1065,11 +1125,10 @@ public interface JsonAsyncClient extends SdkClient {
      */
     default PaginatedOperationWithoutResultKeyPublisher paginatedOperationWithoutResultKeyPaginator(
         PaginatedOperationWithoutResultKeyRequest paginatedOperationWithoutResultKeyRequest) {
-        throw new UnsupportedOperationException();
+        return new PaginatedOperationWithoutResultKeyPublisher(this, paginatedOperationWithoutResultKeyRequest);
     }
 
     /**
-     * Some paginated operation without result_key in paginators.json file<br/>
      * <p>
      * This is a variant of
      * {@link #paginatedOperationWithoutResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest)}
@@ -1123,13 +1182,15 @@ public interface JsonAsyncClient extends SdkClient {
      * {@link #paginatedOperationWithoutResultKey(software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest)}
      * operation.</b>
      * </p>
+     * <br/>
      * <p>
      * This is a convenience which creates an instance of the {@link PaginatedOperationWithoutResultKeyRequest.Builder}
      * avoiding the need to create one manually via {@link PaginatedOperationWithoutResultKeyRequest#builder()}
      * </p>
      *
      * @param paginatedOperationWithoutResultKeyRequest
-     *        A {@link Consumer} that will call methods on {@link PaginatedOperationWithoutResultKeyRequest.Builder} to
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PaginatedOperationWithoutResultKeyRequest.Builder} to
      *        create a request.
      * @return A custom publisher that can be subscribed to request a stream of response pages.<br/>
      *         The CompletableFuture returned by this method can be completed exceptionally with the following
@@ -1203,7 +1264,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param putOperationWithChecksumRequest
-     *        A {@link Consumer} that will call methods on {@link ChecksumStructureWithStreaming.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PutOperationWithChecksumRequest.Builder} to create a
      *        request.
      * @param requestBody
      *        Functional interface that can be implemented to produce the request content in a non-blocking manner. The
@@ -1295,7 +1357,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param putOperationWithChecksumRequest
-     *        A {@link Consumer} that will call methods on {@link ChecksumStructureWithStreaming.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.PutOperationWithChecksumRequest.Builder} to create a
      *        request.
      * @param sourcePath
      *        {@link Path} to file containing data to send to the service. File will be read entirely and may be read
@@ -1373,7 +1436,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingInputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StructureWithStreamingMember.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingInputOperationRequest.Builder} to create a
      *        request.
      * @param requestBody
      *        Functional interface that can be implemented to produce the request content in a non-blocking manner. The
@@ -1438,7 +1502,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingInputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StructureWithStreamingMember.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingInputOperationRequest.Builder} to create a
      *        request.
      * @param sourcePath
      *        {@link Path} to file containing data to send to the service. File will be read entirely and may be read
@@ -1509,8 +1574,9 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingInputOutputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StructureWithStreamingMember.Builder} to create a
-     *        request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingInputOutputOperationRequest.Builder} to create
+     *        a request.
      * @param requestBody
      *        Functional interface that can be implemented to produce the request content in a non-blocking manner. The
      *        size of the content is expected to be known up front. See {@link AsyncRequestBody} for specific details on
@@ -1587,8 +1653,9 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingInputOutputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StructureWithStreamingMember.Builder} to create a
-     *        request.
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingInputOutputOperationRequest.Builder} to create
+     *        a request.
      * @param sourcePath
      *        {@link Path} to file containing data to send to the service. File will be read entirely and may be read
      *        multiple times in the event of a retry. If the file does not exist or the current user does not have
@@ -1659,7 +1726,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingOutputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StreamingOutputOperationRequest.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingOutputOperationRequest.Builder} to create a
      *        request.
      * @param asyncResponseTransformer
      *        The response transformer for processing the streaming response in a non-blocking manner. See
@@ -1724,7 +1792,8 @@ public interface JsonAsyncClient extends SdkClient {
      * </p>
      *
      * @param streamingOutputOperationRequest
-     *        A {@link Consumer} that will call methods on {@link StreamingOutputOperationRequest.Builder} to create a
+     *        A {@link Consumer} that will call methods on
+     *        {@link software.amazon.awssdk.services.json.model.StreamingOutputOperationRequest.Builder} to create a
      *        request.
      * @param destinationPath
      *        {@link Path} to file that response contents will be written to. The file must not exist or this method
@@ -1751,11 +1820,25 @@ public interface JsonAsyncClient extends SdkClient {
                                                                        .build(), destinationPath);
     }
 
-    /**
-     * Creates an instance of {@link JsonUtilities} object with the configuration set on this client.
-     */
-    default JsonUtilities utilities() {
+    @Override
+    default JsonServiceClientConfiguration serviceClientConfiguration() {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Create a {@link JsonAsyncClient} with the region loaded from the
+     * {@link software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain} and credentials loaded from the
+     * {@link software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider}.
+     */
+    static JsonAsyncClient create() {
+        return builder().build();
+    }
+
+    /**
+     * Create a builder that can be used to configure and create a {@link JsonAsyncClient}.
+     */
+    static JsonAsyncClientBuilder builder() {
+        return new DefaultJsonAsyncClientBuilder();
     }
 
     /**

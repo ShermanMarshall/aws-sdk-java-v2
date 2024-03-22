@@ -117,13 +117,15 @@ public final class ProfileFile {
      */
     public Map<String, Profile> profiles() {
         Map<String, Profile> profileMap = profilesAndSectionsMap.get(PROFILES_SECTION_TITLE);
-        return profileMap != null ? Collections.unmodifiableMap(profileMap) : profileMap;
+        return profileMap != null ? Collections.unmodifiableMap(profileMap) : Collections.emptyMap();
     }
 
     @Override
     public String toString() {
+        Map<String, Profile> profiles = profilesAndSectionsMap.get(PROFILES_SECTION_TITLE);
         return ToString.builder("ProfileFile")
-                       .add("profilesAndSectionsMap", profilesAndSectionsMap.values())
+                       .add("sections", profilesAndSectionsMap.keySet())
+                       .add("profiles", profiles == null ? null : profiles.values())
                        .build();
     }
 
@@ -273,7 +275,7 @@ public final class ProfileFile {
         @Override
         public Builder content(Path contentLocation) {
             Validate.paramNotNull(contentLocation, "profileLocation");
-            Validate.validState(contentLocation.toFile().exists(), "Profile file '%s' does not exist.", contentLocation);
+            Validate.validState(Files.exists(contentLocation), "Profile file '%s' does not exist.", contentLocation);
 
             this.content = null;
             this.contentLocation = contentLocation;

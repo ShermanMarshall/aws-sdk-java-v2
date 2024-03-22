@@ -588,7 +588,8 @@
       "type":"string",
       "enum":[
         "ACTIVE",
-        "RETIRING"
+        "RETIRING",
+        "ISOLATED"
       ]
     },
     "AssetType":{
@@ -740,6 +741,10 @@
         "State":{
           "shape":"ComputeAssetState",
           "documentation":"<p>The state.</p> <ul> <li> <p>ACTIVE - The asset is available and can provide capacity for new compute resources.</p> </li> <li> <p>ISOLATED - The asset is undergoing maintenance and can't provide capacity for new compute resources. Existing compute resources on the asset are not affected.</p> </li> <li> <p>RETIRING - The underlying hardware for the asset is degraded. Capacity for new compute resources is reduced. Amazon Web Services sends notifications for resources that must be stopped before the asset can be replaced.</p> </li> </ul>"
+        },
+        "InstanceFamilies":{
+          "shape":"InstanceFamilies",
+          "documentation":"<p>A list of the names of instance families that are currently associated with a given asset.</p>"
         }
       },
       "documentation":"<p> Information about compute hardware assets. </p>"
@@ -1190,6 +1195,16 @@
       "member":{"shape":"HostId"}
     },
     "ISO8601Timestamp":{"type":"timestamp"},
+    "InstanceFamilies":{
+      "type":"list",
+      "member":{"shape":"InstanceFamilyName"}
+    },
+    "InstanceFamilyName":{
+      "type":"string",
+      "max":200,
+      "min":1,
+      "pattern":"^(?:.{1,200}/)?(?:[a-z0-9-_A-Z])+$"
+    },
     "InstanceType":{
       "type":"string",
       "documentation":"<p>The instance type.</p>"
@@ -1233,7 +1248,7 @@
       "members":{
         "CatalogItemId":{
           "shape":"SkuCode",
-          "documentation":"<p> The ID of the catalog item. </p>"
+          "documentation":"<p> The ID of the catalog item.</p>"
         },
         "LineItemId":{
           "shape":"LineItemId",
@@ -1254,6 +1269,14 @@
         "AssetInformationList":{
           "shape":"LineItemAssetInformationList",
           "documentation":"<p> Information about assets. </p>"
+        },
+        "PreviousLineItemId":{
+          "shape":"LineItemId",
+          "documentation":"<p>The ID of the previous line item.</p>"
+        },
+        "PreviousOrderId":{
+          "shape":"OrderId",
+          "documentation":"<p>The ID of the previous order.</p>"
         }
       },
       "documentation":"<p>Information about a line item.</p>"
@@ -1286,7 +1309,6 @@
     },
     "LineItemQuantity":{
       "type":"integer",
-      "max":20,
       "min":1
     },
     "LineItemRequest":{
@@ -1319,7 +1341,8 @@
         "INSTALLING",
         "INSTALLED",
         "ERROR",
-        "CANCELLED"
+        "CANCELLED",
+        "REPLACED"
       ]
     },
     "LineItemStatusCounts":{
@@ -1642,6 +1665,14 @@
         "OrderFulfilledDate":{
           "shape":"ISO8601Timestamp",
           "documentation":"<p>The fulfillment date of the order.</p>"
+        },
+        "PaymentTerm":{
+          "shape":"PaymentTerm",
+          "documentation":"<p>The payment term.</p>"
+        },
+        "OrderType":{
+          "shape":"OrderType",
+          "documentation":"<p>The type of order.</p>"
         }
       },
       "documentation":"<p>Information about an order.</p>"
@@ -1680,7 +1711,7 @@
         },
         "OrderType":{
           "shape":"OrderType",
-          "documentation":"<p> The type of order. </p>"
+          "documentation":"<p>The type of order.</p>"
         },
         "Status":{
           "shape":"OrderStatus",
@@ -2016,7 +2047,6 @@
     "StartConnectionRequest":{
       "type":"structure",
       "required":[
-        "DeviceSerialNumber",
         "AssetId",
         "ClientPublicKey",
         "NetworkInterfaceDeviceIndex"
@@ -2066,7 +2096,7 @@
     "StatusList":{
       "type":"list",
       "member":{"shape":"AssetState"},
-      "max":2,
+      "max":3,
       "min":1
     },
     "String":{
@@ -2149,7 +2179,7 @@
     "Token":{
       "type":"string",
       "documentation":"<p>The pagination token.</p>",
-      "max":1005,
+      "max":2048,
       "min":1,
       "pattern":"^(\\d+)##(\\S+)$"
     },

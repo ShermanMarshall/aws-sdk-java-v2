@@ -17,13 +17,13 @@ package software.amazon.awssdk.http.crt.internal;
 
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.crt.http.HttpClientConnectionManager;
-import software.amazon.awssdk.http.async.AsyncExecuteRequest;
+import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.metrics.MetricCollector;
 
 @SdkInternalApi
 public final class CrtRequestContext {
-    private final AsyncExecuteRequest request;
-    private final int readBufferSize;
+    private final HttpExecuteRequest request;
+    private final long readBufferSize;
     private final HttpClientConnectionManager crtConnPool;
     private final MetricCollector metricCollector;
 
@@ -38,11 +38,11 @@ public final class CrtRequestContext {
         return new Builder();
     }
 
-    public AsyncExecuteRequest sdkRequest() {
+    public HttpExecuteRequest sdkRequest() {
         return request;
     }
 
-    public int readBufferSize() {
+    public long readBufferSize() {
         return readBufferSize;
     }
 
@@ -54,20 +54,20 @@ public final class CrtRequestContext {
         return metricCollector;
     }
 
-    public static class Builder {
-        private AsyncExecuteRequest request;
-        private int readBufferSize;
+    public static final class Builder {
+        private HttpExecuteRequest request;
+        private long readBufferSize;
         private HttpClientConnectionManager crtConnPool;
 
         private Builder() {
         }
 
-        public Builder request(AsyncExecuteRequest request) {
+        public Builder request(HttpExecuteRequest request) {
             this.request = request;
             return this;
         }
 
-        public Builder readBufferSize(int readBufferSize) {
+        public Builder readBufferSize(long readBufferSize) {
             this.readBufferSize = readBufferSize;
             return this;
         }

@@ -26,6 +26,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static software.amazon.awssdk.auth.signer.S3SignerExecutionAttribute.ENABLE_CHUNKED_ENCODING;
 import static software.amazon.awssdk.http.Header.CONTENT_LENGTH;
 import static software.amazon.awssdk.http.Header.CONTENT_TYPE;
 
@@ -34,21 +35,14 @@ import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.HttpChecksumConstant;
-import software.amazon.awssdk.core.checksums.Algorithm;
-import software.amazon.awssdk.core.checksums.SdkChecksum;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.http.ContentStreamProvider;
@@ -71,8 +65,13 @@ public class SyncHttpChecksumInTrailerTest {
                                        .credentialsProvider(AnonymousCredentialsProvider.create())
                                        .region(Region.US_EAST_1)
                                        .endpointOverride(URI.create("http://localhost:" + wireMock.port()))
+                                       // TODO(sra-identity-and-auth): we should remove these
+                                       //  overrides once we set up codegen to set chunk-encoding to true
+                                       //  for requests that are streaming and checksum-enabled
+                                       .overrideConfiguration(c -> c.putExecutionAttribute(
+                                           ENABLE_CHUNKED_ENCODING, true
+                                       ))
                                        .build();
-
     }
 
     @Test
@@ -86,6 +85,26 @@ public class SyncHttpChecksumInTrailerTest {
         verify(putRequestedFor(anyUrl()).withHeader("x-amz-content-sha256", equalTo("STREAMING-UNSIGNED-PAYLOAD-TRAILER")));
         verify(putRequestedFor(anyUrl()).withHeader("x-amz-decoded-content-length", equalTo("11")));
         verify(putRequestedFor(anyUrl()).withHeader("Content-Encoding", equalTo("aws-chunked")));
+        //b is hex value of 11.
+        verify(putRequestedFor(anyUrl()).withRequestBody(
+            containing(
+                "b" + CRLF + "Hello world" + CRLF
+                + "0" + CRLF
+                + "x-amz-checksum-crc32:i9aeUg==" + CRLF + CRLF)));
+    }
+
+    @Test
+    public void sync_streaming_NoSigner_appends_trailer_checksum_withContentEncodingSetByUser() {
+        stubResponseWithHeaders();
+
+
+        client.putOperationWithChecksum(r ->
+            r.checksumAlgorithm(ChecksumAlgorithm.CRC32)
+                                            .contentEncoding("deflate"),
+                                        RequestBody.fromString("Hello world"),
+                                        ResponseTransformer.toBytes());
+        verify(putRequestedFor(anyUrl()).withHeader("Content-Encoding", equalTo("aws-chunked")));
+        verify(putRequestedFor(anyUrl()).withHeader("Content-Encoding", equalTo("deflate")));
         //b is hex value of 11.
         verify(putRequestedFor(anyUrl()).withRequestBody(
             containing(

@@ -111,6 +111,15 @@
       "input":{"shape":"OperationWithExplicitPayloadBlobInput"},
       "output":{"shape":"OperationWithExplicitPayloadBlobInput"}
     },
+    "OperationWithExplicitPayloadString":{
+      "name":"OperationWithExplicitPayloadString",
+      "http":{
+        "method":"POST",
+        "requestUri":"/2016-03-11/operationWithExplicitPayloadString"
+      },
+      "input":{"shape":"OperationWithExplicitPayloadStringInput"},
+      "output":{"shape":"OperationWithExplicitPayloadStringInput"}
+    },
     "OperationWithExplicitPayloadStructure":{
       "name":"OperationWithExplicitPayloadStructure",
       "http":{
@@ -569,6 +578,13 @@
       },
       "payload":"PayloadMember"
     },
+    "OperationWithExplicitPayloadStringInput":{
+      "type":"structure",
+      "members":{
+        "PayloadMember":{"shape":"String"}
+      },
+      "payload":"PayloadMember"
+    },
     "OperationWithExplicitPayloadStructureInput":{
       "type":"structure",
       "members":{
@@ -765,6 +781,11 @@
           "documentation":"<p>Object data.</p>",
           "streaming":true
         },
+        "ContentEncoding":{
+          "shape":"String",
+          "location":"header",
+          "locationName":"Content-Encoding"
+        },
         "ChecksumMode":{
           "shape":"ChecksumMode",
           "location":"header",
@@ -787,6 +808,11 @@
           "shape":"ChecksumMode",
           "location":"header",
           "locationName":"x-amz-checksum-mode"
+        },
+        "ContentEncoding":{
+          "shape":"String",
+          "location":"header",
+          "locationName":"Content-Encoding"
         },
         "ChecksumAlgorithm":{
           "shape":"ChecksumAlgorithm",

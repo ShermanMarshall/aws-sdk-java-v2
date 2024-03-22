@@ -94,7 +94,8 @@
         "MapOfEnumToEnum":{"shape":"MapOfEnumToEnum"},
         "ListOfTimeStamp":{"shape":"ListOfTimeStamp"},
         "MapOfTimeStamp":{"shape":"MapOfTimeStamp"},
-        "MyDocument":{"shape":"MyDocument"}
+        "MyDocument":{"shape":"MyDocument"},
+        "UnionMember":{"shape":"AllTypesUnionStructure"}
       }
     },
     "BaseType":{
@@ -168,6 +169,10 @@
     "IsoTimestamp":{
       "type":"timestamp",
       "timestampFormat":"iso8601"
+    },
+    "UnixTimestamp":{
+      "type":"timestamp",
+      "timestampFormat":"unixTimestamp"
     },
     "ListOfAllTypesStructs":{
       "type":"list",
@@ -300,16 +305,103 @@
     "Timestamp":{"type":"timestamp"},
     "ListOfTimeStamp":{
       "type":"list",
-      "member":{"shape":"Timestamp"}
+      "member":{"shape":"UnixTimestamp"}
     },
     "MapOfTimeStamp":{
       "type":"map",
       "key":{"shape":"String"},
-      "value":{"shape":"Timestamp"}
+      "value":{"shape":"UnixTimestamp"}
     },
     "MyDocument": {
       "type": "structure",
       "document": true
+    },
+    "AllTypesUnionStructure": {
+      "type": "structure",
+      "union": true,
+      "members": {
+        "StringMember": {
+          "shape": "String"
+        },
+        "IntegerMember": {
+          "shape": "Integer"
+        },
+        "BooleanMember": {
+          "shape": "Boolean"
+        },
+        "FloatMember": {
+          "shape": "Float"
+        },
+        "DoubleMember": {
+          "shape": "Double"
+        },
+        "LongMember": {
+          "shape": "Long"
+        },
+        "ShortMember": {
+          "shape": "Short"
+        },
+        "EnumMember": {
+          "shape": "EnumType"
+        },
+        "SimpleList": {
+          "shape": "ListOfStrings"
+        },
+        "ListOfEnums": {
+          "shape": "ListOfEnums"
+        },
+        "ListOfMaps": {
+          "shape": "ListOfMapStringToString"
+        },
+        "ListOfStructs": {
+          "shape": "ListOfSimpleStructs"
+        },
+        "MapOfStringToIntegerList": {
+          "shape": "MapOfStringToIntegerList"
+        },
+        "MapOfStringToString": {
+          "shape": "MapOfStringToString"
+        },
+        "MapOfStringToStruct": {
+          "shape": "MapOfStringToSimpleStruct"
+        },
+        "MapOfEnumToEnum": {
+          "shape": "MapOfEnumToEnum"
+        },
+        "TimestampMember": {
+          "shape": "Timestamp"
+        },
+        "StructWithNestedTimestampMember": {
+          "shape": "StructWithTimestamp"
+        },
+        "BlobArg": {
+          "shape": "BlobType"
+        },
+        "StructWithNestedBlob": {
+          "shape": "StructWithNestedBlobType"
+        },
+        "BlobMap": {
+          "shape": "BlobMapType"
+        },
+        "ListOfBlobs": {
+          "shape": "ListOfBlobsType"
+        },
+        "RecursiveStruct": {
+          "shape": "RecursiveStructType"
+        },
+        "PolymorphicTypeWithSubTypes": {
+          "shape": "BaseType"
+        },
+        "PolymorphicTypeWithoutSubTypes": {
+          "shape": "SubTypeOne"
+        },
+        "SetPrefixedMember": {
+          "shape": "String"
+        },
+        "UnionMember": {
+          "shape": "AllTypesUnionStructure"
+        }
+      }
     }
   }
 }

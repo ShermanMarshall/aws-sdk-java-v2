@@ -22,7 +22,7 @@ import software.amazon.awssdk.codegen.emitters.GeneratorTask;
 import software.amazon.awssdk.codegen.emitters.GeneratorTaskParams;
 import software.amazon.awssdk.codegen.poet.builder.SyncClientBuilderClass;
 import software.amazon.awssdk.codegen.poet.builder.SyncClientBuilderInterface;
-import software.amazon.awssdk.codegen.poet.client.ClientSimpleMethodsIntegrationTests;
+import software.amazon.awssdk.codegen.poet.client.DelegatingSyncClientClass;
 import software.amazon.awssdk.codegen.poet.client.SyncClientClass;
 import software.amazon.awssdk.codegen.poet.client.SyncClientInterface;
 import software.amazon.awssdk.codegen.poet.endpointdiscovery.EndpointDiscoveryCacheLoaderGenerator;
@@ -47,17 +47,21 @@ public class SyncClientGeneratorTasks extends BaseGeneratorTasks {
         tasks.add(createClientBuilderTask());
         tasks.add(createClientInterfaceTask());
         tasks.add(createClientBuilderInterfaceTask());
-        if (!model.simpleMethodsRequiringTesting().isEmpty()) {
-            tasks.add(createClientSimpleMethodsTest());
-        }
         if (model.getEndpointOperation().isPresent()) {
             tasks.add(createEndpointDiscoveryCacheLoaderTask());
+        }
+        if (model.getCustomizationConfig().isDelegateSyncClientClass()) {
+            tasks.add(createDecoratorClientClassTask());
         }
         return tasks;
     }
 
     private GeneratorTask createClientClassTask() throws IOException {
         return createPoetGeneratorTask(new SyncClientClass(generatorTaskParams));
+    }
+
+    private GeneratorTask createDecoratorClientClassTask() throws IOException {
+        return createPoetGeneratorTask(new DelegatingSyncClientClass(model));
     }
 
     private GeneratorTask createClientBuilderTask() throws IOException {
@@ -70,10 +74,6 @@ public class SyncClientGeneratorTasks extends BaseGeneratorTasks {
 
     private GeneratorTask createClientBuilderInterfaceTask() throws IOException {
         return createPoetGeneratorTask(new SyncClientBuilderInterface(model));
-    }
-
-    private GeneratorTask createClientSimpleMethodsTest() throws IOException {
-        return createPoetGeneratorTestTask(new ClientSimpleMethodsIntegrationTests(model));
     }
 
     private GeneratorTask createEndpointDiscoveryCacheLoaderTask() throws IOException {

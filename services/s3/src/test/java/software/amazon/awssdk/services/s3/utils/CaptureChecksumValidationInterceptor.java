@@ -23,10 +23,18 @@ import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
 
 public class CaptureChecksumValidationInterceptor implements ExecutionInterceptor {
-    private   Algorithm validationAlgorithm;
-    private  ChecksumValidation responseValidation;
-    private  String requestChecksumInTrailer;
-    private  String requestChecksumInHeader;
+    private Algorithm validationAlgorithm;
+    private ChecksumValidation responseValidation;
+    private String requestChecksumInTrailer;
+    private String requestChecksumInHeader;
+    private String requestTransferEncodingHeader;
+    private String responseTransferEncodingHeader;
+    private String responseFlexibleChecksumHeader;
+    private String contentEncoding;
+
+    public String contentEncoding() {
+        return contentEncoding;
+    }
 
     public Algorithm validationAlgorithm() {
         return validationAlgorithm;
@@ -43,12 +51,27 @@ public class CaptureChecksumValidationInterceptor implements ExecutionIntercepto
     public String requestChecksumInHeader() {
         return requestChecksumInHeader;
     }
+
+    public String requestTransferEncodingHeader() {
+        return requestTransferEncodingHeader;
+    }
+
+    public String responseTransferEncodingHeader() {
+        return responseTransferEncodingHeader;
+    }
+
+    public String responseFlexibleChecksumHeader() {
+        return responseFlexibleChecksumHeader;
+    }
+
     public void reset() {
         validationAlgorithm = null;
         responseValidation = null;
         requestChecksumInTrailer = null;
         requestChecksumInHeader = null;
-
+        requestTransferEncodingHeader = null;
+        responseTransferEncodingHeader = null;
+        responseFlexibleChecksumHeader = null;
     }
 
     @Override
@@ -56,7 +79,10 @@ public class CaptureChecksumValidationInterceptor implements ExecutionIntercepto
         requestChecksumInTrailer =
             context.httpRequest().firstMatchingHeader("x-amz-trailer").orElse(null);
         requestChecksumInHeader =
-            context.httpRequest().firstMatchingHeader("x-amz-checksum-crc32").orElse(null);}
+            context.httpRequest().firstMatchingHeader("x-amz-checksum-crc32").orElse(null);
+        requestTransferEncodingHeader =
+            context.httpRequest().firstMatchingHeader("x-amz-te").orElse(null);
+    }
 
     @Override
     public void afterExecution(Context.AfterExecution context, ExecutionAttributes executionAttributes) {
@@ -64,6 +90,11 @@ public class CaptureChecksumValidationInterceptor implements ExecutionIntercepto
             executionAttributes.getOptionalAttribute(SdkExecutionAttribute.HTTP_CHECKSUM_VALIDATION_ALGORITHM).orElse(null);
         responseValidation =
             executionAttributes.getOptionalAttribute(SdkExecutionAttribute.HTTP_RESPONSE_CHECKSUM_VALIDATION).orElse(null);
+        contentEncoding = String.join(",", context.httpRequest().matchingHeaders("content-encoding"));
+        responseTransferEncodingHeader =
+            context.httpResponse().firstMatchingHeader("x-amz-transfer-encoding").orElse(null);
+        responseFlexibleChecksumHeader =
+            context.httpResponse().firstMatchingHeader("x-amz-checksum-crc32").orElse(null);
     }
 
     @Override

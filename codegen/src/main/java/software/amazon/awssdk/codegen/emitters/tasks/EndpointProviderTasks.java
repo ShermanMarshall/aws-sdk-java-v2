@@ -27,7 +27,6 @@ import software.amazon.awssdk.codegen.model.config.customization.CustomizationCo
 import software.amazon.awssdk.codegen.model.service.ClientContextParam;
 import software.amazon.awssdk.codegen.poet.rules.ClientContextParamsClassSpec;
 import software.amazon.awssdk.codegen.poet.rules.DefaultPartitionDataProviderSpec;
-import software.amazon.awssdk.codegen.poet.rules.EndpointAuthSchemeInterceptorClassSpec;
 import software.amazon.awssdk.codegen.poet.rules.EndpointParametersClassSpec;
 import software.amazon.awssdk.codegen.poet.rules.EndpointProviderInterfaceSpec;
 import software.amazon.awssdk.codegen.poet.rules.EndpointProviderSpec;
@@ -35,6 +34,7 @@ import software.amazon.awssdk.codegen.poet.rules.EndpointProviderTestSpec;
 import software.amazon.awssdk.codegen.poet.rules.EndpointResolverInterceptorSpec;
 import software.amazon.awssdk.codegen.poet.rules.EndpointRulesClientTestSpec;
 import software.amazon.awssdk.codegen.poet.rules.RequestEndpointInterceptorSpec;
+import software.amazon.awssdk.codegen.poet.rules2.EndpointProviderSpec2;
 
 public final class EndpointProviderTasks extends BaseGeneratorTasks {
     private final GeneratorTaskParams generatorTaskParams;
@@ -49,16 +49,24 @@ public final class EndpointProviderTasks extends BaseGeneratorTasks {
         List<GeneratorTask> tasks = new ArrayList<>();
         tasks.add(generateInterface());
         tasks.add(generateParams());
-        tasks.add(generateDefaultProvider());
+        if (shouldGenerateCompiledEndpointRules()) {
+            tasks.add(generateDefaultProvider2());
+            tasks.add(new RulesEngineRuntimeGeneratorTask(generatorTaskParams));
+            tasks.add(new RulesEngineRuntimeGeneratorTask2(generatorTaskParams));
+        } else {
+            tasks.add(generateDefaultProvider());
+            tasks.add(new RulesEngineRuntimeGeneratorTask(generatorTaskParams));
+        }
         tasks.addAll(generateInterceptors());
         if (shouldGenerateEndpointTests()) {
-            tasks.add(generateClientTests());
             tasks.add(generateProviderTests());
+        }
+        if (shouldGenerateEndpointTests() && shouldGenerateClientEndpointTests()) {
+            tasks.add(generateClientTests());
         }
         if (hasClientContextParams()) {
             tasks.add(generateClientContextParams());
         }
-        tasks.add(new RulesEngineRuntimeGeneratorTask(generatorTaskParams));
         tasks.add(generateDefaultPartitionsProvider());
         return tasks;
     }
@@ -75,17 +83,24 @@ public final class EndpointProviderTasks extends BaseGeneratorTasks {
         return new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(), new EndpointProviderSpec(model));
     }
 
+    private GeneratorTask generateDefaultProvider2() {
+        return new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(), new EndpointProviderSpec2(model));
+    }
+
     private GeneratorTask generateDefaultPartitionsProvider() {
         return new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(),
                                      new DefaultPartitionDataProviderSpec(model));
     }
 
+    private boolean shouldGenerateCompiledEndpointRules() {
+        CustomizationConfig customizationConfig = generatorTaskParams.getModel().getCustomizationConfig();
+        return customizationConfig.isEnableGenerateCompiledEndpointRules();
+    }
+
     private Collection<GeneratorTask> generateInterceptors() {
         return Arrays.asList(
             new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(), new EndpointResolverInterceptorSpec(model)),
-            new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(), new RequestEndpointInterceptorSpec(model)),
-            new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(),
-                                  new EndpointAuthSchemeInterceptorClassSpec(model)));
+            new PoetGeneratorTask(endpointRulesInternalDir(), model.getFileHeader(), new RequestEndpointInterceptorSpec(model)));
     }
 
     private GeneratorTask generateClientTests() {
@@ -118,9 +133,20 @@ public final class EndpointProviderTasks extends BaseGeneratorTasks {
                !generatorTaskParams.getModel().getEndpointTestSuiteModel().getTestCases().isEmpty();
     }
 
+    private boolean shouldGenerateClientEndpointTests() {
+        boolean generateEndpointClientTests = generatorTaskParams.getModel()
+                                                                 .getCustomizationConfig()
+                                                                 .isGenerateEndpointClientTests();
+        boolean someTestCasesHaveOperationInputs = model.getEndpointTestSuiteModel().getTestCases().stream()
+                                                        .anyMatch(t -> t.getOperationInputs() != null);
+        return generateEndpointClientTests || someTestCasesHaveOperationInputs;
+    }
+
     private boolean hasClientContextParams() {
         Map<String, ClientContextParam> clientContextParams = model.getClientContextParams();
-        return clientContextParams != null && !clientContextParams.isEmpty();
+        Map<String, ClientContextParam> customClientContextParams = model.getCustomizationConfig().getCustomClientContextParams();
+        return (clientContextParams != null && !clientContextParams.isEmpty()) ||
+               (customClientContextParams != null && !customClientContextParams.isEmpty());
     }
 
 }

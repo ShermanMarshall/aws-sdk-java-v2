@@ -71,6 +71,11 @@ public enum SdkSystemSetting implements SystemSetting {
     AWS_EC2_METADATA_DISABLED("aws.disableEc2Metadata", "false"),
 
     /**
+     * Whether to disable fallback to insecure EC2 Metadata instance service v1 on errors or timeouts.
+     */
+    AWS_EC2_METADATA_V1_DISABLED("aws.disableEc2MetadataV1", null),
+
+    /**
      * The EC2 instance metadata service endpoint.
      *
      * This allows a service running in EC2 to automatically load its credentials and region without needing to configure them
@@ -112,6 +117,13 @@ public enum SdkSystemSetting implements SystemSetting {
      * @see #AWS_CONTAINER_CREDENTIALS_FULL_URI
      */
     AWS_CONTAINER_AUTHORIZATION_TOKEN("aws.containerAuthorizationToken", null),
+
+    /**
+     * The absolute file path containing the authorization token in plain text to pass to a container metadata
+     * service, only used when {@link #AWS_CONTAINER_CREDENTIALS_FULL_URI} is specified.
+     * @see #AWS_CONTAINER_CREDENTIALS_FULL_URI
+     */
+    AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE("aws.containerAuthorizationTokenFile", null),
 
     /**
      * Explicitly identify the default synchronous HTTP implementation the SDK will use. Useful
@@ -156,6 +168,8 @@ public enum SdkSystemSetting implements SystemSetting {
      */
     AWS_S3_US_EAST_1_REGIONAL_ENDPOINT("aws.s3UseUsEast1RegionalEndpoint", null),
 
+    AWS_S3_DISABLE_EXPRESS_SESSION_AUTH("aws.disableS3ExpressAuth", null),
+
     /**
      * Which {@link RetryMode} to use for the default {@link RetryPolicy}, when one is not specified at the client level.
      */
@@ -183,6 +197,18 @@ public enum SdkSystemSetting implements SystemSetting {
      * Defines whether fips endpoints should be resolved during default endpoint resolution instead of non-fips endpoints.
      */
     AWS_USE_FIPS_ENDPOINT("aws.useFipsEndpoint", null),
+
+    /**
+     * Whether request compression is disabled for operations marked with the RequestCompression trait. The default value is
+     * false, i.e., request compression is enabled.
+     */
+    AWS_DISABLE_REQUEST_COMPRESSION("aws.disableRequestCompression", null),
+
+    /**
+     * Defines the minimum compression size in bytes, inclusive, for a request to be compressed. The default value is 10_240.
+     * The value must be non-negative and no greater than 10_485_760.
+     */
+    AWS_REQUEST_MIN_COMPRESSION_SIZE_BYTES("aws.requestMinCompressionSizeBytes", null),
 
     ;
 

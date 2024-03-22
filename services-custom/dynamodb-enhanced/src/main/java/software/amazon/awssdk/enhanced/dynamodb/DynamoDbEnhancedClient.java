@@ -17,6 +17,7 @@ package software.amazon.awssdk.enhanced.dynamodb;
 
 import java.util.List;
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
@@ -45,6 +46,7 @@ import software.amazon.awssdk.services.dynamodb.model.BatchGetItemRequest;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
@@ -269,7 +271,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
      * Retrieves multiple items from one or more tables in a single atomic transaction. TransactGetItem is a composite operation
-     * where the request contains a set of up to 25 get requests, each containing a table reference and a
+     * where the request contains a set of get requests, each containing a table reference and a
      * {@link GetItemEnhancedRequest}. The list of results correspond to the ordering of the request definitions; for example
      * the third addGetItem() call on the request builder will match the third result (index 2) of the result.
      * <p>
@@ -297,6 +299,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * MyItem item = results.get(3).getItem(secondItemTable);
      * }
      * </pre>
+     * See {@link DynamoDbClient#transactGetItems(Consumer)} to learn more about {@code TransactGetItems}.
      *
      * @param request A {@link TransactGetItemsEnhancedRequest} containing keys with table references.
      * @return a list of {@link Document} with the results.
@@ -307,7 +310,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
      * Retrieves multiple items from one or more tables in a single atomic transaction. TransactGetItem is a composite operation
-     * where the request contains a set of up to 25 get requests, each containing a table reference and a
+     * where the request contains a set of get requests, each containing a table reference and a
      * {@link GetItemEnhancedRequest}. The list of results correspond to the ordering of the request definitions; for example
      * the third addGetItem() call on the request builder will match the third result (index 2) of the result.
      * <p>
@@ -336,9 +339,12 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      * MyItem item = results.get(3).getItem(secondItemTable);
      * }
      * </pre>
+     * <p>
+     * See {@link DynamoDbClient#transactGetItems(Consumer)} to learn more about {@code TransactGetItems}.
      *
      * @param requestConsumer a {@link Consumer} of {@link TransactGetItemsEnhancedRequest} containing keys with table references.
      * @return a list of {@link Document} with the results.
+     *
      */
     default List<Document> transactGetItems(Consumer<TransactGetItemsEnhancedRequest.Builder> requestConsumer) {
         throw new UnsupportedOperationException();
@@ -346,7 +352,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
      * Writes and/or modifies multiple items from one or more tables in a single atomic transaction. TransactGetItem is a
-     * composite operation where the request contains a set of up to 25 action requests, each containing a table reference and
+     * composite operation where the request contains a set of action requests, each containing a table reference and
      * one of the following requests:
      * <ul>
      *     <li>Condition check of item - {@link ConditionCheck}</li>
@@ -384,6 +390,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      *                                      .build());
      * }
      * </pre>
+     * See {@link DynamoDbClient#transactWriteItems(Consumer)} to learn more about {@code TransactWriteItems}.
      *
      * @param request A {@link BatchWriteItemEnhancedRequest} containing keys grouped by tables.
      */
@@ -393,7 +400,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
 
     /**
      * Writes and/or modifies multiple items from one or more tables in a single atomic transaction. TransactGetItem is a
-     * composite operation where the request contains a set of up to 25 action requests, each containing a table reference and
+     * composite operation where the request contains a set of action requests, each containing a table reference and
      * one of the following requests:
      * <ul>
      *     <li>Condition check of item - {@link ConditionCheck}</li>
@@ -427,6 +434,7 @@ public interface DynamoDbEnhancedClient extends DynamoDbEnhancedResource {
      *                                                  .addUpdateItem(secondItemTable, i -> i.item(item4)));
      * }
      * </pre>
+     * See {@link DynamoDbClient#transactWriteItems(Consumer)} to learn more about {@code TransactWriteItems}.
      *
      * @param requestConsumer a {@link Consumer} of {@link TransactWriteItemsEnhancedRequest} containing keys and items grouped
      * by tables.

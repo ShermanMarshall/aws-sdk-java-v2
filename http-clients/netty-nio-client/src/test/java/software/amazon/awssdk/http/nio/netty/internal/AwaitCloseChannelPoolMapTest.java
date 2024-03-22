@@ -118,7 +118,7 @@ public class AwaitCloseChannelPoolMapTest {
         channelPoolMap = new AwaitCloseChannelPoolMap(builder, null, bootstrapProvider);
         channelPoolMap.get(targetUri);
 
-        verify(bootstrapProvider).createBootstrap("some-awesome-service-1234.amazonaws.com", 8080);
+        verify(bootstrapProvider).createBootstrap("some-awesome-service-1234.amazonaws.com", 8080, null);
     }
 
     @Test
@@ -151,7 +151,7 @@ public class AwaitCloseChannelPoolMapTest {
         channelPoolMap = new AwaitCloseChannelPoolMap(builder, shouldProxyCache, bootstrapProvider);
         channelPoolMap.get(targetUri);
 
-        verify(bootstrapProvider).createBootstrap("localhost", mockProxy.port());
+        verify(bootstrapProvider).createBootstrap("localhost", mockProxy.port(), null);
     }
 
     @Test
@@ -266,6 +266,44 @@ public class AwaitCloseChannelPoolMapTest {
         ChannelPool channelPool = channelPoolMap.newPool(URI.create("https://localhost:" + mockProxy.port()));
         channelPool.acquire().awaitUninterruptibly();
         verify(provider).keyManagers();
+    }
+
+    @Test
+    public void acquireChannel_autoReadDisabled() {
+        channelPoolMap = AwaitCloseChannelPoolMap.builder()
+                                                 .sdkChannelOptions(new SdkChannelOptions())
+                                                 .sdkEventLoopGroup(SdkEventLoopGroup.builder().build())
+                                                 .configuration(new NettyConfiguration(GLOBAL_HTTP_DEFAULTS))
+                                                 .protocol(Protocol.HTTP1_1)
+                                                 .maxStreams(100)
+                                                 .sslProvider(SslProvider.OPENSSL)
+                                                 .build();
+
+        ChannelPool channelPool = channelPoolMap.newPool(URI.create("https://localhost:" + mockProxy.port()));
+
+        Channel channel = channelPool.acquire().awaitUninterruptibly().getNow();
+
+        assertThat(channel.config().isAutoRead()).isFalse();
+    }
+
+    @Test
+    public void releaseChannel_autoReadEnabled() {
+        channelPoolMap = AwaitCloseChannelPoolMap.builder()
+                                                 .sdkChannelOptions(new SdkChannelOptions())
+                                                 .sdkEventLoopGroup(SdkEventLoopGroup.builder().build())
+                                                 .configuration(new NettyConfiguration(GLOBAL_HTTP_DEFAULTS))
+                                                 .protocol(Protocol.HTTP1_1)
+                                                 .maxStreams(100)
+                                                 .sslProvider(SslProvider.OPENSSL)
+                                                 .build();
+
+        ChannelPool channelPool = channelPoolMap.newPool(URI.create("https://localhost:" + mockProxy.port()));
+
+        Channel channel = channelPool.acquire().awaitUninterruptibly().getNow();
+
+        channelPool.release(channel).awaitUninterruptibly();
+
+        assertThat(channel.config().isAutoRead()).isTrue();
     }
 
 }
